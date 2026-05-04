@@ -1,0 +1,2509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>GestionProp v2.7</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0F172A;color:#F1F5F9;font-family:"Segoe UI",system-ui,sans-serif;min-height:100vh;font-size:14px}
+input,select,textarea,button{font-family:inherit;font-size:14px}
+.card{background:#1E293B;border-radius:14px;padding:16px;border:1px solid #334155;margin-bottom:8px}
+.btn{border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;border:none;font-size:13px;display:inline-flex;align-items:center;gap:4px}
+.bp{background:#3B82F6;color:#fff}.bok{background:#10B981;color:#fff}.bx{background:#EF4444;color:#fff}
+.bg{background:transparent;color:#94A3B8;border:1px solid #334155}.bpu{background:#8B5CF6;color:#fff}.bw{background:#F59E0B;color:#000}
+.bsm{padding:4px 10px;font-size:11px}
+.inp{background:#0F172A;border:1px solid #334155;border-radius:8px;padding:8px 11px;color:#F1F5F9;width:100%;outline:none}
+.lbl{color:#94A3B8;font-size:11px;font-weight:600;display:block;margin-bottom:3px}
+.fld{margin-bottom:8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.bdg{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}
+.nb{background:transparent;border:none;color:#94A3B8;padding:4px 7px;border-radius:7px;cursor:pointer;font-size:10px;font-weight:500}
+.nb.on{background:#3B82F611;color:#3B82F6;font-weight:700}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto}
+.md{background:#1E293B;border-radius:16px;padding:20px;width:100%;max-width:560px;margin:16px auto;border:1px solid #334155}
+.mdw{max-width:780px}
+.sc{background:#1E293B;border-radius:12px;padding:14px;border:1px solid #334155}
+.wa{background:#25D366;color:#fff;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;text-decoration:none;display:inline-block}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{background:#0F172A;color:#94A3B8;font-weight:600;padding:7px 10px;text-align:left;font-size:11px;border-bottom:1px solid #334155}
+.tbl td{padding:7px 10px;border-bottom:1px solid #1E293B;color:#CBD5E1}
+.wbx{background:#F59E0B11;border-left:3px solid #F59E0B;border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#FCD34D;margin-bottom:10px}
+.ibox{background:#3B82F611;border-left:3px solid #3B82F6;border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#93C5FD;margin-bottom:10px}
+.spin{display:inline-block;width:32px;height:32px;border:3px solid #334155;border-top-color:#3B82F6;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app" style="min-height:100vh;display:flex;align-items:center;justify-content:center">
+<div style="text-align:center"><div class="spin"></div><p style="color:#64748B;margin-top:12px;font-size:12px">Conectando...</p></div>
+</div>
+<script>
+firebase.initializeApp({apiKey:"AIzaSyDhuSP_WTWI3hqf5GqgFExkptFfpqJUn50",authDomain:"gestion-prop.firebaseapp.com",databaseURL:"https://gestion-prop-default-rtdb.firebaseio.com",projectId:"gestion-prop"});
+var DB=firebase.database();
+function dbP(p,v){return DB.ref(p).push(v);}
+function dbU(p,v){return DB.ref(p).update(v);}
+function dbD(p){return DB.ref(p).remove();}
+function oA(o){if(!o)return[];return Object.keys(o).map(function(k){var v=Object.assign({},o[k]);v._key=k;return v;});}
+
+var USUARIOS=[
+  {n:"Admin",u:"admin",p:"admin123",r:"admin"},
+  {n:"Loli",u:"loli",p:"loli123",r:"empleado"},
+  {n:"Hugo",u:"hugo",p:"hugo123",r:"empleado"},
+  {n:"Cris",u:"cris",p:"cris123",r:"empleado"}
+];
+var ED={
+  R1:{n:"Rivadavia 4004",d:"Rivadavia 4004, Munro",u:12},
+  R2:{n:"Rivadavia 4009",d:"Rivadavia 4009, Munro",u:17},
+  BN:{n:"Belgrano 3194",d:"Belgrano 3194, Munro",u:9},
+  LT:{n:"Latorre 6217",d:"Latorre 6217, Villa Ballester",u:8},
+  SC:{n:"Sargento Cabral",d:"Sargento Cabral 1211, Villa Ballester",u:5},
+  WT:{n:"White 5155",d:"White 5155",u:9},
+  RC:{n:"Ramon Castro",d:"Ramon Castro 4505, Munro",u:12},
+  LP:{n:"Los Pilares",d:"Barrio Los Pilares",u:1},
+  OT:{n:"Autos/Otros",d:"Alquiler vehiculos",u:1}
+};
+var COL={R1:"#3B82F6",R2:"#8B5CF6",BN:"#F59E0B",LT:"#84CC16",SC:"#06B6D4",WT:"#10B981",RC:"#EF4444",LP:"#F97316",OT:"#6B7280"};
+var CTAS=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+var CTAP=["Cuenta Loli","Cuenta Hugo"];
+var CATC={Tarjetas:"#8B5CF6",Sueldos:"#10B981",ARBA:"#EF4444",ARCA:"#F43F5E",Municipal:"#FB923C",Electricidad:"#F59E0B",Gas:"#F97316",Agua:"#06B6D4",Administrativo:"#64748B",Salud:"#EC4899",Personal:"#84CC16",Seguros:"#14B8A6","Gastos bancarios":"#6366F1",Cable:"#3B82F6",Internet:"#3B82F6"};
+var CF=[
+  {id:"cf01",d:"Mantenimiento",pv:"Personal",e:"General",c:"Sueldos",ct:"",dv:5},
+  {id:"cf02",d:"Administrativo",pv:"Personal",e:"General",c:"Sueldos",ct:"",dv:5},
+  {id:"cf03",d:"Patente Corolla",pv:"ARBA",e:"General",c:"ARBA",ct:"AF468SP",dv:15},
+  {id:"cf04",d:"Patente Ranger",pv:"ARBA",e:"General",c:"ARBA",ct:"ag394lj",dv:15},
+  {id:"cf05",d:"Contador Hugo",pv:"Contador",e:"General",c:"Administrativo",ct:"",dv:10},
+  {id:"cf06",d:"Contador Loli",pv:"Contador",e:"General",c:"Administrativo",ct:"",dv:10},
+  {id:"cf07",d:"Swiss Medical",pv:"Swiss Medical",e:"General",c:"Salud",ct:"",dv:10},
+  {id:"cf08",d:"Galeno",pv:"Galeno",e:"General",c:"Salud",ct:"",dv:10},
+  {id:"cf09",d:"ARBA Los Pilares",pv:"ARBA",e:"LP",c:"ARBA",ct:"084-185249",dv:15},
+  {id:"cf10",d:"BN WiFi",pv:"Fibertel",e:"BN",c:"Internet",ct:"81004004181100-8",dv:17},
+  {id:"cf11",d:"BN Cable",pv:"Cablevision",e:"BN",c:"Cable",ct:"81004004181100-9",dv:17},
+  {id:"cf12",d:"R1 Cable",pv:"Cablevision",e:"R1",c:"Cable",ct:"81004004181100-6",dv:17},
+  {id:"cf13",d:"R1 WiFi",pv:"Fibertel",e:"R1",c:"Internet",ct:"81004004181100-2",dv:17},
+  {id:"cf14",d:"R2 Cable",pv:"Cablevision",e:"R2",c:"Cable",ct:"81004004181100-3",dv:17},
+  {id:"cf15",d:"R2 WiFi",pv:"Fibertel",e:"R2",c:"Internet",ct:"81004004181100-4",dv:17},
+  {id:"cf16",d:"R2 Cable wifi",pv:"Cablevision",e:"R2",c:"Cable",ct:"81004004181100-7",dv:17},
+  {id:"cf17",d:"RC Cable wifi",pv:"Cablevision",e:"RC",c:"Cable",ct:"81004004181100-5",dv:17},
+  {id:"cf18",d:"WT Cable wifi",pv:"Cablevision",e:"WT",c:"Cable",ct:"81004004181100-0",dv:17},
+  {id:"cf19",d:"SC Cable wifi",pv:"Cablevision",e:"SC",c:"Cable",ct:"",dv:17},
+  {id:"cf20",d:"LT personal y flow",pv:"Flow",e:"LT",c:"Cable",ct:"100304739771000-5",dv:17},
+  {id:"cf21",d:"EDENOR SC",pv:"EDENOR",e:"SC",c:"Electricidad",ct:"1675713877",dv:15},
+  {id:"cf22",d:"EDENOR RC Panama",pv:"EDENOR",e:"RC",c:"Electricidad",ct:"6122449133",dv:15},
+  {id:"cf23",d:"EDENOR RC",pv:"EDENOR",e:"RC",c:"Electricidad",ct:"2753864187",dv:15},
+  {id:"cf24",d:"EDENOR R1",pv:"EDENOR",e:"R1",c:"Electricidad",ct:"174064S437",dv:15},
+  {id:"cf25",d:"EDENOR R2",pv:"EDENOR",e:"R2",c:"Electricidad",ct:"6914278698",dv:15},
+  {id:"cf26",d:"EDENOR BN",pv:"EDENOR",e:"BN",c:"Electricidad",ct:"1441920426",dv:15},
+  {id:"cf27",d:"EDENOR 1 WT",pv:"EDENOR",e:"WT",c:"Electricidad",ct:"3348321514",dv:15},
+  {id:"cf28",d:"EDENOR 2 WT Galpon",pv:"EDENOR",e:"WT",c:"Electricidad",ct:"2129892138",dv:15},
+  {id:"cf29",d:"EDENOR LT",pv:"EDENOR",e:"LT",c:"Electricidad",ct:"7616030669",dv:15},
+  {id:"cf30",d:"Naturgy WT",pv:"Naturgy",e:"WT",c:"Gas",ct:"416400/3",dv:15},
+  {id:"cf31",d:"Naturgy R1",pv:"Naturgy",e:"R1",c:"Gas",ct:"1564731/6",dv:15},
+  {id:"cf32",d:"Naturgy BN",pv:"Naturgy",e:"BN",c:"Gas",ct:"2531702/7",dv:15},
+  {id:"cf33",d:"Naturgy SC",pv:"Naturgy",e:"SC",c:"Gas",ct:"816834/9",dv:15},
+  {id:"cf34",d:"Naturgy LT",pv:"Naturgy",e:"LT",c:"Gas",ct:"817163/4",dv:15},
+  {id:"cf35",d:"AySA WT",pv:"AySA",e:"WT",c:"Agua",ct:"2239047",dv:15},
+  {id:"cf36",d:"AySA RC",pv:"AySA",e:"RC",c:"Agua",ct:"2250480",dv:15},
+  {id:"cf37",d:"AySA BN",pv:"AySA",e:"BN",c:"Agua",ct:"2007659",dv:15},
+  {id:"cf38",d:"AySA R2",pv:"AySA",e:"R2",c:"Agua",ct:"2250861",dv:15},
+  {id:"cf39",d:"AySA R1",pv:"AySA",e:"R1",c:"Agua",ct:"2242016",dv:15},
+  {id:"cf40",d:"AySA SC",pv:"AySA",e:"SC",c:"Agua",ct:"320245",dv:15},
+  {id:"cf41",d:"AySA LT",pv:"AySA",e:"LT",c:"Agua",ct:"",dv:15},
+  {id:"cf42",d:"Municipal WT",pv:"Municipalidad",e:"WT",c:"Municipal",ct:"530783",dv:15},
+  {id:"cf43",d:"Municipal BN",pv:"Municipalidad",e:"BN",c:"Municipal",ct:"551919",dv:15},
+  {id:"cf44",d:"Municipal RC",pv:"Municipalidad",e:"RC",c:"Municipal",ct:"650840",dv:15},
+  {id:"cf45",d:"Municipal R2",pv:"Municipalidad",e:"R2",c:"Municipal",ct:"533175",dv:15},
+  {id:"cf46",d:"Municipal R1",pv:"Municipalidad",e:"R1",c:"Municipal",ct:"530353",dv:15},
+  {id:"cf47",d:"Municipal LT",pv:"Municipalidad",e:"LT",c:"Municipal",ct:"205848",dv:15},
+  {id:"cf48",d:"Municipal SC",pv:"Municipalidad",e:"SC",c:"Municipal",ct:"30699",dv:15},
+  {id:"cf49",d:"ARBA SC",pv:"ARBA",e:"SC",c:"ARBA",ct:"047-090699-5",dv:15},
+  {id:"cf50",d:"ARBA WT",pv:"ARBA",e:"WT",c:"ARBA",ct:"110-060375-2",dv:15},
+  {id:"cf51",d:"ARBA R1",pv:"ARBA",e:"R1",c:"ARBA",ct:"110-102484-5",dv:15},
+  {id:"cf52",d:"ARBA R2",pv:"ARBA",e:"R2",c:"ARBA",ct:"110-060840-1",dv:15},
+  {id:"cf53",d:"ARBA RC",pv:"ARBA",e:"RC",c:"ARBA",ct:"110-025743-9",dv:15},
+  {id:"cf54",d:"ARBA BN",pv:"ARBA",e:"BN",c:"ARBA",ct:"110-004324-2",dv:15},
+  {id:"cf55",d:"ARBA LT",pv:"ARBA",e:"LT",c:"ARBA",ct:"047-091194-",dv:15},
+  {id:"cf56",d:"Arca vep cargas sociales",pv:"ARCA",e:"General",c:"ARCA",ct:"",dv:20},
+  {id:"cf57",d:"Arba Sellos Hugo",pv:"ARBA",e:"General",c:"ARBA",ct:"",dv:20},
+  {id:"cf58",d:"Arba Sellos Loli",pv:"ARBA",e:"General",c:"ARBA",ct:"",dv:20},
+  {id:"cf59",d:"Arba IIBB Hugo",pv:"ARBA",e:"General",c:"ARBA",ct:"",dv:20},
+  {id:"cf60",d:"Arba IIBB Loli",pv:"ARBA",e:"General",c:"ARBA",ct:"",dv:20},
+  {id:"cf61",d:"Arca anual bsps goias Loli",pv:"ARCA",e:"General",c:"ARCA",ct:"",dv:20},
+  {id:"cf62",d:"Arca anticipos goias y bs pers Loli",pv:"ARCA",e:"General",c:"ARCA",ct:"651202",dv:20},
+  {id:"cf63",d:"Arca anticipos goias y bs pers Hugo",pv:"ARCA",e:"General",c:"ARCA",ct:"",dv:20},
+  {id:"cf64",d:"Arca anual bs pers Hugo",pv:"ARCA",e:"General",c:"ARCA",ct:"",dv:20},
+  {id:"cf65",d:"Complementario Loli",pv:"Seguro",e:"General",c:"Seguros",ct:"",dv:20},
+  {id:"cf66",d:"Complementario Hugo",pv:"Seguro",e:"General",c:"Seguros",ct:"44787",dv:20},
+  {id:"cf67",d:"Gastos bancarios Loli",pv:"Banco",e:"General",c:"Gastos bancarios",ct:"",dv:28},
+  {id:"cf68",d:"Gastos bancarios Hugo",pv:"Banco",e:"General",c:"Gastos bancarios",ct:"",dv:28}
+];
+
+// helpers
+function ls(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lw(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function fmt(n){return "$"+Number(n||0).toLocaleString("es-AR");}
+function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
+function hoy(){return new Date().toISOString().split("T")[0];}
+function mes(){return new Date().toISOString().slice(0,7);}
+function fecDisp(s){
+  // Convert YYYY-MM-DD to DD/MM/YY for display
+  if(!s||s.length<10)return s||"--";
+  var p=s.split("-");
+  return p[2]+"/"+p[1]+"/"+p[0].slice(2);
+}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+var _nc=ls("gp_nc",2000);
+function nid(){_nc++;lw("gp_nc",_nc);return String(_nc).padStart(6,"0");}
+function G(id){return document.getElementById(id);}
+function uds(){var r=[];Object.keys(ED).forEach(function(c){for(var i=1;i<=ED[c].u;i++)r.push(c+"-"+i);});return r;}
+function pA(c){return c&&c.pagos?Object.values(c.pagos):[];}
+function pT(c){return pA(c).reduce(function(s,p){return s+p.monto;},0);}
+
+// HTML builders - ALL use double-quoted attributes, no mixing
+function H(tag,attrs,inner){var a=Object.keys(attrs).map(function(k){return k+'="'+attrs[k]+'"';}).join(" ");return "<"+tag+(a?" "+a:"")+">"+inner+"</"+tag+">";}
+function sc(ic,lb,val,sub,col){return "<div class='sc'><div style='font-size:18px'>"+ic+"</div><div style='color:#94A3B8;font-size:10px;font-weight:600;text-transform:uppercase;margin-top:4px'>"+lb+"</div><div style='font-size:20px;font-weight:800;color:"+(col||"#F1F5F9")+"'>"+val+"</div><div style='color:#64748B;font-size:10px'>"+(sub||"")+"</div></div>";}
+function bdg(t,c){return "<span class='bdg' style='background:"+c+"22;color:"+c+"'>"+esc(t)+"</span>";}
+function fld(id,lb,val,tp){return "<div class='fld'><label class='lbl'>"+lb+"</label><input class='inp' id='"+id+"' type='"+(tp||"text")+"' value='"+esc(val||"")+"'/></div>";}
+function sld(id,lb,opts,val){var o=opts.map(function(x){return "<option"+(x===val?" selected":"")+">"+x+"</option>";}).join("");return "<div class='fld'><label class='lbl'>"+lb+"</label><select class='inp' id='"+id+"'>"+o+"</select></div>";}
+function tad(id,lb,val){return "<div class='fld'><label class='lbl'>"+lb+"</label><textarea class='inp' id='"+id+"' style='min-height:70px'>"+esc(val||"")+"</textarea></div>";}
+
+// Key registry for onclick - avoids ALL quote escaping
+var KR=[];
+function kpush(v){KR.push(v);return KR.length-1;}
+function kget(i){return KR[i];}
+
+// Modal
+var MODS=[];
+function openModal(title,html,wide){
+  var d=document.createElement("div");
+  d.className="ov";
+  d.innerHTML="<div class='md"+(wide?" mdw":"")+"'><div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px'><h3 style='font-size:15px;font-weight:800'>"+esc(title)+"</h3><button class='btn bg bsm' onclick='closeModal()'>X</button></div>"+html+"</div>";
+  d.onclick=function(e){if(e.target===d)closeModal();};
+  document.body.appendChild(d);MODS.push(d);
+}
+function closeModal(){var d=MODS.pop();if(d)d.remove();}
+
+// State
+var USER=null,SEC="login";
+var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg"];
+
+// Base CF - never modified directly, overrides stored separately
+var CF_BASE = CF.map(function(c){return Object.assign({},c);});
+
+function getCF(){
+  // Start from base, apply overrides from Firebase
+  var result = CF_BASE.map(function(c){return Object.assign({},c);});
+  var overrides = oA(DATA.cfg).filter(function(x){return x.tipo==="cf_override";});
+  overrides.forEach(function(x){
+    if(x.activo===false){
+      // Mark as inactive
+      result = result.filter(function(c){return c.id!==x.cfid;});
+    } else {
+      result.forEach(function(c,i){if(c.id===x.cfid){result[i]=Object.assign({},c,x);}});
+    }
+  });
+  // Add custom costs (costo_extra) - deduplicated by _key
+  var extras = oA(DATA.cfg).filter(function(x){return (x.tipo==="otro_gasto"||x.tipo==="costo_extra"||x.tipo==="costo_fijo_extra")&&x.activo!==false;});
+  extras.forEach(function(x){
+    var already = result.filter(function(c){return c.id===x._key;}).length;
+    if(!already) result.push({id:x._key,d:x.desc,pv:x.pv||"",e:x.ed||"General",c:x.cat||"Otro",ct:x.cta_num||"",dv:x.dv||15});
+  });
+  return result;
+}
+
+function startDB(){
+  // Load any saved password changes from Firebase
+  DB.ref("usuarios").once("value",function(snap){
+    if(snap.exists()){
+      var overrides=snap.val();
+      USUARIOS.forEach(function(u){
+        if(overrides[u.u]&&overrides[u.u].clave){
+          u.p=overrides[u.u].clave;
+        }
+      });
+    }
+  });
+  DKEYS.forEach(function(k){
+    DB.ref(k).on("value",function(s){
+      DATA[k]=s.exists()?s.val():{};
+      render();
+    });
+  });
+}
+function stopDB(){DKEYS.forEach(function(k){DB.ref(k).off();});}
+
+function render(){
+  if(!USER){rLogin();return;}
+  rShell();
+  var fn={panel:rPanel,alertas:rAlertas,acuerdos:rAcuerdos,historial:rHistorial,cobranzas:rCob,costos:rCostos,caja:rCaja,stats:rStats,config:rConfig};
+  if(fn[SEC])fn[SEC]();
+}
+function go(s){SEC=s;render();}
+
+// LOGIN
+function rLogin(){
+  // First load password overrides from Firebase, then check saved login
+  DB.ref("usuarios").once("value",function(snap){
+    if(snap.exists()){
+      var ov=snap.val();
+      USUARIOS.forEach(function(u){if(ov[u.u]&&ov[u.u].clave)u.p=ov[u.u].clave;});
+    }
+    var saved=ls("gp_rem",null);
+    if(saved){var f=USUARIOS.filter(function(x){return x.u===saved.u&&x.p===saved.p;})[0];if(f){doLogin(f);return;}}
+    mostrarFormLogin();
+  });
+}
+function mostrarFormLogin(){
+  G("app").innerHTML="<div style='min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px'><div class='card' style='max-width:340px;width:100%;padding:28px'><div style='text-align:center;margin-bottom:22px'><div style='background:linear-gradient(135deg,#3B82F6,#8B5CF6);border-radius:12px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 10px'>GP</div><h1 style='font-size:20px;font-weight:800'>GestionProp</h1></div>"+fld("lu","Usuario")+fld("lp","Contrasena","","password")+"<label style='display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:#0F172A;border-radius:9px;border:1px solid #334155;margin-bottom:10px'><input type='checkbox' id='rem'/> <span style='font-size:12px'>Recordarme</span></label><div id='lerr' style='color:#EF4444;font-size:12px;margin-bottom:8px;display:none'>Usuario o clave incorrectos</div><button class='btn bp' onclick='tryLogin()' style='width:100%;padding:11px'>Ingresar</button></div></div>";
+  G("lp").onkeydown=function(e){if(e.key==="Enter")tryLogin();};
+}
+function tryLogin(){
+  var u=G("lu").value.trim(),p=G("lp").value;
+  var f=USUARIOS.filter(function(x){return x.u===u&&x.p===p;})[0];
+  if(f){
+    // Store only username for "remember me" - password loaded fresh from Firebase each time
+    if(G("rem")&&G("rem").checked) lw("gp_rem",{u:u,p:p});
+    else lw("gp_rem",null);
+    doLogin(f);
+  }
+  else G("lerr").style.display="block";
+}
+function doLogin(u){USER=u;SEC="alertas";startDB();}
+function logout(){lw("gp_rem",null);stopDB();USER=null;SEC="login";render();}
+
+// SHELL
+function rShell(){
+  var esA=USER.r==="admin";
+  var m=mes(),al=oA(DATA.cob).filter(function(c){return c.mes===m&&c.estado!=="pagado";}).length;
+  var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
+  var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).length;
+  var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["stats","Stats"],["config","Config"]];
+  var navE=[["alertas","Alertas"],["acuerdos","Acuerdos"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"]];
+  var nav=esA?navA:navE;
+  var nh=nav.map(function(n){
+    var s=n[0],lb=n[1];
+    var cls="nb"+(SEC===s?" on":"");
+    var ab=s==="cobranzas"&&al>0?"<span style='background:#EF4444;color:#fff;border-radius:8px;font-size:8px;padding:1px 4px;font-weight:800;margin-left:2px'>"+al+"</span>":"";
+    return "<button class='"+cls+"' data-go='"+s+"'>"+lb+ab+"</button>";
+  }).join("");
+  G("app").innerHTML="<div style='min-height:100vh'><div style='background:#1E293B;border-bottom:1px solid #334155;padding:0 10px;position:sticky;top:0;z-index:100'><div style='max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:46px;gap:6px'><div style='font-weight:800;color:#3B82F6;font-size:14px'>GP</div><nav style='display:flex;gap:1px;flex-wrap:wrap;justify-content:center;flex:1' id='nav'>"+nh+"</nav><div style='display:flex;align-items:center;gap:6px;flex-shrink:0'><div style='text-align:right'><div style='color:#F1F5F9;font-size:10px;font-weight:600'>"+USER.n+"</div><div style='font-size:9px;color:"+(esA?"#8B5CF6":"#10B981")+"'>"+act+"/"+totU+"</div></div><button class='btn bg bsm' onclick='logout()'>Salir</button></div></div></div><div id='main' style='max-width:1200px;margin:0 auto;padding:14px 12px'></div></div>";
+  // Event delegation for nav
+  G("nav").onclick=function(e){var b=e.target.closest("[data-go]");if(b)go(b.dataset.go);};
+}
+
+// PANEL
+function rPanel(){
+  var m=mes(),h=new Date();
+  var iqA=oA(DATA.iq),cobA=oA(DATA.cob),evA=oA(DATA.ev);
+  var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
+  var act=iqA.filter(function(i){return i.estado==="activo";}).length;
+  var cobrado=cobA.filter(function(c){return c.mes===m;}).reduce(function(s,c){return s+pT(c);},0);
+  var pend=cobA.filter(function(c){return c.mes===m&&c.estado!=="pagado";}).length;
+  var evH=evA.filter(function(e){return e.fecha===hoy();}).length;
+  var proxV=iqA.filter(function(i){if(i.estado!=="activo"||!i.egreso)return false;var d=Math.round((new Date(i.egreso)-h)/86400000);return d>=0&&d<=15;});
+  // Fin de contrato proximos 30 dias (para gestionar renovacion o salida)
+  var proxAniv=iqA.filter(function(i){
+    if(i.estado!=="activo"||!i.egreso)return false;
+    var d=Math.round((new Date(i.egreso)-h)/86400000);
+    i._diasAniv=d;
+    i._anivDate=i.egreso;
+    return d>=0&&d<=30;
+  });
+  // proxA: cuatrimestral adjustment months are April(4), August(8), December(12)
+  // Show alert in the 15 days BEFORE these months
+  var mesActual=h.getMonth()+1; // 1-12
+  var diaActual=h.getDate();
+  // We are in adjustment period if we're in the last 15 days of Mar, Jul, or Nov
+  // OR in the first days of Apr, Aug, Dec
+  var esMesAjuste=(mesActual===4||mesActual===8||mesActual===12)&&diaActual<=15;
+  var esPreAjuste=(mesActual===3||mesActual===7||mesActual===11)&&diaActual>=16;
+  var proxA=[];
+  if(esMesAjuste||esPreAjuste){
+    // Calculate days to next adjustment month
+    var proximoMesAj=mesActual===3||mesActual===4?4:mesActual===7||mesActual===8?8:12;
+    var fechaAj=new Date(h.getFullYear(),proximoMesAj-1,1);
+    if(fechaAj<h) fechaAj.setFullYear(h.getFullYear()+1);
+    iqA.forEach(function(i){
+      if(i.estado!=="activo")return;
+      var d=Math.round((fechaAj-h)/86400000);
+      i._diasAj=d;
+      i._mesAj=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][proximoMesAj-1];
+      proxA.push(i);
+    });
+  }
+  var o="<h2 style='font-size:20px;font-weight:800;margin-bottom:4px'>Panel General</h2><p style='color:#64748B;font-size:11px;margin-bottom:12px'>"+new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})+"</p>";
+  o+="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px'>";
+  o+=sc("GP","Ocupacion",(totU?Math.round((act/totU)*100):0)+"%",act+"/"+totU,"");
+  o+=sc("$","Cobrado",fmt(cobrado),"este mes","#10B981");
+  o+=sc("!","Pendientes",pend,"pagos","#F59E0B");
+  o+=sc("C","Hoy",evH,"eventos","#06B6D4");
+  o+="</div>";
+  if(proxV.length){o+="<div class='card' style='margin-bottom:8px;border-left:3px solid #F59E0B'><h3 style='font-size:13px;color:#F59E0B;margin-bottom:8px'>Vencimientos proximos</h3>";proxV.forEach(function(i){var d=Math.round((new Date(i.egreso)-h)/86400000);o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #334155;font-size:12px'><span>"+i.unidad+" - "+esc(i.nombre)+"</span><span style='color:#F59E0B;font-weight:700'>"+d+" dias</span></div>";});o+="</div>";}
+    proxA.forEach(function(i){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #334155;font-size:12px'><span>"+i.unidad+" - "+esc(i.nombre)+" - "+fmt(i.alquiler)+"</span><span style='color:#8B5CF6;font-weight:700'>Ajuste en "+i._diasAj+" dias ("+i._mesAj+")</span></div>";});
+  if(proxAniv.length){
+    o+="<div class='card' style='margin-bottom:8px;border-left:3px solid #10B981'><h3 style='font-size:13px;color:#10B981;margin-bottom:8px'>🔄 Vencimiento / Renovacion (proximos 30 dias)</h3>";
+    proxAniv.sort(function(a,b){return a._diasAniv-b._diasAniv;}).forEach(function(i){
+      o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #334155;font-size:12px'>";
+      o+="<span>"+i.unidad+" - "+esc(i.nombre)+"</span>";
+      o+="<span style='color:#10B981;font-weight:700'>Vence "+i._anivDate+" ("+i._diasAniv+" dias)</span></div>";
+    });
+    o+="</div>";
+  }
+  if(!act)o+="<div class='card' style='text-align:center;padding:24px;border-left:3px solid #3B82F6'><p style='color:#93C5FD;font-weight:700;font-size:15px;margin-bottom:12px'>Listo para cargar los "+totU+" departamentos!</p><button class='btn bp' data-go='acuerdos'>Ir a Acuerdos</button></div>";
+  G("main").innerHTML=o;
+  G("main").onclick=function(e){var b=e.target.closest("[data-go]");if(b)go(b.dataset.go);};
+}
+
+// ACUERDOS
+var _vD=false;
+function rAcuerdos(){
+  var iqA=oA(DATA.iq),udl=uds();
+  var act=iqA.filter(function(i){return i.estado==="activo";}).length;
+  var lib=udl.filter(function(u){return !iqA.filter(function(i){return i.unidad===u&&i.estado==="activo";}).length;}).length;
+  G("main").innerHTML="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px'><div><h2 style='font-size:20px;font-weight:800'>Acuerdos Vigentes</h2><p style='color:#64748B;font-size:11px'>"+act+" activos - "+lib+" libres</p></div><div style='display:flex;gap:5px'><button class='btn bg bsm' onclick='_vD=!_vD;fAc()'>Deptos</button><button class='btn bp bsm' onclick='openNA()'>+ Nuevo</button><button class='btn bpu bsm' onclick='openAjusteCuat()'>Ajuste Alquileres</button></div></div><div style='display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap'><input class='inp' id='iq-q' placeholder='Buscar nombre, unidad, DNI, ID...' style='flex:1;min-width:160px' oninput='fAc()'/><select class='inp' id='iq-e' style='max-width:100px' onchange='fAc()'><option value=''>Todos</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div><div id='iq-list'></div>";
+  fAc();
+}
+function fAc(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  var q=(G("iq-q")||{value:""}).value.toLowerCase();
+  var ed=(G("iq-e")||{value:""}).value;
+  var el=G("iq-list");if(!el)return;
+  if(_vD){rVD(iqA,el);return;}
+  var list=iqA.filter(function(i){return(i.nombre||"").toLowerCase().includes(q)||(i.unidad||"").includes(q)||(i.id_ac||"").includes(q)||(i.dni||"").includes(q);}).filter(function(i){return !ed||i.unidad.startsWith(ed+"-");});
+  if(!list.length){el.innerHTML="<p style='color:#64748B;text-align:center;padding:32px'>Sin resultados</p>";return;}
+  var rows=[];
+  list.forEach(function(i){
+    var cod=(i.unidad||"").split("-")[0],ec=COL[cod]||"#64748B";
+    var dias=i.egreso?Math.round((new Date(i.egreso)-new Date())/86400000):-1;
+    var ki=kpush(i._key);
+    var o="<div class='card' style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer;padding:12px' data-ficha='"+ki+"'>";
+    o+="<div style='display:flex;gap:9px;align-items:center'>";
+    o+="<div style='background:"+ec+"22;color:"+ec+";border-radius:9px;padding:5px 9px;font-weight:800;font-size:11px;min-width:44px;text-align:center'>"+i.unidad+"</div>";
+    o+="<div><div style='font-weight:700;font-size:13px'>"+esc(i.nombre)+"</div>";
+    o+="<div style='color:#64748B;font-size:10px'>ID #"+(i.id_ac||"--")+" - DNI "+esc(i.dni||"--")+" - "+(i.ingreso||"")+" a "+(i.egreso||"")+"</div>";
+    if(dias>=0&&dias<=15)o+="<div style='color:#F59E0B;font-size:10px;font-weight:700'>Vence en "+dias+" dias</div>";
+    o+="</div></div>";
+    o+="<div style='display:flex;gap:5px;align-items:center'><span style='color:#10B981;font-weight:700;font-size:12px'>"+fmt(i.alquiler)+"/mes</span>"+bdg("activo","#10B981")+"</div></div>";
+    rows.push(o);
+  });
+  el.innerHTML=rows.join("");
+  el.onclick=function(e){
+    var b=e.target.closest("[data-ficha]");if(b)openFicha(kget(parseInt(b.dataset.ficha)));
+    var f=e.target.closest("[data-genform]");if(f)openGenForm(f.dataset.genform);
+  };
+}
+function rVD(iqA,el){
+  var o="";
+  Object.keys(ED).forEach(function(cod){
+    var e=ED[cod],color=COL[cod]||"#64748B";
+    o+="<div class='card' style='margin-bottom:8px'><div style='margin-bottom:8px'><span style='color:"+color+";font-weight:800'>"+cod+"</span> <span style='font-size:12px'>"+e.n+"</span><div style='color:#64748B;font-size:10px'>"+e.d+"</div></div><div style='display:flex;flex-wrap:wrap;gap:4px'>";
+    for(var i=1;i<=e.u;i++){
+      var u=cod+"-"+i,inq=iqA.filter(function(x){return x.unidad===u;})[0];
+      var ki=inq?kpush(inq._key):-1;
+      o+="<div style='background:"+(inq?color+"22":"#0F172A")+";border:1px solid "+(inq?color:"#334155")+";border-radius:7px;padding:4px 8px;cursor:"+(inq?"pointer":"default")+";min-width:50px;text-align:center'"+(inq?" data-ficha='"+ki+"'":"")+">";
+      o+="<div style='color:"+(inq?color:"#64748B")+";font-weight:700;font-size:11px'>"+u+"</div>";
+      o+="<div style='color:#94A3B8;font-size:9px'>"+(inq?inq.nombre.split(",")[0]:"Libre")+"</div>";
+      if(!inq){o+="<button style='font-size:8px;background:#3B82F6;color:#fff;border:none;border-radius:4px;padding:2px 4px;cursor:pointer;display:block;margin-top:2px;width:100%' data-genform='"+u+"'>Enviar Form</button>";}
+      o+="</div>";
+    }
+    o+="</div></div>";
+  });
+  el.innerHTML=o;
+  el.onclick=function(e){
+    var b=e.target.closest("[data-ficha]");if(b)openFicha(kget(parseInt(b.dataset.ficha)));
+    var f=e.target.closest("[data-genform]");if(f)openGenForm(f.dataset.genform);
+  };
+}
+
+function openGenForm(unidad){_gfUnidad=unidad;
+  var cod=unidad.split("-")[0],e=ED[cod]||{};
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Pre-cargá los datos del acuerdo. El inquilino va a completar sus datos personales y firmar.</p>";
+  o+="<div class='g2'>"+fld("gf-alq","Alquiler mensual $","","number")+fld("gf-dep","Deposito $","","number")+fld("gf-gs","Gastos de gestion $","","number")+fld("gf-ing","Inicio contrato","","date")+fld("gf-egr","Fin contrato","","date")+fld("gf-pos","Fecha de posesion real","","date")+"</div>";
+  o+="<div id='gf-link' style='display:none;margin:10px 0;padding:10px;background:#0F172A;border-radius:8px;word-break:break-all;font-size:11px;color:#93C5FD'></div>";
+  o+="<div style='display:flex;gap:7px;flex-wrap:wrap;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bp bsm' id='gf-run'>Generar Link</button>";
+  o+="<div id='gf-wa' style='display:none'></div>";
+  o+="</div>";
+  openModal("Enviar formulario — "+unidad,o);
+  setTimeout(function(){var b=G("gf-run");if(b)b.onclick=function(){genFormLink(_gfUnidad);};},100);
+}
+var _gfUnidad='';function genFormLink(unidad){
+  var alq=G("gf-alq").value,dep=G("gf-dep").value,gs=G("gf-gs").value;
+  var ing=G("gf-ing").value,egr=G("gf-egr").value,pos=G("gf-pos").value;
+  if(!alq){alert("El alquiler es obligatorio");return;}
+  var cod=unidad.split("-")[0],e=ED[cod]||{};
+  var base=location.href.replace(/index\.html.*$/,"").replace(/\?.*$/,"")+"form.html";
+  var url=base+"?u="+encodeURIComponent(unidad)+"&ed="+encodeURIComponent(cod)+"&dir="+encodeURIComponent(e.d||"")+"&alq="+alq+"&dep="+(dep||0)+"&gs="+(gs||0)+"&ing="+ing+"&egr="+egr+"&pos="+pos;
+  var el=G("gf-link");el.textContent=url;el.style.display="block";
+  var wa=G("gf-wa");
+  var msg="Hola! Te enviamos el formulario de ingreso para el departamento "+unidad+". Por favor completalo con tus datos y firma el acuerdo:\n\n"+url+"\n\nAdministracion: 1555787641";
+  wa.innerHTML="<a class='wa' href='https://wa.me/?text="+encodeURIComponent(msg)+"' target='_blank'>💬 Enviar por WhatsApp</a>";
+  wa.style.display="block";
+}
+
+var ACUERDO="ACUERDO DE CONVIVENCIA Y LOCACION\n\nEs indispensable para la buena convivencia respetar las normas basicas de buenas costumbres.\n\nDado el tamano de los departamentos y las condiciones particulares del alquiler, se estipula que es apto para vivienda de 1 o 2 personas adultas (sin chicos y sin mascotas).\n\nA fin de no molestar a sus vecinos rogamos no hacer reuniones de mas de 3 personas, respetar horarios de descanso, orden, limpieza, etc.\n\nLos espacios comunes son de transito, no de permanencia ni deposito de objetos personales (moto, bicicleta, muebles, etc.)\n\nRESPECTO A LOS SERVICIOS:\nLos servicios estan incluidos para uso racional. Queda terminantemente prohibido el uso de lavarropas, aire acondicionado, caloventor o artefactos de gran consumo. En caso de utilizarlo se cobrara un adicional.\n\nRESPECTO AL PAGO:\nEl alquiler se abona del 1 al 5 con 10% de descuento por pronto pago. Luego del dia 5 se pierde el descuento. Desde el dia 10 se aplican punitorios diarios segun la tasa del BCRA.\n\nEl deposito se devuelve cumplidos los 12 meses contra entrega del departamento en iguales condiciones. El ajuste se realiza en abril, agosto y diciembre con 15 dias de aviso.\n\nAdministracion: Lun-Vie 8-13 y 14-18, Sab 8-12. Tel: 1555787641";
+
+function openFicha(key){
+  var i=DATA.iq[key];if(!i)return;
+  var esA=USER.r==="admin";
+  var dias=i.egreso?Math.round((new Date(i.egreso)-new Date())/86400000):-1;
+  var rows=[["ID Acuerdo","#"+(i.id_ac||"--")],["Unidad",i.unidad],["Nombre",i.nombre],["DNI",i.dni||"--"],["Telefono",i.tel||"--"],["Alquiler",fmt(i.alquiler)],["Deposito",fmt(i.deposito||0)],["Pago a cuenta",fmt(i.pago_cuenta||0)],["Inicio",i.ingreso||"--"],["Vencimiento",i.egreso||"--"]];
+  var o="<div class='g2' style='margin-bottom:12px'>";
+  rows.forEach(function(r){o+="<div><div class='lbl'>"+r[0]+"</div><div style='font-size:12px'>"+esc(r[1])+"</div></div>";});
+  o+="</div>";
+  if(dias>=0&&dias<=15)o+="<div class='wbx'>Vencimiento en "+dias+" dias - "+i.egreso+"</div>";
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'><div class='lbl'>Obs. al ingreso</div><div style='font-size:12px;margin-top:3px'>"+esc(i.obs_ingreso||"Sin observaciones")+"</div></div>";
+  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #334155'>";
+  if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank'>WhatsApp</a>";
+  var ki=kpush(key);
+  o+="<button class='btn bpu bsm' data-ac='"+ki+"'>Ver Acuerdo</button>";
+  o+="<button class='btn bg bsm' data-hev='"+ki+"'>📋 Historial</button>";
+  if(esA){o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";}
+  if(esA){o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";}
+  if(esA){o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";}
+  if(esA){o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";}
+  if(esA&&(i.deposito||0)>0){o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";}
+  o+="</div>";
+  openModal("Ficha - "+esc(i.nombre),o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    var t=e.target;
+    if(t.dataset.ac)verAc(kget(parseInt(t.dataset.ac)));
+    else if(t.dataset.obs)editObs(kget(parseInt(t.dataset.obs)));
+    else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
+    else if(t.dataset.renovar)openRenovar(kget(parseInt(t.dataset.renovar)));
+    else if(t.dataset.adicional)openAdicional(kget(parseInt(t.dataset.adicional)));
+    else if(t.dataset.hev)openHistorialEventos(kget(parseInt(t.dataset.hev)));
+    else if(t.dataset.devdep)openDevolverDeposito(kget(parseInt(t.dataset.devdep)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function verAc(key){
+  var i=DATA.iq[key];if(!i)return;
+  var ki=kpush(key);
+  var o="<div style='background:#0F172A;border-radius:10px;padding:14px;max-height:300px;overflow-y:auto;font-size:11px;color:#CBD5E1;line-height:1.8;white-space:pre-wrap;margin-bottom:12px'>"+esc(ACUERDO)+"</div>";
+  o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'><b style='color:#10B981'>Firmado por:</b> "+esc(i.firma||"--")+" el "+esc(i.fecha_firma||"--")+"</div>";
+  o+="<div style='display:flex;gap:7px;flex-wrap:wrap'>";
+  o+="<button class='btn bg bsm' onclick='navigator.clipboard.writeText(ACUERDO)'>Copiar</button>";
+  if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"?text="+encodeURIComponent(ACUERDO)+"' target='_blank'>Enviar WA</a>";
+  o+="<button class='btn bg bsm' data-imp='"+ki+"'>Imprimir</button></div>";
+  openModal("Acuerdo - "+esc(i.unidad),o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.imp)impAc(kget(parseInt(e.target.dataset.imp)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function impAc(key){
+  var i=DATA.iq[key],w=window.open("","_blank");
+  w.document.write("<html><head><title>Acuerdo</title><style>body{font-family:Arial;padding:40px;font-size:13px;line-height:1.8}pre{white-space:pre-wrap;font-family:Arial}</style></head><body><h2>Acuerdo - "+esc(i.unidad)+" - "+esc(i.nombre)+"</h2><pre>"+esc(ACUERDO)+"</pre><br><p>Firma: "+esc(i.firma||"--")+" Fecha: "+esc(i.fecha_firma||"--")+"</p></body></html>");
+  w.document.close();w.print();
+}
+function editObs(key){
+  var i=DATA.iq[key];
+  var ki=kpush(key);
+  openModal("Observaciones",tad("obs-i","Obs. al ingreso",i.obs_ingreso)+tad("obs-e","Obs. al egreso",i.obs_egreso)+"<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:10px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-sobs='"+ki+"'>Guardar</button></div>");
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.sobs)saveObs(kget(parseInt(e.target.dataset.sobs)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function saveObs(key){DB.ref("iq/"+key).update({obs_ingreso:G("obs-i").value,obs_egreso:G("obs-e").value});closeModal();closeModal();}
+function openCerrar(key){
+  var i=DATA.iq[key];
+  var ki=kpush(key);
+  var o="<div class='wbx'>El depto "+i.unidad+" quedara libre y pasara al historial.</div>";
+  o+=fld("egr-f","Fecha de egreso real",hoy(),"date");
+  o+=sld("egr-m","Motivo",["Fin de contrato","Rescision anticipada","Desalojo","Otro"]);
+  o+=tad("egr-o","Obs. al egreso");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:10px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bx bsm' data-ca='"+ki+"'>Confirmar</button></div>";
+  openModal("Cerrar Acuerdo",o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.ca)cerrarAc(kget(parseInt(e.target.dataset.ca)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function cerrarAc(key){
+  var i=DATA.iq[key];
+  // Get eventos history for this inquilino
+  var eventos=oA(DATA.cfg).filter(function(x){return x.tipo==="evento_iq"&&x.id_ac===i.id_ac;})
+    .sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");});
+  var reg=Object.assign({},i,{
+    estado:"baja",
+    fecha_egreso_real:G("egr-f").value,
+    motivo_egreso:G("egr-m").value,
+    obs_egreso:G("egr-o").value,
+    fecha_cierre:hoy(),
+    historial_eventos:eventos.map(function(ev){return ev.fecha+": "+ev.texto;}).join(" | ")
+  });
+  DB.ref("hist").push(reg);
+  DB.ref("iq/"+key).remove();
+  // Clean up eventos from cfg
+  eventos.forEach(function(ev){DB.ref("cfg/"+ev._key).remove();});
+  closeModal();closeModal();
+  alert("Acuerdo cerrado. "+i.unidad+" quedo libre. Historial de "+eventos.length+" eventos guardado.");
+  go("acuerdos");
+}
+// ── RENOVACION ───────────────────────────────────────────────────────────────
+function openRenovar(key){
+  var i=DATA.iq[key];
+  var ki=kpush(key);
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Al renovar se registra un nuevo pago de gastos de gestion. Se puede pagar en cuotas.</p>";
+  o+="<div class='g2'>"+fld("rv-alq","Nuevo alquiler $",i.alquiler,"number")+fld("rv-gs","Gastos renovacion $","","number")+"</div>";
+  o+="<div class='g2'>"+fld("rv-ing","Nuevo inicio","","date")+fld("rv-egr","Nuevo fin","","date")+"</div>";
+  o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
+  openModal("Renovar Acuerdo - "+esc(i.unidad),o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function saveRenovar(key){
+  var alq=Number(G("rv-alq").value||0);
+  var gs=Number(G("rv-gs").value||0);
+  var ing=G("rv-ing").value;
+  var egr=G("rv-egr").value;
+  var cuotas=parseInt(G("rv-cuotas").value)||1;
+  if(!alq){alert("El alquiler es obligatorio");return;}
+  // Update inquilino
+  var upd={alquiler:alq,ingreso:ing||DATA.iq[key].ingreso,egreso:egr||DATA.iq[key].egreso,ultimo_aj:ing||hoy()};
+  DB.ref("iq/"+key).update(upd);
+  // Register gastos as partial payments in cobranzas if > 0
+  if(gs>0){
+    var montoCuota=Math.round(gs/cuotas);
+    var m=mes();
+    for(var c=0;c<cuotas;c++){
+      var yr=parseInt(m.split("-")[0]),mo=parseInt(m.split("-")[1])+c;
+      if(mo>12){mo=mo-12;yr++;}
+      var mesC=yr+"-"+String(mo).padStart(2,"0");
+      var cobReg={id_ac:DATA.iq[key].id_ac||"",unidad:DATA.iq[key].unidad,inq:DATA.iq[key].nombre,mes:mesC,monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas};
+      DB.ref("cob").push(cobReg);
+    }
+  }
+  closeModal();closeModal();
+  alert("Renovacion registrada. Nuevo alquiler: "+fmt(alq)+(gs>0?" - Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):""));
+}
+
+// ── AJUSTE CUATRIMESTRAL ──────────────────────────────────────────────────────
+function openAjusteCuat(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  if(!iqA.length){alert("No hay acuerdos activos");return;}
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Modifica el valor del alquiler para cada unidad. El sistema avisara automaticamente 15 dias antes.</p>";
+  o+="<div style='overflow-x:auto'><table class='tbl'><thead><tr><th>Unidad</th><th>Inquilino</th><th>Actual</th><th>Nuevo valor $</th></tr></thead><tbody>";
+  iqA.sort(function(a,b){return a.unidad.localeCompare(b.unidad);}).forEach(function(i){
+    o+="<tr><td style='font-weight:600'>"+i.unidad+"</td><td style='font-size:11px'>"+esc(i.nombre.split(",")[0])+"</td><td style='color:#10B981'>"+fmt(i.alquiler)+"</td><td><input class='inp' type='number' id='aj-"+i._key+"' value='"+i.alquiler+"' style='padding:4px 8px;font-size:12px'/></td></tr>";
+  });
+  o+="</tbody></table></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveAjusteCuat()'>Guardar Ajuste</button></div>";
+  openModal("Ajuste Cuatrimestral",o,true);
+}
+function saveAjusteCuat(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  var cambios=0;
+  iqA.forEach(function(i){
+    var inp=G("aj-"+i._key);
+    if(inp){
+      var nuevo=Number(inp.value||0);
+      if(nuevo>0&&nuevo!==i.alquiler){
+        DB.ref("iq/"+i._key).update({alquiler:nuevo,nuevo_alq:nuevo,ultimo_aj:hoy()});
+        cambios++;
+      }
+    }
+  });
+  closeModal();
+  alert("Ajuste guardado en "+cambios+" unidades. Las alertas de WhatsApp se envian desde la seccion Alertas 15 dias antes.");
+}
+
+// ── RECARGOS ──────────────────────────────────────────────────────────────────
+function openRecargos(ckey){
+  var c=DATA.cob[ckey];if(!c)return;
+  var ki=kpush(ckey);
+  var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0),saldo=tot-pg;
+  var rec10=Math.round(c.monto_total*0.10);
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>"+c.unidad+" - "+esc(c.inq)+" - Saldo: <b style='color:#EF4444'>"+fmt(saldo)+"</b></p>";
+  o+="<div class='card' style='margin-bottom:8px'>";
+  o+="<div style='font-weight:700;margin-bottom:8px'>Aplicar recargo por:</div>";
+  o+="<label style='display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'><input type='checkbox' id='rc-tardio'/> <span>Pago fuera de termino (+10%: <b>"+fmt(rec10)+"</b>)</span></label>";
+  o+="<label style='display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'><input type='checkbox' id='rc-digital'/> <span>Pago con medio electronico (+10%: <b>"+fmt(rec10)+"</b>)</span></label>";
+  o+="<div style='display:flex;gap:8px;margin-top:8px'><div style='flex:1'><div class='lbl'>O ingresar monto fijo</div><input class='inp' type='number' id='rc-monto' placeholder='0' style='padding:5px 8px'/></div></div>";
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bx bsm' data-rckey='"+ki+"'>Aplicar Recargo</button></div>";
+  openModal("Recargos - "+c.unidad,o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.rckey)saveRecargo(kget(parseInt(e.target.dataset.rckey)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function saveRecargo(ckey){
+  var c=DATA.cob[ckey];
+  var tardio=G("rc-tardio").checked;
+  var digital=G("rc-digital").checked;
+  var manual=Number(G("rc-monto").value||0);
+  var monto=manual>0?manual:0;
+  if(tardio)monto+=Math.round(c.monto_total*0.10);
+  if(digital)monto+=Math.round(c.monto_total*0.10);
+  if(!monto){alert("Selecciona un recargo o ingresa un monto");return;}
+  var ups={};
+  var ts=Date.now();
+  ups["cob/"+ckey+"/pagos/"+ts]={fecha:hoy(),monto:monto,cuenta:"Efectivo",concepto:"Recargo"+(tardio?" pago tardio":"")+(digital?" medio electronico":"")};
+  ups["cob/"+ckey+"/monto_total"]=c.monto_total+monto;
+  DB.ref("/").update(ups);
+  closeModal();
+  alert("Recargo de "+fmt(monto)+" aplicado.");
+  setTimeout(rCob,300);
+}
+
+
+function openNA(){
+  var udl=uds().filter(function(u){return !oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length;});
+  var o="<div class='fld' style='grid-column:1/-1;margin-bottom:4px'>";
+  o+="<div style='display:flex;gap:12px;background:#0F172A;padding:10px;border-radius:8px;border:1px solid #334155'>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-nuevo' checked onchange='toggleModoNA()'> <b>Contrato nuevo</b> (genera cobros de ingreso)</label>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-vigente' onchange='toggleModoNA()'> <b>Contrato vigente</b> (solo cobra alquiler mensual)</label>";
+  o+="</div></div>";
+  o+="<div class='g2'>";
+  o+="<div class='fld' style='grid-column:1/-1'><label class='lbl'>Unidad *</label><select class='inp' id='na-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
+  o+=fld("na-n","Nombre y apellido *")+fld("na-d","DNI *")+fld("na-t","Telefono")+fld("na-e","Email","","email");
+  o+=fld("na-ce","Contacto emergencia")+fld("na-te","Tel. emergencia");
+  o+="<div class='fld' style='grid-column:1/-1'>";
+  o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px solid #3B82F633'>";
+  o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:10px'>MONTOS AL INGRESO</div>";
+  o+="<div class='g2'>";
+  o+=fld("na-alq","Alquiler mensual $","","number");
+  o+=fld("na-dep","Deposito $","","number");
+  o+=fld("na-gs","Gastos de gestion $","","number");
+  o+=fld("na-desc-gs","Descuento en gastos $","0","number");
+  o+=fld("na-pc","Reserva / Pago a cuenta $","0","number");
+  o+=sld("na-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
+  o+=sld("na-cuotas-gs","Gastos de gestion en cuotas",["1 cuota (contado)","2 cuotas"]);
+  o+="</div>";
+  o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:8px'>Completa los montos para ver el resumen</div>";
+  o+="</div></div>";
+  o+="<div id='na-vigente-info' style='display:none;background:#10B98111;border-left:3px solid #10B981;border-radius:0 8px 8px 0;padding:10px;font-size:11px;color:#6EE7B7;margin-bottom:8px'>Solo se genera cobranza de alquiler del mes de inicio. El deposito y gastos ya fueron cobrados al inicio del contrato original.</div>";
+  o+=fld("na-ing","Inicio contrato","","date")+fld("na-egr","Fin contrato (1 año)","","date");
+  o+="<div class='fld' style='grid-column:1/-1'>"+tad("na-obs","Observaciones al ingreso")+"</div>";
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNA()'>Crear Acuerdo</button></div>";
+  openModal("Nuevo Acuerdo",o,true);
+  // Live preview
+  setTimeout(function(){
+    ["na-alq","na-dep","na-gs","na-desc-gs","na-pc"].forEach(function(id){
+      var el=G(id); if(el) el.oninput=actualizarResumenNA;
+    });
+  },100);
+}
+function toggleModoNA(){
+  var vigente=G("na-vigente")&&G("na-vigente").checked;
+  // Hide deposit and gastos fields in vigente mode
+  ["na-dep","na-gs","na-desc-gs","na-pc","na-cuotas-dep","na-cuotas-gs"].forEach(function(id){
+    var el=G(id);
+    if(el){
+      var wrap=el.closest(".fld");
+      if(wrap) wrap.style.display=vigente?"none":"block";
+    }
+  });
+  var info=G("na-vigente-info");
+  if(info) info.style.display=vigente?"block":"none";
+  actualizarResumenNA();
+}
+function actualizarResumenNA(){
+  var alq=Number((G("na-alq")||{value:0}).value||0);
+  var dep=Number((G("na-dep")||{value:0}).value||0);
+  var gs=Number((G("na-gs")||{value:0}).value||0);
+  var desc=Number((G("na-desc-gs")||{value:0}).value||0);
+  var pc=Number((G("na-pc")||{value:0}).value||0);
+  var gsNeto=Math.max(0,gs-desc);
+  var total=alq+dep+gsNeto;
+  var saldo=Math.max(0,total-pc);
+  var el=G("na-resumen"); if(!el) return;
+  el.innerHTML="<b style='color:#F1F5F9'>Total al ingreso: "+fmt(total)+"</b>"
+    +"<br>Alquiler: "+fmt(alq)
+    +(dep>0?" | Deposito: "+fmt(dep):"")
+    +(gsNeto>0?" | Gastos: "+fmt(gsNeto)+(desc>0?" (desc. "+fmt(desc)+")":""):"")
+    +(pc>0?"<br><span style='color:#10B981'>Reserva/Pago a cuenta: "+fmt(pc)+"</span><br><b style='color:#F59E0B'>Saldo pendiente: "+fmt(saldo)+"</b>":"");
+}
+
+function saveNA(){
+  var u=G("na-u").value,n=G("na-n").value,d=G("na-d").value;
+  if(!u||!n||!d){alert("Unidad, nombre y DNI son obligatorios");return;}
+  var hist=oA(DATA.hist).filter(function(h){return h.dni===d;});
+  if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
+
+  var id=nid();
+  var alq=Number(G("na-alq").value||0);
+  var dep=Number(G("na-dep").value||0);
+  var gs=Number(G("na-gs").value||0);
+  var desc=Number(G("na-desc-gs").value||0);
+  var gsNeto=Math.max(0,gs-desc);
+  var pc=Number(G("na-pc").value||0);
+  var ing=G("na-ing").value;
+  var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
+  var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
+  var mesInicio=ing?ing.slice(0,7):mes();
+
+  function getMesN(start,n){
+    var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+n;
+    while(mo>12){mo-=12;yr++;} return yr+"-"+String(mo).padStart(2,"0");
+  }
+
+  // Save inquilino
+  DB.ref("iq").push({
+    id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
+    tel:G("na-t").value,email:G("na-e").value,
+    ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
+    alquiler:alq,deposito:dep,gastos:gs,gastos_neto:gsNeto,
+    descuento_gs:desc,pago_cuenta:pc,
+    total_ingreso:alq+dep+gsNeto,
+    ingreso:ing,egreso:G("na-egr").value,
+    ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",
+    eventos:[],fecha_reg:hoy()
+  });
+
+  var pcRestante=pc;
+  function aplicarPC(monto){
+    if(pcRestante<=0) return {monto:monto,pagos:{},estado:"pendiente"};
+    var aplicado=Math.min(pcRestante,monto);
+    pcRestante-=aplicado;
+    var pagos={};
+    pagos[Date.now()+Math.random()]=({fecha:hoy(),monto:aplicado,cuenta:"Efectivo",concepto:"Reserva / pago a cuenta"});
+    return {monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
+  }
+
+  var esVigente=G("na-vigente")&&G("na-vigente").checked;
+
+  // Alquiler primer mes (siempre)
+  if(alq>0){
+    var ca=aplicarPC(alq);
+    DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,
+      monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,
+      concepto:"Alquiler"});
+  }
+  // Deposito y Gastos: solo en contratos NUEVOS
+  if(!esVigente&&dep>0){
+    var cuotaDep=Math.round(dep/cuotasDep);
+    for(var cd=0;cd<cuotasDep;cd++){
+      var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};
+      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),
+        monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,
+        concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});
+    }
+  }
+  // Gastos gestion en cuotas (solo contratos nuevos)
+  if(!esVigente&&gsNeto>0){
+    var cuotaGs=Math.round(gsNeto/cuotasGs);
+    for(var cg=0;cg<cuotasGs;cg++){
+      var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};
+      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),
+        monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,
+        concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/descuento "+fmt(desc)+")":"")});
+    }
+  }
+
+  closeModal();
+  var msg="Acuerdo #"+id+" creado.";
+  if(alq>0) msg+=" Alquiler "+fmt(alq)+".";
+  if(dep>0) msg+=" Deposito "+fmt(dep)+(cuotasDep>1?" en "+cuotasDep+" cuotas":"")+" .";
+  if(gsNeto>0) msg+=" Gastos "+fmt(gsNeto)+(cuotasGs>1?" en "+cuotasGs+" cuotas":"")+(desc>0?" (desc. "+fmt(desc)+")":"")+" .";
+  if(pc>0) msg+=" Reserva "+fmt(pc)+" aplicada.";
+  alert(msg);
+}
+
+
+// HISTORIAL
+function rHistorial(){
+  var hist=oA(DATA.hist);
+  G("main").innerHTML="<div style='margin-bottom:12px'><h2 style='font-size:20px;font-weight:800'>Historial de Inquilinos</h2><p style='color:#64748B;font-size:11px'>"+hist.length+" registros</p></div><div style='margin-bottom:10px'><input class='inp' id='hist-q' placeholder='Buscar nombre, DNI, unidad...' oninput='fH()'/></div><div id='hist-list'></div>";
+  fH();
+}
+function fH(){
+  var hist=oA(DATA.hist),el=G("hist-list");if(!el)return;
+  var q=(G("hist-q")||{value:""}).value.toLowerCase();
+  var list=hist.filter(function(i){
+    return(i.nombre||"").toLowerCase().includes(q)
+      ||(i.unidad||"").includes(q)
+      ||(i.dni||"").includes(q)
+      ||(i.id_ac||"").includes(q);
+  }).sort(function(a,b){return(b.fecha_cierre||"").localeCompare(a.fecha_cierre||"");});
+  if(!list.length){el.innerHTML="<p style='color:#64748B;text-align:center;padding:32px'>Sin resultados</p>";return;}
+  var rows=list.map(function(i){
+    var cod=(i.unidad||"").split("-")[0],ec=COL[cod]||"#64748B";
+    var malo=(i.obs_egreso||"").toLowerCase().includes("deuda")||(i.obs_egreso||"").toLowerCase().includes("problema");
+    var ki=kpush(i._key);
+    var o="<div class='card' style='padding:12px;border-left:3px solid "+(malo?"#EF4444":"#334155")+";cursor:pointer' data-histkey='"+ki+"'>";
+    o+="<div style='display:flex;gap:9px;align-items:flex-start'>";
+    o+="<div style='background:"+ec+"22;color:"+ec+";border-radius:9px;padding:5px 9px;font-weight:800;font-size:11px;min-width:44px;text-align:center;flex-shrink:0'>"+esc(i.unidad||"--")+"</div>";
+    o+="<div style='flex:1'>";
+    o+="<div style='font-weight:700;font-size:13px'>"+esc(i.nombre)+(malo?" <span style='color:#EF4444;font-size:10px'>[DEUDA/PROBLEMA]</span>":"")+"</div>";
+    o+="<div style='color:#64748B;font-size:10px'>DNI "+(i.dni||"--")+" - ID #"+(i.id_ac||"--")+"</div>";
+    o+="<div style='color:#64748B;font-size:10px'>Ingreso: "+(i.ingreso||"--")+" - Egreso: "+(i.fecha_egreso_real||i.egreso||"--")+"</div>";
+    if(i.motivo_egreso) o+="<div style='color:#F59E0B;font-size:10px'>Motivo: "+esc(i.motivo_egreso)+"</div>";
+    o+="</div>";
+    o+="<span style='color:#64748B;font-size:10px;flex-shrink:0'>ver ></span>";
+    o+="</div></div>";
+    return o;
+  });
+  el.innerHTML=rows.join("");
+  el.onclick=function(e){
+    var b=e.target.closest("[data-histkey]");
+    if(b) openFichaHist(kget(parseInt(b.dataset.histkey)));
+  };
+}
+
+function openFichaHist(key){
+  var i=DATA.hist[key]; if(!i) return;
+  var o="<div class='g2' style='margin-bottom:12px'>";
+  var rows=[
+    ["ID Acuerdo","#"+(i.id_ac||"--")],["Unidad",i.unidad||"--"],
+    ["Nombre",i.nombre],["DNI",i.dni||"--"],["Telefono",i.tel||"--"],
+    ["Alquiler",fmt(i.alquiler||0)],["Deposito",fmt(i.deposito||0)],
+    ["Ingreso",i.ingreso||"--"],["Egreso real",i.fecha_egreso_real||i.egreso||"--"],
+    ["Cierre",i.fecha_cierre||"--"],["Motivo",i.motivo_egreso||"--"]
+  ];
+  rows.forEach(function(r){o+="<div><div class='lbl'>"+r[0]+"</div><div style='font-size:12px'>"+esc(r[1])+"</div></div>";});
+  o+="</div>";
+  if(i.obs_egreso) o+="<div style='background:#EF444411;border-left:3px solid #EF4444;border-radius:0 8px 8px 0;padding:10px;margin-bottom:8px;font-size:12px'><b style='color:#EF4444'>Obs. egreso:</b> "+esc(i.obs_egreso)+"</div>";
+  if(i.obs_ingreso) o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px'><b class='lbl'>Obs. ingreso:</b> "+esc(i.obs_ingreso)+"</div>";
+  if(i.historial_eventos){
+    o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
+    o+="<div class='lbl' style='margin-bottom:6px'>Historial de eventos</div>";
+    i.historial_eventos.split(" | ").forEach(function(ev){
+      if(ev.trim()) o+="<div style='font-size:11px;color:#94A3B8;padding:3px 0;border-bottom:1px solid #1E293B'>"+esc(ev)+"</div>";
+    });
+    o+="</div>";
+  }
+  openModal("Historial - "+esc(i.nombre),o,true);
+}
+
+
+// COBRANZAS
+var _cobMes=mes();
+function rCob(){
+  var cobA=oA(DATA.cob).filter(function(c){return c.mes===_cobMes;});
+  var esp=cobA.reduce(function(s,c){return s+c.monto_total+Number(c.sal_ant||0);},0);
+  var cob=cobA.reduce(function(s,c){return s+pT(c);},0);
+  var edFil=localStorage.getItem("gp_cob_ed")||"";
+  var sortFil=localStorage.getItem("gp_cob_sort")||"unidad";
+  if(edFil) cobA=cobA.filter(function(c){return c.unidad&&c.unidad.startsWith(edFil+"-");});
+  cobA.sort(function(a,b){
+    if(sortFil==="estado"){var ord={pendiente:0,parcial:1,pagado:2};return(ord[a.estado]||0)-(ord[b.estado]||0);}
+    if(sortFil==="monto")return b.monto_total-a.monto_total;
+    return(a.unidad||"").localeCompare(b.unidad||"");
+  });
+  var edOpts=Object.keys(ED).map(function(k){return "<option"+(k===edFil?" selected":"")+">"+k+"</option>";}).join("");
+  G("main").innerHTML="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'><div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#64748B;font-size:11px'>"+cobA.length+" registros</p></div><div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' onchange=\"_cobMes=this.value;rCob()\"/><button class='btn bg bsm' onclick='genCob()'>Generar</button></div></div><div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><select class='inp' style='max-width:110px' id='cob-ed'><option value=''>Todos</option>"+edOpts+"</select><select class='inp' style='max-width:140px' id='cob-sort'><option value='unidad'"+(sortFil==="unidad"?" selected":"")+">Por unidad</option><option value='estado'"+(sortFil==="estado"?" selected":"")+">Por estado</option><option value='monto'"+(sortFil==="monto"?" selected":"")+">Por monto</option></select></div><div id='cob-list'></div>";
+  setTimeout(function(){
+    var ce=G("cob-ed");if(ce)ce.onchange=function(){localStorage.setItem("gp_cob_ed",this.value);rCob();};
+    var cs=G("cob-sort");if(cs)cs.onchange=function(){localStorage.setItem("gp_cob_sort",this.value);rCob();};
+  },50);
+  o+="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px'>";
+  o+=sc("$","Esperado",fmt(esp),"","#3B82F6")+sc("V","Cobrado",fmt(cob),"","#10B981")+sc("X","Pendiente",fmt(esp-cob),"","#EF4444")+sc("%","%",(esp?Math.round((cob/esp)*100):0)+"%","","#8B5CF6");
+  // Append summary to existing main content
+  var sumDiv=document.createElement("div");sumDiv.innerHTML=o;
+  G("main").appendChild(sumDiv);
+  var CE={pagado:"#10B981",parcial:"#F59E0B",pendiente:"#EF4444"};
+  // Wire filter inputs
+  setTimeout(function(){
+    var mi=G("cob-mes-inp"); if(mi) mi.onchange=function(){_cobMes=this.value;rCob();};
+    var ef=G("cob-ed-fil"); if(ef) ef.onchange=function(){localStorage.setItem("gp_cob_ed",this.value);rCob();};
+    var sf=G("cob-sort-fil"); if(sf) sf.onchange=function(){localStorage.setItem("gp_cob_sort",this.value);rCob();};
+  },50);
+  // Apply filters
+  var edFil=localStorage.getItem("gp_cob_ed")||"";
+  var sortFil=localStorage.getItem("gp_cob_sort")||"unidad";
+  if(edFil) cobA=cobA.filter(function(c){return c.unidad&&c.unidad.startsWith(edFil+"-");});
+  cobA.sort(function(a,b){
+    if(sortFil==="estado"){var ord={pendiente:0,parcial:1,pagado:2};return (ord[a.estado]||0)-(ord[b.estado]||0);}
+    if(sortFil==="monto"){return b.monto_total-a.monto_total;}
+    return (a.unidad||"").localeCompare(b.unidad||"");
+  });
+  if(!cobA.length){G("cob-list").innerHTML="<div style='text-align:center;padding:32px;color:#64748B'><p>Sin cobranzas.</p><button class='btn bp' onclick='genCob()' style='margin-top:8px'>Generar</button></div>";return;}
+  var rows=[];
+  cobA.sort(function(a,b){return(a.unidad||"").localeCompare(b.unidad||"");}).forEach(function(c){
+    var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0);
+    var cod=(c.unidad||"").split("-")[0],ec=COL[cod]||"#64748B";
+    var ps=pA(c).map(function(p){return fmt(p.monto)+" ("+p.cuenta+")";}).join(" + ");
+    var ki=kpush(c._key);
+    var concepto=c.concepto||"Alquiler";
+    var row="<div class='card' style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px'>";
+    row+="<div style='display:flex;gap:9px;align-items:center;flex:1'>";
+    row+="<div style='background:"+ec+"22;color:"+ec+";border-radius:9px;padding:5px 8px;font-weight:800;font-size:11px;min-width:44px;text-align:center'>"+c.unidad+"</div>";
+    row+="<div><div style='font-weight:600;font-size:13px'>"+esc(c.inq)+"</div>";
+    row+="<div style='color:#64748B;font-size:10px'>"+esc(concepto)+" - "+fmt(c.monto_total)+(c.sal_ant>0?" + Ant.:"+fmt(c.sal_ant):"")+"</div>";
+    if(ps) row+="<div style='color:#94A3B8;font-size:9px'>"+ps+"</div>";
+    row+="</div></div>";
+    row+="<div style='display:flex;gap:5px;align-items:center;flex-wrap:wrap'>";
+    row+="<div style='color:"+(pg>tot?"#06B6D4":pg>=tot?"#10B981":"#EF4444")+";font-weight:700;font-size:12px'>"+(pg>tot?"A favor "+fmt(pg-tot):pg>=tot?"Al dia":"Debe "+fmt(tot-pg))+"</div>";
+    row+=bdg(c.estado,CE[c.estado]||"#64748B");
+    if(c.estado!=="pagado"){
+      row+="<button class='btn bp bsm' data-pago='"+ki+"'>+Pago</button>";
+      row+="<button class='btn bx bsm' data-recargo='"+ki+"'>Recargo</button>";
+    }
+    if(pg>0) row+="<button class='btn bg bsm' data-editpago='"+ki+"'>Editar</button>";
+    row+="</div></div>";
+    rows.push(row);
+  });
+  G("cob-list").innerHTML=rows.join("");
+  G("cob-list").onclick=function(e){
+    var b=e.target.closest("[data-pago]");if(b)openPago(kget(parseInt(b.dataset.pago)));
+    var r=e.target.closest("[data-recargo]");if(r)openRecargos(kget(parseInt(r.dataset.recargo)));
+    var ep=e.target.closest("[data-editpago]");if(ep)openEditPagos(kget(parseInt(ep.dataset.editpago)));
+  };
+}
+function genCob(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  var ya=oA(DATA.cob).filter(function(c){return c.mes===_cobMes;}).map(function(c){return c.unidad;});
+  var ns=iqA.filter(function(i){return !ya.includes(i.unidad);});
+  if(!ns.length){alert("Todas las unidades activas ya tienen cobranza este mes");return;}
+  var yr=parseInt(_cobMes.split("-")[0]),mo=parseInt(_cobMes.split("-")[1]);
+  var mPrev=mo===1?(yr-1)+"-12":yr+"-"+String(mo-1).padStart(2,"0");
+  var cobP=oA(DATA.cob).filter(function(c){return c.mes===mPrev;});
+  ns.forEach(function(i){
+    var prev=cobP.filter(function(c){return c.unidad===i.unidad;})[0];
+    var sal=0;if(prev){var pg=pT(prev),tot=prev.monto_total+Number(prev.sal_ant||0);if(pg<tot)sal=tot-pg;}
+    var extra=aplicarAdicionales(i.unidad,i.alquiler,_cobMes);
+    var totalMes=i.alquiler+extra;
+    var concepto=extra>0?"Alquiler + adicionales ("+fmt(extra)+" extra)":"";
+    DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:_cobMes,monto_total:totalMes,pagos:{},sal_ant:sal,estado:sal>0?"parcial":"pendiente",concepto_extra:concepto});
+  });
+  setTimeout(rCob,600);
+}
+function openPago(ckey){
+  var c=DATA.cob[ckey];if(!c)return;
+  var pg=pT(c),sal=(c.monto_total+Number(c.sal_ant||0))-pg;
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Saldo pendiente: <b style='color:#EF4444'>"+fmt(sal)+"</b></p>";
+  o+="<div class='g2'>"+fld("p-f","Fecha",hoy(),"date")+sld("p-c","Cuenta",CTAS)+"</div>";
+  o+=fld("p-m","Monto $","","number");
+  o+="<label style='display:flex;align-items:center;gap:7px;color:#94A3B8;font-size:11px;cursor:pointer;margin:8px 0'><input type='checkbox' id='p-d' onchange=\"G('p-d2').style.display=this.checked?'grid':'none'\"> Segundo medio de pago</label>";
+  o+="<div id='p-d2' style='display:none' class='g2'>"+sld("p-c2","Cuenta 2",CTAS)+fld("p-m2","Monto 2 $","","number")+"</div>";
+  var ki=kpush(ckey);
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rp='"+ki+"'>Registrar</button></div>";
+  openModal("Registrar pago - "+c.unidad,o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.rp)regPago(kget(parseInt(e.target.dataset.rp)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function regPago(ckey){
+  var m=Number(G("p-m").value);if(!m){alert("Ingresa el monto");return;}
+  var c=DATA.cob[ckey],ts=Date.now(),ups={};
+  ups["cob/"+ckey+"/pagos/"+ts]={fecha:G("p-f").value,monto:m,cuenta:G("p-c").value,concepto:"Alquiler "+c.unidad};
+  if(G("p-d").checked){var m2=Number((G("p-m2")||{value:0}).value||0);if(m2)ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:G("p-f").value,monto:m2,cuenta:G("p-c2").value,concepto:"Alquiler "+c.unidad};}
+  var allP=Object.assign({},c.pagos||{});Object.keys(ups).forEach(function(k){allP[k.split("/").pop()]=ups[k];});
+  var tot=Object.values(allP).reduce(function(s,p){return s+p.monto;},0);
+  ups["cob/"+ckey+"/estado"]=tot>=c.monto_total?"pagado":tot>0?"parcial":"pendiente";
+  DB.ref("/").update(ups);
+  var iq=oA(DATA.iq).filter(function(i){return i.unidad===c.unidad&&i.estado==="activo";})[0];
+  if(iq&&iq.tel&&confirm("Enviar confirmacion por WhatsApp a "+iq.nombre.split(",")[0]+"?")){
+    window.open("https://wa.me/"+iq.tel+"?text="+encodeURIComponent("Hola "+iq.nombre.split(",")[0].trim()+"! Recibimos tu pago de "+fmt(m)+" para el alquiler de "+c.mes.replace("-","/")+". Gracias! Adm: 1555787641"),"_blank");
+  }
+  closeModal();setTimeout(rCob,400);
+}
+
+// COSTOS
+var _cstMes=mes(),_cstCat="Todas",_cstEd="Todos",_editC=null;
+function rCostos(){
+  var cfActual=getCF(); // Get CF with overrides applied
+  var existingCst=oA(DATA.cst).filter(function(c){return c.mes===_cstMes;});
+  var existingIds=existingCst.map(function(c){return c.cfid;});
+  var existingDescs=existingCst.map(function(c){return c.desc;});
+  // Filter out items that already exist by cfid OR by description (prevents duplicates)
+  var nuevos=cfActual.filter(function(c){return !existingIds.includes(c.id)&&!existingDescs.includes(c.d);});
+  if(nuevos.length){nuevos.forEach(function(c){DB.ref("cst").push({cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:0,nro_fact:"",fec_venc:"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"});});setTimeout(rCostos,800);return;}
+  var cstA=oA(DATA.cst).filter(function(c){return c.mes===_cstMes&&(_cstCat==="Todas"||c.cat===_cstCat)&&(_cstEd==="Todos"||c.ed===_cstEd);});
+  var totP=cstA.filter(function(c){return c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
+  var totPend=cstA.filter(function(c){return !c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
+  var sinF=cstA.filter(function(c){return !c.pagado&&!c.nro_fact&&Number(c.monto||0)>0;}).length;
+  var cats=[];CF.forEach(function(c){if(!cats.includes(c.c))cats.push(c.c);});
+  var esA=USER.r==="admin";
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'><div><h2 style='font-size:20px;font-weight:800'>Costos</h2><p style='color:#64748B;font-size:11px'>Pagado: "+fmt(totP)+" - Pendiente: "+fmt(totPend)+(sinF>0?" - "+sinF+" sin nro.":"")+"</p></div></div>";
+  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><input type='month' class='inp' value='"+_cstMes+"' style='max-width:140px' onchange=\"_cstMes=this.value;_editC=null;rCostos()\"/><select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
+  setTimeout(function(){var so=G("cst-ord");if(so)so.onchange=function(){rCostos();};},50);
+  var cstOrd=(G("cst-ord")||{value:"cat"}).value;
+  cstA.sort(function(a,b){
+    if(cstOrd==="venc") return (Number(a.dv)||15)-(Number(b.dv)||15);
+    if(cstOrd==="pend") return (a.pagado?1:0)-(b.pagado?1:0);
+    return (a.cat||"").localeCompare(b.cat||"");
+  });
+  var rows=[];
+  cstA.forEach(function(c){
+    var cc=CATC[c.cat]||"#64748B",ec=COL[c.ed]||"#64748B";
+    var al=!c.pagado&&!c.nro_fact&&Number(c.monto||0)>0;
+    var isE=_editC===c._key;
+    var ki=kpush(c._key);
+    var row="<div class='card' style='border-left:3px solid "+(c.pagado?"#10B981":al?"#8B5CF6":"#334155")+";opacity:"+(c.pagado?0.7:1)+";padding:12px;margin-bottom:6px'>";
+    row+="<div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px'><div style='flex:1'>";
+    row+="<div style='display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px'>"+bdg(c.ed,ec)+" "+bdg(c.cat,cc)+(c.pagado?bdg("Pagado","#10B981"):"")+(al?bdg("Sin Nro","#8B5CF6"):"")+"</div>";
+    row+="<div style='font-weight:700;font-size:13px'>"+esc(c.desc)+"</div>";
+    row+="<div style='color:#64748B;font-size:10px'>"+(c.pv?c.pv+" - ":"")+(c.cta_num?"Cta:"+c.cta_num+" - ":"")+(c.nro_fact?"Fact:"+c.nro_fact+" - ":"")+(c.fec_venc?"Vence:"+c.fec_venc:c.dv?"Vence dia "+c.dv:"")+"</div></div>";
+    row+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:4px'><div style='color:"+(Number(c.monto||0)>0?"#F87171":"#64748B")+";font-weight:700;font-size:14px'>"+(Number(c.monto||0)>0?fmt(c.monto):"--")+"</div>";
+    if(!c.pagado)row+="<button class='btn bp bsm' data-ec='"+ki+"'>Cargar</button>";
+    if(c.pagado&&esA)row+="<button class='btn bg bsm' data-rev='"+ki+"'>Revertir</button>";
+    row+="</div></div>";
+    if(isE){row+="<div style='margin-top:10px;padding-top:10px;border-top:1px solid #334155' class='g3'>"+fld("ec-m","Monto $",c.monto||"","number")+fld("ec-f","Nro. Factura *",c.nro_fact||"")+fld("ec-v","Fecha venc.",c.fec_venc||"","date")+sld("ec-c","Cuenta",CTAS,c.cuenta||"Banco")+"<div class='fld' style='padding-top:18px'><label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#94A3B8'><input type='checkbox' id='ec-p' "+(c.pagado?"checked":"")+" > Pagado</label></div><div style='display:flex;gap:6px;padding-top:16px'><button class='btn bok bsm' data-sc='"+ki+"'>Guardar</button><button class='btn bg bsm' onclick='_editC=null;rCostos()'>X</button></div></div>";}
+    row+="</div>";
+    rows.push(row);
+  });
+  o+=rows.join("")||"<p style='color:#64748B;text-align:center;padding:24px'>Sin costos para el periodo</p>";
+  G("main").innerHTML=o;
+  G("main").onclick=function(e){
+    var b=e.target;
+    if(b.dataset.ec){_editC=kget(parseInt(b.dataset.ec));rCostos();}
+    else if(b.dataset.sc)saveCosto(kget(parseInt(b.dataset.sc)));
+    else if(b.dataset.rev)revCosto(kget(parseInt(b.dataset.rev)));
+  };
+}
+function saveCosto(ckey){
+  var m=Number(G("ec-m").value||0),f=G("ec-f").value,p=G("ec-p").checked;
+  if(p&&m>0&&!f){alert("El numero de factura es obligatorio");return;}
+  DB.ref("cst/"+ckey).update({monto:m,nro_fact:f,fec_venc:G("ec-v").value,cuenta:G("ec-c").value,pagado:p});
+  _editC=null;setTimeout(rCostos,400);
+}
+function revCosto(ckey){if(!confirm("Revertir pago?"))return;DB.ref("cst/"+ckey).update({pagado:false,nro_fact:"",monto:0});setTimeout(rCostos,400);}
+
+// ALERTAS
+function rAlertas(){
+  var h=new Date(),dia=h.getDate(),m=mes();
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  var cobA=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  var evA=oA(DATA.ev); // agenda events
+  
+  // Load sent status from localStorage
+  var sent=JSON.parse(localStorage.getItem("gp_als_sent_"+m)||"{}");
+  
+  var grupos={mora:[],pronto:[],ajuste:[],renovacion:[],agenda:[],morosos:[]};
+  
+  iqA.forEach(function(inq){
+    var c=cobA.filter(function(x){return x.unidad===inq.unidad;})[0];
+    var pg=c?pT(c):0,ok=pg>=(inq.alquiler),nom=inq.nombre.split(",")[0].trim();
+    var desc=Math.round(inq.alquiler*0.9);
+    var key=inq.unidad;
+    
+    // Pronto pago dias 1-4
+    if(dia>=1&&dia<=4&&!ok){
+      grupos.pronto.push({key:key+"_pronto",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
+        msg:"Hola "+nom+"! Recordatorio alquiler "+m.replace("-","/")+". Con descuento pronto pago (hasta dia 5): "+fmt(desc)+". Sin descuento: "+fmt(inq.alquiler)+". Adm: 1555787641"});
+    }
+    // Mora dia 10+
+    if(dia>=10&&!ok){
+      var atraso=dia-10;
+      grupos.mora.push({key:key+"_mora",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
+        msg:"Hola "+nom+". Tu alquiler de "+m.replace("-","/")+" esta en mora ("+atraso+" dia"+(atraso!==1?"s":"")+" de atraso). Se aplican punitorios segun tasa BCRA. Adm: 1555787641"});
+    }
+    // Morosos (dia 5+ sin pagar)
+    if(dia>=5&&dia<10&&!ok){
+      grupos.morosos.push({key:key+"_tard",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
+        msg:"Hola "+nom+"! Tu alquiler de "+m.replace("-","/")+": "+fmt(inq.alquiler)+" vencio el dia 5. Adm: 1555787641"});
+    }
+    // Renovacion proximos 30 dias
+    if(inq.egreso){
+      var d=Math.round((new Date(inq.egreso)-h)/86400000);
+      if(d>=0&&d<=30){
+        grupos.renovacion.push({key:key+"_ren",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
+          msg:"Hola "+nom+"! Tu contrato vence el "+inq.egreso+" (en "+d+" dia"+(d!==1?"s":"")+"). Contactanos para gestionar la renovacion. Adm: 1555787641"});
+      }
+    }
+    // Ajuste cuatrimestral
+    var mesN=h.getMonth()+1,diaN=h.getDate();
+    var esPreAj=(mesN===3||mesN===7||mesN===11)&&diaN>=16;
+    var esMesAj=(mesN===4||mesN===8||mesN===12)&&diaN<=15;
+    if(esPreAj||esMesAj){
+      var nv=inq.nuevo_alq||Math.round(inq.alquiler*1.12);
+      var mesesAj={4:"Abril",8:"Agosto",12:"Diciembre"};
+      var mesAjN=esMesAj?mesesAj[mesN]:mesesAj[mesN===3?4:mesN===7?8:12];
+      grupos.ajuste.push({key:key+"_aj",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
+        msg:"Hola "+nom+"! Ajuste cuatrimestral "+mesAjN+": "+fmt(inq.alquiler)+" → "+fmt(nv)+". Aplica desde el dia 1. Adm: 1555787641"});
+    }
+  });
+  
+  // Agenda events for today and next 7 days
+  var hoy7=new Date(h); hoy7.setDate(hoy7.getDate()+7);
+  var hoyStr=hoy();
+  evA.filter(function(ev){return ev.fecha>=hoyStr&&ev.fecha<=hoy7.toISOString().split("T")[0];})
+    .sort(function(a,b){return a.fecha.localeCompare(b.fecha);})
+    .forEach(function(ev){
+      grupos.agenda.push({key:"ev_"+ev._key,u:ev.unidad||"",nom:ev.nombre||ev.titulo,tel:ev.tel||"",
+        fecha:ev.fecha,tipo:ev.tipo,titulo:ev.titulo,
+        msg:ev.tel?"Hola "+esc(ev.nombre||"")+"! Recordatorio: "+ev.titulo+" el "+ev.fecha+(ev.unidad?" en "+ev.unidad:"")+". Adm: 1555787641":""});
+    });
+  
+  window._als_grupos=grupos;
+  window._als_sent=sent;
+  
+  var total=Object.values(grupos).reduce(function(s,g){return s+g.length;},0);
+  var pendientes=Object.values(grupos).reduce(function(s,g){return s+g.filter(function(a){return !sent[a.key];}).length;},0);
+  
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px'>";
+  o+="<div><h2 style='font-size:20px;font-weight:800'>Alertas</h2>";
+  o+="<p style='color:#64748B;font-size:11px'>Dia "+dia+" — "+pendientes+" pendientes de "+total+" total</p></div>";
+  o+="<div style='display:flex;gap:6px'><button class='btn bp bsm' onclick='openEv()'>+ Recordatorio</button><button class='btn bg bsm' onclick='limpiarOk()'>Limpiar OK</button></div></div>";
+  
+  // Render each group
+  var grupos_config=[
+    {id:"mora",label:"Mora (dia 10+)",color:"#EF4444"},
+    {id:"morosos",label:"Pago tardio (dia 5-9)",color:"#F97316"},
+    {id:"pronto",label:"Pronto pago (dia 1-4)",color:"#10B981"},
+    {id:"ajuste",label:"Ajuste cuatrimestral",color:"#8B5CF6"},
+    {id:"renovacion",label:"Renovacion de contrato",color:"#06B6D4"},
+    {id:"agenda",label:"Agenda proximos 7 dias",color:"#3B82F6"}
+  ];
+  
+  var hayAlgo=false;
+  grupos_config.forEach(function(gc){
+    var lista=grupos[gc.id].filter(function(a){return !sent[a.key];});
+    if(!lista.length)return;
+    hayAlgo=true;
+    o+="<div style='margin-bottom:14px'>";
+    o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>";
+    o+="<h3 style='font-size:12px;font-weight:700;color:"+gc.color+"'>"+gc.label+" ("+lista.length+")</h3>";
+    o+="<button class='btn bsm bg' data-okgroup='"+gc.id+"'>✓ Marcar todas OK</button></div>";
+    lista.forEach(function(a){
+      var msgId="msg_"+a.key.replace(/[^a-z0-9]/gi,"_");
+      o+="<div class='card' style='border-left:4px solid "+gc.color+";margin-bottom:6px;padding:10px'>";
+      o+="<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:8px'>";
+      o+="<div style='flex:1'>";
+      o+="<div style='font-size:12px;font-weight:700;margin-bottom:6px'>"+bdg(a.u,gc.color)+" "+esc(a.nom)+"</div>";
+      if(a.msg){
+        o+="<textarea id='"+msgId+"' style='width:100%;background:#0F172A;border:1px solid #334155;border-radius:7px;padding:8px;font-size:11px;color:#CBD5E1;line-height:1.6;min-height:70px;font-family:inherit;resize:vertical'>"+esc(a.msg)+"</textarea>";
+      } else {
+        o+="<div style='font-size:11px;color:#94A3B8'>"+esc(a.titulo||"")+" — "+esc(a.fecha||"")+"</div>";
+      }
+      o+="<div style='color:#64748B;font-size:9px;margin-top:3px'>"+(a.tel||"Sin telefono")+"</div></div>";
+      o+="<div style='display:flex;flex-direction:column;gap:4px;min-width:70px'>";
+      if(a.msg&&a.tel) o+="<a class='wa' style='font-size:10px;text-align:center;display:block;padding:4px 0' href='https://wa.me/"+a.tel+"?text="+encodeURIComponent(a.msg)+"' target='_blank' id='wa_"+msgId+"'>WA</a>";
+      if(a.msg) o+="<button class='btn bp bsm' data-cp='"+msgId+"' style='font-size:10px'>Copiar</button>";
+      o+="<button class='btn bok bsm' data-ok='"+a.key+"' style='font-size:10px'>OK ✓</button>";
+      o+="</div></div></div>";
+    });
+    o+="</div>";
+  });
+  
+  if(!hayAlgo) o+="<div class='card' style='text-align:center;padding:32px'><p style='color:#10B981;font-size:18px;font-weight:700'>Sin alertas pendientes</p><p style='color:#64748B;font-size:12px;margin-top:8px'>Dia "+dia+" — todo en orden</p></div>";
+  
+  G("main").innerHTML=o;
+  G("main").onclick=function(e){
+    // Copy button
+    var cp=e.target.closest("[data-cp]");
+    if(cp){
+      var ta=G(cp.dataset.cp);
+      var txt=ta?ta.value:"";
+      navigator.clipboard.writeText(txt).then(function(){alert("Copiado!");});
+      // Update WA link
+      var wa=G("wa_"+cp.dataset.cp);
+      if(wa) wa.href="https://wa.me/"+wa.href.split("wa.me/")[1].split("?")[0]+"?text="+encodeURIComponent(txt);
+      return;
+    }
+    // OK single
+    var ok=e.target.closest("[data-ok]");
+    if(ok){
+      sent[ok.dataset.ok]=true;
+      localStorage.setItem("gp_als_sent_"+m,JSON.stringify(sent));
+      rAlertas();return;
+    }
+    // OK group
+    var og=e.target.closest("[data-okgroup]");
+    if(og){
+      var g=grupos[og.dataset.okgroup]||[];
+      g.forEach(function(a){sent[a.key]=true;});
+      localStorage.setItem("gp_als_sent_"+m,JSON.stringify(sent));
+      rAlertas();return;
+    }
+  };
+}
+function limpiarOk(){
+  if(!confirm("Limpiar todas las alertas marcadas como OK?"))return;
+  localStorage.removeItem("gp_als_sent_"+mes());
+  rAlertas();
+}
+
+// ── AGENDA (mantener funciones para el modulo interno) ────────────────────────
+function openEv(){
+  var udl=uds();
+  var TL={reparacion:"Reparacion",visita:"Visita",pago:"Pago prometido",vencimiento:"Vencimiento",otro:"Otro"};
+  var o="<div class='g2'>"+fld("ev-f","Fecha *",hoy(),"date");
+  o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='ev-t'>"+Object.keys(TL).map(function(k){return "<option value='"+k+"'>"+TL[k]+"</option>";}).join("")+"</select></div></div>";
+  o+=fld("ev-ti","Titulo *")+"<div class='g2'><div class='fld'><label class='lbl'>Depto</label><select class='inp' id='ev-u'><option value=''>Sin depto</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>"+fld("ev-n","Nombre contacto")+"</div>";
+  o+=fld("ev-tel","Telefono","","tel")+"<div class='fld'><label class='lbl'>Notas</label><textarea class='inp' id='ev-no' style='min-height:56px'></textarea></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveEv()'>Guardar</button></div>";
+  openModal("Nuevo Evento / Recordatorio",o);
+}
+function saveEv(){
+  var t=G("ev-ti").value,f=G("ev-f").value;if(!t||!f){alert("Titulo y fecha obligatorios");return;}
+  DB.ref("ev").push({fecha:f,tipo:G("ev-t").value,titulo:t,unidad:G("ev-u").value,nombre:G("ev-n").value,tel:G("ev-tel").value,notas:G("ev-no").value});
+  closeModal();alert("Evento guardado. Aparece en Alertas si es en los proximos 7 dias.");
+}
+function elimEv(key){if(!confirm("Eliminar?"))return;DB.ref("ev/"+key).remove();}
+
+
+// AGENDA
+var _agMes=mes();
+function rAgenda(){
+  var evA=oA(DATA.ev),evMes=evA.filter(function(e){return e.fecha&&e.fecha.startsWith(_agMes);});
+  var yr=parseInt(_agMes.split("-")[0]),mo=parseInt(_agMes.split("-")[1]);
+  var primerDia=new Date(yr,mo-1,1).getDay(),diasMes=new Date(yr,mo,0).getDate();
+  var TC={reparacion:"#EF4444",visita:"#3B82F6",pago:"#10B981",vencimiento:"#F59E0B",otro:"#8B5CF6"};
+  var TL={reparacion:"Reparacion",visita:"Visita",pago:"Pago prometido",vencimiento:"Vencimiento",otro:"Otro"};
+  var cal="<div style='display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px'>"+["D","L","M","X","J","V","S"].map(function(d){return "<div style='text-align:center;color:#64748B;font-size:10px;font-weight:700'>"+d+"</div>";}).join("")+"</div><div style='display:grid;grid-template-columns:repeat(7,1fr);gap:2px'>";
+  for(var x=0;x<(primerDia===0?6:primerDia-1);x++)cal+="<div></div>";
+  for(var d=1;d<=diasMes;d++){
+    var ds=_agMes+"-"+String(d).padStart(2,"0");
+    var evD=evA.filter(function(e){return e.fecha===ds;});
+    var esH=ds===hoy();
+    cal+="<div style='min-height:44px;background:"+(esH?"#3B82F611":"#0F172A")+";border-radius:6px;border:1px solid "+(esH?"#3B82F6":"#1E293B")+";padding:3px 4px;cursor:"+(evD.length?"pointer":"default")+"'"+(evD.length?" data-evdia='"+ds+"'":"")+">";
+    cal+="<span style='color:"+(esH?"#3B82F6":"#CBD5E1")+";font-size:11px'>"+d+"</span>";
+    evD.slice(0,2).forEach(function(ev){cal+="<div style='background:"+(TC[ev.tipo]||"#64748B")+"33;border-left:2px solid "+(TC[ev.tipo]||"#64748B")+";border-radius:2px;padding:1px 3px;font-size:8px;color:"+(TC[ev.tipo]||"#64748B")+";overflow:hidden;white-space:nowrap;margin-top:1px'>"+esc(ev.titulo)+"</div>";});
+    cal+="</div>";
+  }
+  cal+="</div>";
+  var udl=uds();
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px'><div><h2 style='font-size:20px;font-weight:800'>Agenda</h2><p style='color:#64748B;font-size:11px'>"+evMes.length+" eventos</p></div><div style='display:flex;gap:6px'><input type='month' class='inp' value='"+_agMes+"' style='max-width:140px' onchange=\"_agMes=this.value;rAgenda()\"/><button class='btn bp bsm' onclick='openEv()'>+ Evento</button></div></div>";
+  o+="<div class='card' style='margin-bottom:10px'>"+cal+"</div><div id='ev-list'></div>";
+  G("main").innerHTML=o;
+  G("main").onclick=function(e){var b=e.target.closest("[data-evdia]");if(b)evDia(b.dataset.evdia);};
+  var rows=[];
+  evMes.sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");}).forEach(function(ev){
+    var ki=kpush(ev._key);
+    var row="<div class='card' style='border-left:4px solid "+(TC[ev.tipo]||"#64748B")+";display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:7px;padding:12px;margin-bottom:6px'>";
+    row+="<div style='display:flex;gap:9px;align-items:center'><div style='color:"+(TC[ev.tipo]||"#64748B")+";font-weight:800;font-size:16px;min-width:28px'>"+((ev.fecha||"").split("-")[2]||"")+"</div>";
+    row+="<div><div style='font-weight:700;font-size:13px'>"+esc(ev.titulo)+"</div><div style='color:#64748B;font-size:10px'>"+(TL[ev.tipo]||"")+(ev.unidad?" - "+ev.unidad:"")+(ev.nombre?" - "+esc(ev.nombre):"")+"</div></div></div>";
+    row+="<div style='display:flex;gap:5px'>"+(ev.tel?"<a class='wa' style='font-size:10px' href='https://wa.me/"+ev.tel+"?text="+encodeURIComponent("Hola "+ev.nombre+"! Recordatorio: "+ev.titulo+" el "+ev.fecha+(ev.unidad?" en "+ev.unidad:"")+". Adm: 1555787641")+"' target='_blank'>WA</a>":"")+"<button class='btn bx bsm' data-elev='"+ki+"'>X</button></div></div>";
+    rows.push(row);
+  });
+  G("ev-list").innerHTML=rows.join("")||"<p style='color:#64748B;text-align:center;padding:20px'>Sin eventos este mes</p>";
+  G("ev-list").onclick=function(e){var b=e.target.closest("[data-elev]");if(b)elimEv(kget(parseInt(b.dataset.elev)));};
+}
+function evDia(ds){
+  var evs=oA(DATA.ev).filter(function(e){return e.fecha===ds;});
+  var TL={reparacion:"Reparacion",visita:"Visita",pago:"Pago prometido",vencimiento:"Vencimiento",otro:"Otro"};
+  openModal(ds,evs.map(function(ev){return "<div style='margin-bottom:10px;padding:10px;background:#0F172A;border-radius:8px'><b>"+esc(ev.titulo)+"</b><div style='color:#64748B;font-size:11px'>"+(TL[ev.tipo]||"")+(ev.unidad?" - "+ev.unidad:"")+(ev.nombre?" - "+esc(ev.nombre):"")+"</div>"+(ev.tel?"<div style='margin-top:6px'><a class='wa' href='https://wa.me/"+ev.tel+"?text="+encodeURIComponent("Hola "+ev.nombre+"! Recordatorio: "+ev.titulo+" el "+ev.fecha+(ev.unidad?" en "+ev.unidad:"")+". Adm: 1555787641")+"' target='_blank' style='font-size:11px'>Enviar WA</a></div>":" ")+"</div>";}).join(""));
+}
+function openEv(){
+  var udl=uds();
+  var TL={reparacion:"Reparacion",visita:"Visita",pago:"Pago prometido",vencimiento:"Vencimiento",otro:"Otro"};
+  var o="<div class='g2'>"+fld("ev-f","Fecha *",hoy(),"date")+"<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='ev-t'>"+Object.keys(TL).map(function(k){return "<option value='"+k+"'>"+TL[k]+"</option>";}).join("")+"</select></div></div>"+fld("ev-ti","Titulo *")+"<div class='g2'><div class='fld'><label class='lbl'>Depto</label><select class='inp' id='ev-u'><option value=''>Sin depto</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>"+fld("ev-n","Nombre contacto")+"</div>"+fld("ev-tel","Telefono","","tel")+"<div class='fld'><label class='lbl'>Notas</label><textarea class='inp' id='ev-no' style='min-height:56px'></textarea></div><div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveEv()'>Guardar</button></div>";
+  openModal("Nuevo Evento",o);
+}
+function saveEv(){
+  var t=G("ev-ti").value,f=G("ev-f").value;if(!t||!f){alert("Titulo y fecha obligatorios");return;}
+  DB.ref("ev").push({fecha:f,tipo:G("ev-t").value,titulo:t,unidad:G("ev-u").value,nombre:G("ev-n").value,tel:G("ev-tel").value,notas:G("ev-no").value});
+  closeModal();setTimeout(rAgenda,300);
+}
+function elimEv(key){if(!confirm("Eliminar?"))return;DB.ref("ev/"+key).remove();setTimeout(rAgenda,300);}
+
+// CAJA
+var _cajaMes=mes(),_cajaF=hoy(),_cajaV="dia";
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CAJA
+// ══════════════════════════════════════════════════════════════════════════════
+var _cajaMes=mes(),_cajaF=hoy(),_cajaV="dia";
+
+// Helper: get cumulative balance for an account up to a date (inclusive)
+function saldoAcumulado(cta, hastaFecha, hastaM){
+  // All payments in this account up to date
+  var ing=0,egr=0;
+  oA(DATA.cob).forEach(function(c){
+    pA(c).forEach(function(p){
+      if(p.cuenta===cta&&p.fecha<=hastaFecha) ing+=p.monto;
+    });
+  });
+  oA(DATA.aj).forEach(function(a){
+    if(a.cuenta===cta&&a.fecha<=hastaFecha){
+      if(a.tipo==="ingreso") ing+=Number(a.monto||0);
+      else egr+=Number(a.monto||0);
+    }
+  });
+  oA(DATA.cst).forEach(function(c){
+    if(c.pagado&&c.cuenta===cta&&c.fec_venc&&c.fec_venc<=hastaFecha) egr+=Number(c.monto||0);
+  });
+  // Subtract withdrawals, add deposits (movs)
+  oA(DATA.movs).forEach(function(mv){
+    if(mv.cuenta===cta&&mv.fecha<=hastaFecha){
+      if(mv.tipo==="retiro") egr+=Number(mv.monto||0);
+      else ing+=Number(mv.monto||0);
+    }
+  });
+  return ing-egr;
+}
+
+function rCaja(){
+  if(!G("main")) return;
+  var esA=USER.r==="admin",m=_cajaMes;
+  // ALL cobranzas and costs for this month
+  var cobM=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  var cstM=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
+  var ajM=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m);});
+  var movsM=oA(DATA.movs).filter(function(mv){return mv.fecha&&mv.fecha.startsWith(m);});
+  var subcM=oA(DATA.subc).filter(function(s){return s.fecha&&s.fecha.startsWith(m);});
+  var cierreM=oA(DATA.cierres).filter(function(c){return c.mes===m;})[0];
+  var tcVal=Number(localStorage.getItem("gp_tc_"+m)||0);
+
+  // Monthly totals (ingresos = cobrado, egresos = costos pagados + aj egresos)
+  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)
+        +ajM.filter(function(a){return a.tipo==="ingreso"&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+  var eM=cstM.reduce(function(s,c){return s+Number(c.monto||0);},0)
+        +ajM.filter(function(a){return a.tipo==="egreso"&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+  var util=iM-eM;
+
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px'>";
+  o+="<h2 style='font-size:20px;font-weight:800'>Caja</h2>";
+  o+="<div style='display:flex;gap:5px;flex-wrap:wrap'>";
+  o+="<button class='btn bsm "+(_cajaV==="dia"?"bp":"bg")+"' data-cv='dia'>Diario</button>";
+  o+="<button class='btn bsm "+(_cajaV==="mes"?"bp":"bg")+"' data-cv='mes'>Mensual</button>";
+  o+="<button class='btn bsm bpu' onclick='openAj()'>+ Ajuste</button>";
+  o+="</div></div>";
+
+  if(_cajaV==="dia"){
+    // DAY VIEW
+    var subcDia=subcM.filter(function(s){return s.fecha===_cajaF;})[0];
+    // Payments on this day
+    var pagosD=[];
+    cobM.forEach(function(c){
+      pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
+        pagosD.push(Object.assign({},p,{concepto:(p.concepto||"Alquiler")+" "+c.unidad+" - "+c.inq}));
+      });
+    });
+    var costosD=cstM.filter(function(c){return c.fec_venc===_cajaF;});
+    var ajD=ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;});
+    var iD=pagosD.reduce(function(s,p){return s+p.monto;},0)
+            +ajD.filter(function(a){return a.tipo==="ingreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+    var eD=costosD.reduce(function(s,c){return s+Number(c.monto||0);},0)
+            +ajD.filter(function(a){return a.tipo==="egreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+
+    o+="<div style='display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap'>";
+    o+="<input type='date' class='inp' value='"+_cajaF+"' style='max-width:160px' id='caja-fecha'/>";
+    o+="<span style='color:#64748B;font-size:12px'>"+(subcDia?"✅ Subcierre realizado":"Sin subcierre")+"</span></div>";
+
+    o+="<div class='g3' style='margin-bottom:12px'>";
+    o+=sc("$","Ingresos del dia",fmt(iD),"","#10B981");
+    o+=sc("X","Egresos del dia",fmt(eD),"","#EF4444");
+    o+=sc("=","Saldo del dia",fmt(iD-eD),"",(iD-eD)>=0?"#10B981":"#EF4444");
+    o+="</div>";
+
+    // Saldos acumulados por cuenta hasta hoy
+    // Saldo inicial (hasta ayer) + movimientos hoy + saldo final
+    var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);var ayerStr=ayer.toISOString().split("T")[0];
+    o+="<div class='card' style='margin-bottom:10px;overflow-x:auto'>";
+    o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Saldos por cuenta — "+_cajaF+"</h3>";
+    o+="<table class='tbl'><thead><tr><th>Cuenta</th><th>Saldo inicio dia</th><th>Entro hoy</th><th>Salio hoy</th><th>Saldo cierre</th></tr></thead><tbody>";
+    var hayMovs=false;
+    CTAS.forEach(function(cta){
+      var salIni=saldoAcumulado(cta,ayerStr,m);
+      var ingHoy=pagosD.filter(function(p){return p.cuenta===cta;}).reduce(function(s,p){return s+p.monto;},0)+ajD.filter(function(a){return a.tipo==="ingreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+      var egrHoy=costosD.filter(function(c){return c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)+ajD.filter(function(a){return a.tipo==="egreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+      var salFin=salIni+ingHoy-egrHoy;
+      if(salIni!==0||ingHoy!==0||egrHoy!==0){
+        hayMovs=true;
+        o+="<tr><td style='font-weight:600'>"+cta+"</td>";
+        o+="<td style='color:#94A3B8'>"+fmt(salIni)+"</td>";
+        o+="<td style='color:#10B981'>"+(ingHoy>0?fmt(ingHoy):"--")+"</td>";
+        o+="<td style='color:#EF4444'>"+(egrHoy>0?fmt(egrHoy):"--")+"</td>";
+        o+="<td style='color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(salFin)+"</td></tr>";
+      }
+    });
+    if(!hayMovs) o+="<tr><td colspan='5' style='color:#64748B;text-align:center'>Sin movimientos</td></tr>";
+    o+="</tbody></table></div>";
+
+    // Movements of the day
+    if(pagosD.length||ajD.filter(function(a){return a.tipo==="ingreso";}).length){
+      o+="<div class='card' style='margin-bottom:8px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px;color:#10B981'>Ingresos del dia</h3>";
+      pagosD.forEach(function(p){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(p.concepto)+"<div style='color:#64748B;font-size:10px'>"+p.cuenta+"</div></div><span style='color:#10B981;font-weight:700'>"+fmt(p.monto)+"</span></div>";});
+      ajD.filter(function(a){return a.tipo==="ingreso";}).forEach(function(a){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(a.concepto)+"<div style='color:#64748B;font-size:10px'>"+a.cuenta+"</div></div><span style='color:#10B981;font-weight:700'>"+fmt(a.monto)+"</span></div>";});
+      o+="</div>";
+    }
+    if(costosD.length||ajD.filter(function(a){return a.tipo==="egreso";}).length){
+      o+="<div class='card' style='margin-bottom:8px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px;color:#EF4444'>Egresos del dia</h3>";
+      costosD.forEach(function(c){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(c.desc)+"<div style='color:#64748B;font-size:10px'>"+c.cuenta+" - "+c.ed+"</div></div><span style='color:#EF4444;font-weight:700'>"+fmt(c.monto)+"</span></div>";});
+      ajD.filter(function(a){return a.tipo==="egreso";}).forEach(function(a){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(a.concepto)+"<div style='color:#64748B;font-size:10px'>"+a.cuenta+"</div></div><span style='color:#EF4444;font-weight:700'>"+fmt(a.monto)+"</span></div>";});
+      o+="</div>";
+    }
+
+    // Subcierre
+    o+="<div class='card' style='border-left:3px solid "+(subcDia?"#10B981":"#3B82F6")+"'>";
+    o+="<div style='display:flex;justify-content:space-between;align-items:center'>";
+    o+="<div><h3 style='font-size:13px;font-weight:700'>Subcierre del dia</h3>";
+    o+="<p style='color:#64748B;font-size:11px'>"+(subcDia?"Realizado por "+esc(subcDia.cerradoPor):"Conta el efectivo y registra los saldos reales")+"</p></div>";
+    if(!subcDia) o+="<button class='btn bp bsm' onclick='openSubc()'>Hacer Subcierre</button>";
+    o+="</div>";
+    if(subcDia&&subcDia.saldos){
+      o+="<table class='tbl' style='margin-top:8px'><thead><tr><th>Cuenta</th><th>Segun sistema</th><th>Real contado</th><th>Diferencia</th></tr></thead><tbody>";
+      Object.entries(subcDia.saldos).forEach(function(e){
+        var s=e[1];
+        o+="<tr><td style='font-weight:600'>"+e[0]+"</td><td>"+fmt(s.sistema)+"</td><td>"+fmt(s.real)+"</td>";
+        o+="<td style='color:"+(s.dif===0?"#10B981":s.dif>0?"#F59E0B":"#EF4444")+";font-weight:700'>"+(s.dif>0?"+":"")+fmt(s.dif)+"</td></tr>";
+      });
+      o+="</tbody></table>";
+    }
+    o+="</div>";
+
+  } else {
+    // MONTHLY VIEW
+    o+="<input type='month' class='inp' value='"+m+"' style='max-width:150px;margin-bottom:12px' id='caja-mes'/>";
+    if(esA){
+      o+="<div style='display:flex;gap:8px;margin-bottom:12px;align-items:flex-end;flex-wrap:wrap'>";
+      o+="<div class='fld' style='margin:0'><label class='lbl'>Tipo de cambio USD del mes</label>";
+      o+="<div style='display:flex;gap:5px'><input class='inp' type='number' id='tc-inp' value='"+(tcVal||"")+"' placeholder='Ej: 1250' style='max-width:120px'/>";
+      o+="<button class='btn bg bsm' onclick='guardarTC()'>Guardar</button></div></div></div>";
+    }
+
+    // Summary cards
+    o+="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px'>";
+    o+=sc("$","Ingresos",fmt(iM),"cobrado","#10B981");
+    o+=sc("X","Egresos",fmt(eM),"costos","#EF4444");
+    if(esA) o+=sc("=","Resultado",fmt(util),"",util>=0?"#10B981":"#EF4444");
+    if(esA&&tcVal>0) o+=sc("$","USD",fusd(util,tcVal),"","#06B6D4");
+    if(esA) o+=sc("2","x Socio",fmt(util/2),"","#8B5CF6");
+    o+="</div>";
+
+    // Balance por cuenta del mes
+    o+="<div class='card' style='margin-bottom:10px;overflow-x:auto'>";
+    o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Saldo por cuenta — "+m+"</h3>";
+    o+="<table class='tbl'><thead><tr><th>Cuenta</th><th>Ingresos</th><th>Egresos</th><th>Saldo del mes</th><th>Acumulado</th></tr></thead><tbody>";
+    var lastDayM=m+"-31"; // approximate last day for accumulation
+    CTAS.forEach(function(cta){
+      var ingC=cobM.reduce(function(s,c){return s+pA(c).filter(function(p){return p.cuenta===cta;}).reduce(function(a,p){return a+p.monto;},0);},0)
+               +ajM.filter(function(a){return a.tipo==="ingreso"&&a.cuenta===cta&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+      var egrC=cstM.filter(function(c){return c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)
+               +ajM.filter(function(a){return a.tipo==="egreso"&&a.cuenta===cta&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+      var salMes=ingC-egrC;
+      var salAcum=saldoAcumulado(cta,lastDayM,m);
+      if(ingC||egrC){
+        o+="<tr><td style='font-weight:600'>"+cta+"</td>";
+        o+="<td style='color:#10B981'>"+(ingC>0?fmt(ingC):"--")+"</td>";
+        o+="<td style='color:#EF4444'>"+(egrC>0?fmt(egrC):"--")+"</td>";
+        o+="<td style='color:"+(salMes>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(salMes)+"</td>";
+        o+="<td style='color:#94A3B8'>"+fmt(salAcum)+"</td></tr>";
+      }
+    });
+    o+="<tr style='border-top:2px solid #334155;font-weight:700'><td>TOTAL</td><td style='color:#10B981'>"+fmt(iM)+"</td><td style='color:#EF4444'>"+fmt(eM)+"</td><td style='color:"+(util>=0?"#10B981":"#EF4444")+"'>"+fmt(util)+"</td><td></td></tr>";
+    o+="</tbody></table></div>";
+
+    // Subcierres del mes
+    if(subcM.length){
+      o+="<div class='card' style='margin-bottom:10px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Subcierres del mes</h3>";
+      subcM.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(s){
+        o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'>";
+        o+="<span>"+s.fecha+" - "+esc(s.cerradoPor)+"</span><span style='color:#10B981'>✅</span></div>";
+      });
+      o+="</div>";
+    }
+
+    // Retiros y Aportes
+    o+="<div class='card' style='margin-bottom:10px'>";
+    o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+    o+="<h3 style='font-size:13px;font-weight:700'>Retiros y Aportes personales</h3>";
+    o+="<button class='btn bpu bsm' onclick='openMov()'>+ Registrar</button></div>";
+    CTAP.forEach(function(cta){
+      var mc=movsM.filter(function(mv){return mv.cuenta===cta;});
+      var ap=mc.filter(function(mv){return mv.tipo==="aporte";}).reduce(function(s,mv){return s+Number(mv.monto||0);},0);
+      var ret=mc.filter(function(mv){return mv.tipo==="retiro";}).reduce(function(s,mv){return s+Number(mv.monto||0);},0);
+      o+="<div style='margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #334155'>";
+      o+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'>";
+      o+="<b style='font-size:12px'>"+cta+"</b>";
+      o+="<div style='font-size:11px'><span style='color:#10B981'>+"+fmt(ap)+"</span> aportes  <span style='color:#EF4444'>-"+fmt(ret)+"</span> retiros</div></div>";
+      if(mc.length){
+        o+="<table class='tbl'>";
+        mc.forEach(function(mv){
+          o+="<tr><td style='font-size:10px;color:#64748B'>"+mv.fecha+"</td>";
+          o+="<td style='font-size:11px'>"+(mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" - "+esc(mv.nota):"")+"</td>";
+          o+="<td style='color:"+(mv.tipo==="retiro"?"#EF4444":"#10B981")+";font-weight:600;font-size:12px'>"+(mv.tipo==="retiro"?"-":"+")+fmt(mv.monto)+"</td></tr>";
+        });
+        o+="</table>";
+      }
+      o+="</div>";
+    });
+    o+="</div>";
+
+    // Cierre mensual
+    if(esA){
+      o+="<div class='card' style='border-left:3px solid "+(cierreM?"#10B981":"#F59E0B")+"'>";
+      o+="<div style='display:flex;justify-content:space-between;align-items:center'>";
+      o+="<div><h3 style='font-size:13px;font-weight:700;margin-bottom:4px'>Cierre Mensual — "+m+"</h3>";
+      o+="<p style='color:#64748B;font-size:11px'>"+(cierreM?"Cerrado el "+cierreM.fecha+" por "+esc(cierreM.cerradoPor):"Pendiente de cierre")+"</p></div>";
+      if(!cierreM) o+="<button class='btn bok bsm' onclick='cerrarMes()'>Cerrar Mes</button>";
+      o+="</div></div>";
+    }
+  }
+
+  G("main").innerHTML=o;
+  // Wire view toggle buttons
+  G("main").addEventListener("click",function(e){
+    var cv=e.target.closest("[data-cv]");
+    if(cv){_cajaV=cv.dataset.cv;rCaja();return;}
+  },true);
+  // Wire date/month inputs
+  setTimeout(function(){
+    var fd=G("caja-fecha");
+    if(fd) fd.onchange=function(){_cajaF=this.value;rCaja();};
+    var fm=G("caja-mes");
+    if(fm) fm.onchange=function(){_cajaMes=this.value;rCaja();};
+  },50);
+}
+
+function guardarTC(){
+  var v=(G("tc-inp")||{value:""}).value||"";
+  localStorage.setItem("gp_tc_"+_cajaMes,v);
+  rCaja();
+}
+
+function cerrarMes(){
+  if(!confirm("Cerrar el mes "+_cajaMes+"? Esta accion es definitiva."))return;
+  // Ask for exchange rate if not set
+  var tcActual=Number(localStorage.getItem("gp_tc_"+_cajaMes)||0);
+  if(!tcActual){
+    var tcInput=prompt("Ingresa el tipo de cambio USD promedio del mes "+_cajaMes+" (ej: 1250):");
+    if(tcInput&&Number(tcInput)>0){
+      localStorage.setItem("gp_tc_"+_cajaMes,tcInput);
+    }
+  }
+  var m=_cajaMes;
+  var cobM=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  var cstM=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
+  var ajM=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
+  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)+ajM.filter(function(a){return a.tipo==="ingreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+  var eM=cstM.reduce(function(s,c){return s+Number(c.monto||0);},0)+ajM.filter(function(a){return a.tipo==="egreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+  var tc=Number(localStorage.getItem("gp_tc_"+m)||0);
+  // Save saldos por cuenta at month end
+  var saldosCuenta={};
+  CTAS.forEach(function(cta){saldosCuenta[cta]=saldoAcumulado(cta,m+"-31",m);});
+  DB.ref("cierres").push({mes:m,fecha:hoy(),ingresos:iM,egresos:eM,utilidad:iM-eM,tc:tc,cerradoPor:USER.n,saldos:saldosCuenta});
+  alert("Mes "+m+" cerrado. Utilidad: "+fmt(iM-eM));
+  setTimeout(rCaja,300);
+}
+
+function openSubc(){
+  var o="<div class='wbx' style='margin-bottom:12px;font-size:11px'>";
+  o+="<b>Instrucciones:</b> La columna <b>Calculado</b> muestra lo que deberia haber segun los movimientos registrados. ";
+  o+="Conta el dinero real de cada cuenta y escribilo en <b>Real contado</b>. Si hay diferencia queda registrada.";
+  o+="</div>";
+  o+="<table class='tbl' style='margin-bottom:12px'><thead><tr><th>Cuenta</th><th>Calculado (sistema)</th><th>Real contado $</th></tr></thead><tbody>";
+  CTAS.forEach(function(cta){
+    var sal=saldoAcumulado(cta,_cajaF,_cajaMes);
+    if(sal!==0||true){
+      o+="<tr><td style='font-weight:600'>"+cta+"</td>";
+      o+="<td style='color:"+(sal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(sal)+"</td>";
+      o+="<td><input class='inp' type='number' id='sc-"+cta.replace(/ /g,"-")+"' placeholder='Ingresar monto real...' style='padding:4px 8px;font-size:12px'/></td></tr>";
+    }
+  });
+  o+="</tbody></table>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveSubc()'>Confirmar Subcierre</button></div>";
+  openModal("Subcierre — "+_cajaF,o,true);
+}
+
+function saveSubc(){
+  var saldos={},ups={};
+  CTAS.forEach(function(cta){
+    var sistema=saldoAcumulado(cta,_cajaF,_cajaMes);
+    var inp=G("sc-"+cta.replace(/ /g,"-"));
+    var real=inp&&inp.value.trim()?Number(inp.value):sistema; // if empty, no difference
+    var dif=real-sistema;
+    saldos[cta]={sistema:sistema,real:real,dif:dif};
+    // Register difference as adjustment only if non-zero
+    if(dif!==0){
+      var nk=DB.ref("aj").push().key;
+      ups["aj/"+nk]={fecha:_cajaF,tipo:dif>0?"ingreso":"egreso",sub:"Diferencia de caja",
+        cuenta:cta,concepto:"Diferencia subcierre "+_cajaF,monto:Math.abs(dif),auto:true};
+    }
+  });
+  var sk=DB.ref("subc").push().key;
+  ups["subc/"+sk]={fecha:_cajaF,cerradoPor:USER.n,saldos:saldos};
+  DB.ref("/").update(ups);
+  closeModal();
+  alert("Subcierre registrado para "+_cajaF+".");
+  setTimeout(rCaja,300);
+}
+
+function openAj(){
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Movimientos que no son alquileres ni costos del sistema.</p>";
+  o+="<div class='g2'>"+fld("aj-f","Fecha",hoy(),"date");
+  o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='aj-t'><option value='egreso'>Egreso (-)</option><option value='ingreso'>Ingreso (+)</option></select></div>";
+  o+="<div class='fld'><label class='lbl'>Categoria</label><select class='inp' id='aj-s'><option>Diferencia de caja</option><option>Compra insumos</option><option>Gastos bancarios</option><option>Impuesto/tasa</option><option>Gasto personal</option><option>Devolucion deposito</option><option>Otro</option></select></div>";
+  o+=sld("aj-c","Cuenta",CTAS)+"</div>";
+  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","number");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveAj()'>Registrar</button></div>";
+  openModal("Ajuste Manual",o);
+}
+function saveAj(){
+  var m=Number(G("aj-m").value),c=G("aj-con").value;
+  if(!m||!c){alert("Monto y descripcion obligatorios");return;}
+  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:G("aj-s").value,cuenta:G("aj-c").value,concepto:c,monto:m});
+  closeModal();setTimeout(rCaja,300);
+}
+function openMov(){
+  var o="<div class='g2'>"+fld("mv-f","Fecha",hoy(),"date");
+  o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro</option><option value='aporte'>Aporte</option></select></div>";
+  o+=sld("mv-c","Cuenta",CTAP)+fld("mv-m","Monto $","","number")+"</div>"+fld("mv-n","Nota");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
+  openModal("Retiro / Aporte",o);
+}
+function saveMov(){
+  var m=Number(G("mv-m").value);if(!m){alert("Ingresa el monto");return;}
+  DB.ref("movs").push({fecha:G("mv-f").value,tipo:G("mv-t").value,cuenta:G("mv-c").value,monto:m,nota:G("mv-n").value});
+  closeModal();setTimeout(rCaja,300);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ESTADISTICAS
+// ══════════════════════════════════════════════════════════════════════════════
+function rStats(){
+  var iqA=oA(DATA.iq),histA=oA(DATA.hist);
+  var act=iqA.filter(function(i){return i.estado==="activo";});
+  var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
+  var cieA=oA(DATA.cierres).sort(function(a,b){return(b.mes||"").localeCompare(a.mes||"");});
+
+  // Current month
+  var m=mes(),tcVal=Number(localStorage.getItem("gp_tc_"+m)||0);
+  var cobM=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  var cstM=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
+  var ajM=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
+  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)+ajM.filter(function(a){return a.tipo==="ingreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+  var eM=cstM.reduce(function(s,c){return s+Number(c.monto||0);},0)+ajM.filter(function(a){return a.tipo==="egreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+  var util=iM-eM;
+
+  var o="<h2 style='font-size:20px;font-weight:800;margin-bottom:12px'>Estadisticas</h2>";
+
+  // Summary cards
+  o+="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px'>";
+  o+=sc("GP","Ocupacion",act.length+"/"+totU,(totU?Math.round((act.length/totU)*100):0)+"%","");
+  o+=sc("R","Rotacion",histA.length,"historico","#F59E0B");
+  o+=sc("$","Renta/mes",fmt(act.reduce(function(s,i){return s+i.alquiler;},0)),"potencial","#10B981");
+  o+=sc("C","Cobrado",fmt(iM),"este mes","#10B981");
+  o+=sc("X","Costos",fmt(eM),"este mes","#EF4444");
+  o+=sc("=","Resultado",fmt(util),"",util>=0?"#10B981":"#EF4444");
+  if(tcVal>0) o+=sc("$","USD",fusd(util,tcVal),"","#06B6D4");
+  o+="</div>";
+
+  // Por edificio
+  // Stats per building with current month
+  o+="<div class='card' style='margin-bottom:10px;overflow-x:auto'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Ingresos por Edificio — "+m+(tcVal>0?" (USD: 1=$"+tcVal+")":"")+"</h3>";
+  o+="<table class='tbl'><thead><tr><th>Edif.</th><th>Ocup.</th><th>Renta pot.</th><th>Cobrado</th><th>Costos</th><th>Resultado</th><th>USD</th></tr></thead><tbody>";
+  Object.keys(ED).forEach(function(cod){
+    var inqEd=act.filter(function(i){return i.unidad&&i.unidad.startsWith(cod+"-");});
+    var rentaPot=inqEd.reduce(function(s,i){return s+i.alquiler;},0);
+    var cobEd=cobM.filter(function(c){return c.unidad&&c.unidad.startsWith(cod+"-");}).reduce(function(s,c){return s+pT(c);},0);
+    var cstEd=cstM.filter(function(c){return c.ed===cod;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
+    var resEd=cobEd-cstEd;
+    o+="<tr><td>"+bdg(cod,COL[cod]||"#64748B")+"</td>";
+    o+="<td>"+inqEd.length+"/"+ED[cod].u+"</td>";
+    o+="<td style='color:#94A3B8'>"+fmt(rentaPot)+"</td>";
+    o+="<td style='color:#10B981'>"+fmt(cobEd)+"</td>";
+    o+="<td style='color:#EF4444'>"+fmt(cstEd)+"</td>";
+    o+="<td style='color:"+(resEd>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(resEd)+"</td>";
+    o+="<td style='color:#06B6D4'>"+(tcVal>0?fusd(resEd,tcVal):"--")+"</td></tr>";
+  });
+  o+="</tbody></table></div>";
+
+  // Historial de cierres
+  // Top departments by rent
+  if(act.length){
+    o+="<div class='card' style='margin-bottom:10px;overflow-x:auto'>";
+    o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Por Departamento — alquiler actual</h3>";
+    o+="<table class='tbl'><thead><tr><th>Depto</th><th>Inquilino</th><th>Alquiler</th><th>USD</th><th>Vence</th></tr></thead><tbody>";
+    act.sort(function(a,b){return b.alquiler-a.alquiler;}).forEach(function(i){
+      var d=i.egreso?Math.round((new Date(i.egreso)-new Date())/86400000):-1;
+      o+="<tr><td>"+bdg(i.unidad,COL[i.unidad.split('-')[0]]||'#64748B')+"</td>";
+      o+="<td style='font-size:11px'>"+esc(i.nombre.split(',')[0])+"</td>";
+      o+="<td style='color:#10B981;font-weight:600'>"+fmt(i.alquiler)+"</td>";
+      o+="<td style='color:#06B6D4'>"+(tcVal>0?fusd(i.alquiler,tcVal):"--")+"</td>";
+      o+="<td style='color:"+(d>=0&&d<=30?"#F59E0B":"#64748B")+";font-size:10px'>"+(i.egreso||"--")+"</td></tr>";
+    });
+    o+="</tbody></table></div>";
+  }
+
+  if(cieA.length){
+    o+="<div class='card' style='overflow-x:auto'>";
+    o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Historial de Resultados Mensuales</h3>";
+    o+="<table class='tbl'><thead><tr><th>Mes</th><th>Ingresos</th><th>Egresos</th><th>Resultado</th><th>USD</th><th>x Socio</th></tr></thead><tbody>";
+    cieA.forEach(function(c){
+      var u=c.utilidad||0;
+      o+="<tr><td style='font-weight:600'>"+c.mes+"</td>";
+      o+="<td style='color:#10B981'>"+fmt(c.ingresos||0)+"</td>";
+      o+="<td style='color:#EF4444'>"+fmt(c.egresos||0)+"</td>";
+      o+="<td style='color:"+(u>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(u)+"</td>";
+      o+="<td style='color:#06B6D4'>"+(c.tc>0?fusd(u,c.tc):"--")+"</td>";
+      o+="<td style='color:#8B5CF6'>"+(u>0?fmt(u/2):"--")+"</td></tr>";
+    });
+    o+="</tbody></table></div>";
+  }
+
+  G("main").innerHTML=o;
+}
+
+
+// ── CONFIGURACION (solo Admin) ────────────────────────────────────────────────
+var _cfgTab = "propiedades"; // propiedades | costos | ingresos
+
+function rConfig(){
+  if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
+
+  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["usuarios","Usuarios"]];
+  var o = "<h2 style='font-size:20px;font-weight:800;margin-bottom:12px'>Configuracion</h2>";
+  o += "<div style='display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap'>";
+  tabs.forEach(function(t){
+    var cls="btn bsm "+(_cfgTab===t[0]?"bp":"bg");
+    var btn=document.createElement("button");
+    btn.className=cls;
+    btn.textContent=t[1];
+    btn.dataset.tab=t[0];
+    o += "<button class='"+cls+"' data-cfgtab='"+t[0]+"'>"+t[1]+"</button>";
+  });
+  o += "</div><div id='cfg-body'></div>";
+  G("main").innerHTML = o;
+  G("main").addEventListener("click",function(e){var b=e.target.closest("[data-cfgtab]");if(b){_cfgTab=b.dataset.cfgtab;rConfig();}},true);
+
+  if(_cfgTab==="propiedades") renderCfgProp();
+  else if(_cfgTab==="costos") renderCfgCostos();
+  else if(_cfgTab==="ingresos") renderCfgIngresos();
+  else if(_cfgTab==="usuarios") renderCfgUsuarios();
+}
+
+// ── TAB PROPIEDADES ───────────────────────────────────────────────────────────
+function renderCfgProp(){
+  var el = G("cfg-body"); if(!el) return;
+  var custom = oA(DATA.cfg).filter(function(x){return x.tipo==="propiedad";});
+  var vendidas = oA(DATA.cfg).filter(function(x){return x.tipo==="vendida";});
+
+  var o = "<div class='card' style='margin-bottom:10px'>";
+  o += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+  o += "<h3 style='font-size:13px;font-weight:700'>Edificios del sistema</h3></div>";
+  Object.keys(ED).forEach(function(cod){
+    var e=ED[cod];
+    var inq=oA(DATA.iq).filter(function(i){return i.estado==="activo"&&(i.unidad||"").startsWith(cod+"-");}).length;
+    o += "<div style='display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
+    o += "<div><span style='color:"+COL[cod]+";font-weight:700'>"+cod+"</span>  "+esc(e.n)+"  <span style='color:#64748B;font-size:10px'>"+esc(e.d)+"  "+e.u+" unidades</span></div>";
+    o += "<span style='color:#10B981;font-size:11px'>"+inq+" ocupadas</span></div>";
+  });
+  o += "</div>";
+
+  if(custom.length){
+    o += "<div class='card' style='margin-bottom:10px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Propiedades agregadas</h3>";
+    custom.forEach(function(p){
+      var ki=kpush(p._key);
+      o += "<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
+      o += "<div><b>"+esc(p.codigo||"")+"</b>  "+esc(p.nombre)+"  <span style='color:#64748B;font-size:10px'>"+esc(p.dir||"")+"  "+( p.unidades||1)+" unid.</span></div>";
+      o += "<div style='display:flex;gap:4px'>";
+      o += "<button class='btn bw bsm' data-editprop='"+ki+"'>Editar</button>";
+      o += "<button class='btn bx bsm' data-venprop='"+ki+"'>Vender/Dar baja</button>";
+      o += "</div></div>";
+    });
+    o += "</div>";
+  }
+
+  if(vendidas.length){
+    o += "<div class='card' style='margin-bottom:10px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px;color:#64748B'>Propiedades vendidas / dadas de baja</h3>";
+    vendidas.forEach(function(p){
+      o += "<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:11px;color:#64748B'>";
+      o += "<span>"+esc(p.nombre)+"</span><span>Baja: "+esc(p.fecha_baja||"--")+"</span></div>";
+    });
+    o += "</div>";
+  }
+
+  o += "<button class='btn bp' style='margin-top:4px' onclick='openAddProp()'>+ Agregar propiedad</button>";
+  el.innerHTML = o;
+  el.onclick = function(e){
+    var ep=e.target.closest("[data-editprop]"); if(ep)openEditProp(kget(parseInt(ep.dataset.editprop)));
+    var vp=e.target.closest("[data-venprop]"); if(vp)venderProp(kget(parseInt(vp.dataset.venprop)));
+  };
+}
+
+function openAddProp(){
+  var o = fld("ap-cod","Codigo (ej: R3, LP2)","")
+        + fld("ap-nom","Nombre / descripcion *","")
+        + fld("ap-dir","Direccion","")
+        + fld("ap-u","Cantidad de unidades","1","number")
+        + fld("ap-obs","Notas","");
+  o += "<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveProp()'>Agregar</button></div>";
+  openModal("Agregar Propiedad / Inmueble",o);
+}
+function saveProp(){
+  var cod=G("ap-cod").value, nom=G("ap-nom").value;
+  if(!nom){alert("El nombre es obligatorio");return;}
+  DB.ref("cfg").push({tipo:"propiedad",codigo:cod,nombre:nom,dir:G("ap-dir").value,unidades:Number(G("ap-u").value||1),obs:G("ap-obs").value,fecha_alta:hoy(),activo:true});
+  closeModal(); setTimeout(rConfig,300);
+}
+function openEditProp(key){
+  var p=DATA.cfg[key]; if(!p) return;
+  var ki=kpush(key);
+  var o = fld("ep-cod","Codigo",p.codigo||"")
+        + fld("ep-nom","Nombre *",p.nombre||"")
+        + fld("ep-dir","Direccion",p.dir||"")
+        + fld("ep-u","Unidades",p.unidades||1,"number")
+        + fld("ep-obs","Notas",p.obs||"");
+  o += "<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-saveedit='"+ki+"'>Guardar</button></div>";
+  openModal("Editar Propiedad",o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.saveedit)doEditProp(kget(parseInt(e.target.dataset.saveedit)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function doEditProp(key){
+  DB.ref("cfg/"+key).update({codigo:G("ep-cod").value,nombre:G("ep-nom").value,dir:G("ep-dir").value,unidades:Number(G("ep-u").value||1),obs:G("ep-obs").value});
+  closeModal(); setTimeout(rConfig,300);
+}
+function venderProp(key){
+  var p=DATA.cfg[key];
+  if(!confirm("Dar de baja / vender: "+p.nombre+"?")) return;
+  DB.ref("cfg/"+key).update({tipo:"vendida",fecha_baja:hoy(),activo:false});
+  setTimeout(rConfig,300);
+}
+
+// ── TAB COSTOS ────────────────────────────────────────────────────────────────
+function renderCfgCostos(){
+  var el=G("cfg-body"); if(!el) return;
+  var costosExtra=oA(DATA.cfg).filter(function(x){return x.tipo==="otro_gasto"||x.tipo==="costo_extra"||x.tipo==="costo_fijo_extra";});
+  var cfActual=getCF();
+  var cats=[]; cfActual.forEach(function(c){if(!cats.includes(c.c))cats.push(c.c);}); cats.push("Otro");
+
+  // Group costs by category
+  var grupos={};
+  cfActual.filter(function(c){return !c.id.startsWith("ce_")&&!oA(DATA.cfg).filter(function(x){return x.tipo==="costo_extra";}).map(function(x){return x._key;}).includes(c.id);}).forEach(function(c){if(!grupos[c.c])grupos[c.c]=[];grupos[c.c].push(c);});
+
+  var o="<div class='card' style='margin-bottom:10px'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Costos fijos del sistema ("+CF.length+" items)</h3></div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Estos costos se generan automaticamente cada mes. Para agregar o quitar servicios usa el boton de abajo.</p>";
+  Object.keys(grupos).forEach(function(cat){
+    var cc=CATC[cat]||"#64748B";
+    o+="<div style='margin-bottom:6px'><div style='color:"+cc+";font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px'>"+cat+"</div>";
+    grupos[cat].forEach(function(c){
+      var cfki=kpush(c.id+"__cf");
+      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;border-bottom:1px solid #1E293B'>";
+      o+="<span>"+esc(c.d)+" <span style='color:#64748B;font-size:10px'>"+(c.ct?"Cta:"+c.ct:"")+"</span></span>";
+      o+="<div style='display:flex;gap:4px;align-items:center'><span style='color:#64748B;font-size:10px'>"+c.e+" Dia "+c.dv+"</span>";
+      o+="<button class='btn bw bsm' style='font-size:9px;padding:2px 6px' data-editcf='"+cfki+"'>Editar</button>";
+      o+="<button class='btn bx bsm' style='font-size:9px;padding:2px 6px' data-delcf='"+cfki+"'>Quitar</button>";
+      o+="</div></div>";
+    });
+    o+="</div>";
+  });
+  o+="</div>";
+
+  // Custom costs
+  o+="<div class='card' style='margin-bottom:10px'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Costos variables (autos, nuevos servicios, etc.)</h3>";
+  o+="<button class='btn bp bsm' onclick='openAddCosto()'>+ Agregar</button></div>";
+  if(costosExtra.length){
+    costosExtra.forEach(function(c){
+      var ki=kpush(c._key);
+      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
+      o+="<div><b style='color:"+(c.activo?"#F1F5F9":"#64748B")+"'>"+esc(c.desc)+"</b>  <span style='color:#64748B;font-size:10px'>"+esc(c.cat||"")+"  "+esc(c.ed||"General")+(c.cta_num?"  Cta:"+esc(c.cta_num):"")+"</span></div>";
+      var tipoBadge=c.tipo==="costo_fijo_extra"?"Fijo mensual":"Eventual";var tipoColor=c.tipo==="costo_fijo_extra"?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
+      o+="<button class='btn bw bsm' data-editcosto='"+ki+"'>Editar</button>";
+      o+="<button class='btn "+(c.activo?"bg":"bok")+" bsm' data-togglecosto='"+ki+"'>"+(c.activo?"Desactivar":"Activar")+"</button>";
+      o+="<button class='btn bx bsm' data-delcosto='"+ki+"'>Borrar</button>";
+      o+="</div></div>";
+    });
+  } else {
+    o+="<p style='color:#64748B;font-size:12px'>Sin costos variables. Los fijos del sistema siguen activos.</p>";
+  }
+  o+="</div>";
+
+  el.innerHTML=o;
+  el.onclick=function(e){
+    var ec=e.target.closest("[data-editcosto]"); if(ec)openEditCosto(kget(parseInt(ec.dataset.editcosto)));
+    var tc=e.target.closest("[data-togglecosto]"); if(tc)toggleCosto(kget(parseInt(tc.dataset.togglecosto)));
+    var dc=e.target.closest("[data-delcosto]"); if(dc)borrarCosto(kget(parseInt(dc.dataset.delcosto)));
+    var ecf=e.target.closest("[data-editcf]"); if(ecf)openEditCF(kget(parseInt(ecf.dataset.editcf)));
+    var dcf=e.target.closest("[data-delcf]"); if(dcf)quitarCF(kget(parseInt(dcf.dataset.delcf)));
+  };
+}
+function openAddCosto(){
+  var cats=["Electricidad","Gas","Agua","Impuestos","Sueldos","Tarjetas","Seguros","Administrativo","Salud","Personal","Vehiculos","Otro"];
+  var o="<div class='fld'><label class='lbl'>Tipo de costo</label><div style='display:flex;gap:16px;margin-top:4px'>";
+  o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-fijo' value='fijo' checked> <b>Fijo mensual</b></label>";
+  o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-eventual' value='eventual'> <b>Eventual</b></label>";
+  o+="</div><div style='color:#64748B;font-size:10px;margin-top:3px'>Fijo: aparece todos los meses automaticamente. Eventual: gasto puntual unico.</div></div>";
+  o+=fld("nc-desc","Descripcion *","")
+    +fld("nc-prov","Proveedor","")
+    +sld("nc-cat","Categoria",cats)
+    +fld("nc-ed","Edificio o General","General")
+    +fld("nc-cta","Nro. cuenta / contrato","")
+    +fld("nc-dv","Dia de vencimiento","15","number");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNuevoCosto()'>Agregar</button></div>";
+  openModal("Agregar Costo",o,true);
+}
+function saveNuevoCosto(){
+  var desc=G("nc-desc").value; if(!desc){alert("La descripcion es obligatoria");return;}
+  var fijo=G("nc-fijo")&&G("nc-fijo").checked;
+  var nuevo={
+    tipo:fijo?"costo_fijo_extra":"otro_gasto",
+    desc:desc,pv:G("nc-prov").value,cat:G("nc-cat").value,
+    ed:G("nc-ed").value||"General",cta_num:G("nc-cta").value,
+    dv:Number(G("nc-dv").value||15),activo:true,fecha_alta:hoy()
+  };
+  DB.ref("cfg").push(nuevo);
+  closeModal(); setTimeout(rConfig,300);
+}
+
+function openEditCosto(key){
+  var c=DATA.cfg[key]; if(!c) return;
+  var ki=kpush(key);
+  var cats=["Electricidad","Gas","Agua","Impuestos","Sueldos","Tarjetas","Seguros","Administrativo","Salud","Personal","Vehiculos","Otro"];
+  var o=fld("ece-desc","Descripcion *",c.desc||"")
+       +fld("ece-prov","Proveedor",c.pv||"")
+       +sld("ece-cat","Categoria",cats,c.cat)
+       +fld("ece-ed","Edificio o General",c.ed||"General")
+       +fld("ece-cta","Nro. cuenta / contrato",c.cta_num||"")
+       +fld("ece-dv","Dia de vencimiento",c.dv||15,"number");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-savece='"+ki+"'>Guardar</button></div>";
+  openModal("Editar Costo",o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.savece)doEditCosto(kget(parseInt(e.target.dataset.savece)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function doEditCosto(key){
+  DB.ref("cfg/"+key).update({desc:G("ece-desc").value,pv:G("ece-prov").value,cat:G("ece-cat").value,ed:G("ece-ed").value||"General",cta_num:G("ece-cta").value,dv:Number(G("ece-dv").value||15)});
+  closeModal(); setTimeout(rConfig,300);
+}
+function toggleCosto(key){
+  var c=DATA.cfg[key];
+  DB.ref("cfg/"+key).update({activo:!c.activo});
+  setTimeout(rConfig,300);
+}
+function borrarCosto(key){
+  if(!confirm("Borrar este gasto? No se borran registros historicos."))return;
+  DB.ref("cfg/"+key).remove();
+  setTimeout(rConfig,300);
+}
+
+// ── TAB INGRESOS EXTRAS ───────────────────────────────────────────────────────
+function renderCfgIngresos(){
+  var el=G("cfg-body"); if(!el) return;
+  var extras=oA(DATA.cfg).filter(function(x){return x.tipo==="ingreso_extra";});
+  var cieA=oA(DATA.cierres).sort(function(a,b){return(b.mes||"").localeCompare(a.mes||"");});
+
+  var o="<div class='card' style='margin-bottom:10px'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Rubros de ingreso adicionales</h3>";
+  o+="<button class='btn bp bsm' onclick='openAddIngreso()'>+ Agregar</button></div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Venta de propiedades, alquiler de cocheras, ingresos extraordinarios, etc.</p>";
+  if(extras.length){
+    extras.forEach(function(ing){
+      var ki=kpush(ing._key);
+      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
+      o+="<div><b>"+esc(ing.nombre)+"</b>  <span style='color:#64748B;font-size:10px'>"+esc(ing.cat||"")+"  "+( ing.recurrente?"Recurrente":"Unico")+"</span></div>";
+      var tipoBadge=c.tipo==="costo_fijo_extra"?"Fijo mensual":"Eventual";var tipoColor=c.tipo==="costo_fijo_extra"?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
+      o+="<button class='btn bw bsm' data-editing='"+ki+"'>Editar</button>";
+      o+="<button class='btn bx bsm' data-deling='"+ki+"'>Borrar</button>";
+      o+="</div></div>";
+    });
+  } else {
+    o+="<p style='color:#64748B;font-size:12px'>Sin rubros adicionales. Los alquileres se registran automaticamente en Cobranzas.</p>";
+  }
+  o+="</div>";
+
+  // Historial cierres
+  o+="<div class='card'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Historial de Cierres Mensuales</h3>";
+  if(cieA.length){
+    o+="<div style='overflow-x:auto'><table class='tbl'><thead><tr><th>Mes</th><th>Ingresos</th><th>Egresos</th><th>Utilidad $</th><th>USD</th><th>Cerrado por</th></tr></thead><tbody>";
+    cieA.forEach(function(c){
+      o+="<tr><td style='font-weight:600'>"+c.mes+"</td><td style='color:#10B981'>"+fmt(c.ingresos||0)+"</td><td style='color:#EF4444'>"+fmt(c.egresos||0)+"</td>";
+      o+="<td style='color:"+(c.utilidad>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(c.utilidad||0)+"</td>";
+      o+="<td style='color:#06B6D4'>"+(c.tc>0?fusd(c.utilidad,c.tc):"--")+"</td>";
+      o+="<td style='color:#64748B;font-size:10px'>"+esc(c.cerradoPor||"--")+" el "+esc(c.fecha||"--")+"</td></tr>";
+    });
+    o+="</tbody></table></div>";
+  } else {
+    o+="<p style='color:#64748B;font-size:12px'>Sin cierres. El cierre mensual se hace desde Caja.</p>";
+  }
+  o+="</div>";
+
+  el.innerHTML=o;
+  el.onclick=function(e){
+    var ei=e.target.closest("[data-editing]"); if(ei)openEditIngreso(kget(parseInt(ei.dataset.editing)));
+    var di=e.target.closest("[data-deling]"); if(di)borrarIngreso(kget(parseInt(di.dataset.deling)));
+  };
+}
+function openAddIngreso(){
+  var cats=["Venta propiedad","Alquiler cochera","Alquiler comercial","Ingreso extraordinario","Reintegro","Otro"];
+  var o=fld("ni-nom","Nombre del rubro *","")
+       +sld("ni-cat","Categoria",cats)
+       +fld("ni-obs","Descripcion","");
+  o+="<div class='fld'><label class='lbl'>Tipo</label><div style='display:flex;gap:8px;margin-top:4px'><label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='ni-rec' id='ni-unico' checked> Ingreso unico</label><label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='ni-rec' id='ni-rec'> Recurrente mensual</label></div></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveIngreso()'>Agregar</button></div>";
+  openModal("Agregar Rubro de Ingreso",o,true);
+}
+function saveIngreso(){
+  var nom=G("ni-nom").value; if(!nom){alert("El nombre es obligatorio");return;}
+  DB.ref("cfg").push({tipo:"ingreso_extra",nombre:nom,cat:G("ni-cat").value,obs:G("ni-obs").value,recurrente:G("ni-rec").checked,fecha_alta:hoy(),activo:true});
+  closeModal(); setTimeout(rConfig,300);
+}
+function openEditIngreso(key){
+  var ing=DATA.cfg[key]; if(!ing) return;
+  var ki=kpush(key);
+  var cats=["Venta propiedad","Alquiler cochera","Alquiler comercial","Ingreso extraordinario","Reintegro","Otro"];
+  var o=fld("ei-nom","Nombre *",ing.nombre||"")+sld("ei-cat","Categoria",cats,ing.cat)+fld("ei-obs","Descripcion",ing.obs||"");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-saveei='"+ki+"'>Guardar</button></div>";
+  openModal("Editar Rubro",o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.saveei)doEditIngreso(kget(parseInt(e.target.dataset.saveei)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function doEditIngreso(key){
+  DB.ref("cfg/"+key).update({nombre:G("ei-nom").value,cat:G("ei-cat").value,obs:G("ei-obs").value});
+  closeModal(); setTimeout(rConfig,300);
+}
+function borrarIngreso(key){
+  if(!confirm("Borrar este rubro?"))return;
+  DB.ref("cfg/"+key).remove();
+  setTimeout(rConfig,300);
+}
+
+// ── AJUSTE CUATRIMESTRAL (Abril, Agosto, Diciembre) ──────────────────────────
+function openAjusteCuat(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  if(!iqA.length){alert("No hay acuerdos activos");return;}
+  var hoy_mes=new Date().getMonth()+1;
+  var prox=hoy_mes<4?"Abril":hoy_mes<8?"Agosto":hoy_mes<12?"Diciembre":"Abril";
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:4px'>Ajuste cuatrimestral (<b style='color:#8B5CF6'>"+prox+"</b>) — modificacion discrecional por inquilino.</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>Ingresa el nuevo valor para cada uno. Deja igual los que no cambian. El sistema enviara alertas WA 15 dias antes desde la seccion Alertas.</p>";
+  o+="<div style='overflow-x:auto'><table class='tbl'><thead><tr><th>Unidad</th><th>Inquilino</th><th>Alquiler actual</th><th>Nuevo valor $ (editable)</th><th>Diferencia</th></tr></thead><tbody id='aj-tbody'></tbody></table></div>";
+  o+="<div style='display:flex;gap:8px;margin:10px 0;flex-wrap:wrap'>";
+  o+="<div class='fld' style='margin:0;flex:1'><label class='lbl'>Aplicar % a todos</label><div style='display:flex;gap:5px'><input class='inp' type='number' id='aj-pct' placeholder='ej: 15' style='max-width:90px'/><button class='btn bg bsm' onclick='aplicarPct()'>Aplicar %</button></div></div>";
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveAjusteCuat()'>Guardar Ajuste</button></div>";
+  openModal("Ajuste Cuatrimestral",o,true);
+  // Populate table
+  setTimeout(function(){
+    var tbody=G("aj-tbody"); if(!tbody) return;
+    iqA.sort(function(a,b){return a.unidad.localeCompare(b.unidad);}).forEach(function(i){
+      var tr=document.createElement("tr");
+      tr.innerHTML="<td style='font-weight:600'>"+i.unidad+"</td><td style='font-size:11px'>"+esc(i.nombre.split(",")[0])+"</td><td style='color:#10B981'>"+fmt(i.alquiler)+"</td><td><input class='inp' type='number' id='ajv-"+i._key+"' value='"+i.alquiler+"' style='padding:4px 8px;font-size:12px'/></td><td id='ajd-"+i._key+"' style='color:#94A3B8;font-size:11px'>--</td>";
+      tbody.appendChild(tr);
+      G("ajv-"+i._key).oninput=function(){
+        var nuevo=Number(this.value||0);
+        var dif=nuevo-i.alquiler;
+        var pct=i.alquiler>0?Math.round((dif/i.alquiler)*100):0;
+        var el=G("ajd-"+i._key);
+        if(el)el.innerHTML="<span style='color:"+(dif>0?"#10B981":dif<0?"#EF4444":"#64748B")+"'>"+(dif>0?"+":"")+fmt(dif)+" ("+pct+"%)</span>";
+      };
+    });
+    window._iqAjuste=iqA;
+  },50);
+}
+window.aplicarPct=function(){
+  var pct=Number(G("aj-pct").value||0); if(!pct) return;
+  (window._iqAjuste||[]).forEach(function(i){
+    var inp=G("ajv-"+i._key); if(!inp) return;
+    var nuevo=Math.round(i.alquiler*(1+pct/100));
+    inp.value=nuevo;
+    inp.dispatchEvent(new Event("input"));
+  });
+};
+function saveAjusteCuat(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  var cambios=0;
+  iqA.forEach(function(i){
+    var inp=G("ajv-"+i._key); if(!inp) return;
+    var nuevo=Number(inp.value||0);
+    if(nuevo>0&&nuevo!==i.alquiler){
+      DB.ref("iq/"+i._key).update({alquiler:nuevo,nuevo_alq:nuevo});
+      cambios++;
+    }
+  });
+  closeModal();
+  alert("Ajuste guardado en "+cambios+" unidades. Desde Alertas podes enviar el aviso a cada inquilino 15 dias antes.");
+}
+
+// ── RENOVACION ────────────────────────────────────────────────────────────────
+function openRenovar(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var ki=kpush(key);
+  // Calculate next anniversary date
+  var ing=new Date(i.ingreso||hoy());
+  var anivNext=new Date(ing);
+  anivNext.setFullYear(new Date().getFullYear());
+  if(anivNext <= new Date()) anivNext.setFullYear(new Date().getFullYear()+1);
+  var anivStr=anivNext.toISOString().split("T")[0];
+  var anivEgr=new Date(anivNext);
+  anivEgr.setFullYear(anivEgr.getFullYear()+1);
+  anivEgr.setDate(anivEgr.getDate()-1);
+  var anivEgrStr=anivEgr.toISOString().split("T")[0];
+
+  var o="<div class='card' style='margin-bottom:10px;background:#0F172A'>";
+  o+="<div class='g2'>";
+  o+="<div><div class='lbl'>Inquilino</div><div style='font-size:13px;font-weight:700'>"+esc(i.nombre)+"</div></div>";
+  o+="<div><div class='lbl'>Unidad</div><div style='font-size:13px;font-weight:700'>"+i.unidad+"</div></div>";
+  o+="<div><div class='lbl'>Ingreso original</div><div style='font-size:12px'>"+( i.ingreso||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Deposito (no cambia)</div><div style='font-size:12px;color:#10B981'>"+fmt(i.deposito||0)+"</div></div>";
+  o+="</div></div>";
+  o+="<div class='ibox' style='background:#10B98111;border-color:#10B981;color:#6EE7B7;margin-bottom:10px'>La fecha de ingreso original se mantiene. Solo se extiende la vigencia por 12 meses mas.</div>";
+  o+="<div class='g2'>";
+  o+=fld("rv-alq","Nuevo alquiler mensual $",i.alquiler,"number");
+  o+=fld("rv-gs","Gastos de gestion y mant. $","","number");
+  o+="</div>";
+  o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
+  o+="<div class='g2'>";
+  o+=fld("rv-ini","Nueva vigencia desde",anivStr,"date");
+  o+=fld("rv-egr","Nueva vigencia hasta",anivEgrStr,"date");
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
+  openModal("Renovar — "+esc(i.unidad)+" — "+esc(i.nombre),o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));else if(e.target.classList.contains("ov"))closeModal();};
+}
+function saveRenovar(key){
+  var i=DATA.iq[key];
+  var alq=Number(G("rv-alq").value||0);
+  var gs=Number(G("rv-gs").value||0);
+  var cuotas=G("rv-cuotas").value.includes("2")?2:1;
+  var ini=G("rv-ini").value;
+  var egr=G("rv-egr").value;
+  if(!alq){alert("El alquiler es obligatorio");return;}
+  // Keep ingreso original, only update egreso and alquiler
+  var upd={alquiler:alq,egreso:egr||i.egreso};
+  // Do NOT change i.ingreso - it stays as original entry date
+  DB.ref("iq/"+key).update(upd);
+  // Register gastos as cobranza entries
+  if(gs>0){
+    var montoCuota=Math.round(gs/cuotas);
+    var yr=parseInt(mes().split("-")[0]),mo=parseInt(mes().split("-")[1]);
+    for(var c=0;c<cuotas;c++){
+      var moc=mo+c; var yrc=yr;
+      if(moc>12){moc=moc-12;yrc++;}
+      var mesC=yrc+"-"+String(moc).padStart(2,"0");
+      DB.ref("cob").push({
+        id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,
+        mes:mesC,monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},
+        concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas
+      });
+    }
+  }
+  closeModal();closeModal();
+  alert("Renovacion registrada! Nuevo alquiler: "+fmt(alq)+(gs>0?". Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):".")+". Fecha de ingreso original sin cambios.");
+}
+
+
+// Edit/quitar built-in CF costs (stored as overrides in Firebase)
+var _cfOverrides = {}; // cached from DATA.cfg
+function openEditCF(cfid){
+  // cfid is like "cf01__cf" - extract real id
+  var id = typeof cfid === "string" ? cfid.replace("__cf","") : "";
+  var orig = CF.filter(function(c){return c.id===id;})[0];
+  if(!orig){alert("Costo no encontrado");return;}
+  // Check if there's already an override
+  var over = oA(DATA.cfg).filter(function(x){return x.tipo==="cf_override"&&x.cfid===id;})[0];
+  var current = over||orig;
+  var cats=["Electricidad","Gas","Agua","Impuestos","Sueldos","Tarjetas","Seguros","Administrativo","Salud","Personal","Vehiculos","Otro"];
+  var ki = kpush(id+"__editcf");
+  var o = fld("ecf-desc","Descripcion",current.d||current.desc||"")
+        + fld("ecf-prov","Proveedor",current.pv||current.prov||"")
+        + sld("ecf-cat","Categoria",cats,current.c||current.cat||"")
+        + fld("ecf-ed","Edificio",current.e||current.ed||"")
+        + fld("ecf-cta","Nro. cuenta",current.ct||current.cta_num||"")
+        + fld("ecf-dv","Dia vencimiento",current.dv||15,"number");
+  o += "<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-savecf='"+id+"'>Guardar</button></div>";
+  openModal("Editar: "+esc(orig.d),o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    if(e.target.dataset.savecf)doEditCF(e.target.dataset.savecf);
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function doEditCF(cfid){
+  // Save override to Firebase
+  var over = oA(DATA.cfg).filter(function(x){return x.tipo==="cf_override"&&x.cfid===cfid;})[0];
+  var data = {tipo:"cf_override",cfid:cfid,d:G("ecf-desc").value,pv:G("ecf-prov").value,c:G("ecf-cat").value,e:G("ecf-ed").value,ct:G("ecf-cta").value,dv:Number(G("ecf-dv").value||15),activo:true};
+  if(over){DB.ref("cfg/"+over._key).update(data);}
+  else{DB.ref("cfg").push(data);}
+  closeModal(); setTimeout(rConfig,300);
+}
+function quitarCF(cfid){
+  var id = typeof cfid === "string" ? cfid.replace("__cf","") : cfid;
+  var orig = CF.filter(function(c){return c.id===id;})[0];
+  if(!confirm("Quitar del sistema: "+(orig?orig.d:id)+"? No se borran registros historicos."))return;
+  // Save as inactive override
+  var over = oA(DATA.cfg).filter(function(x){return x.tipo==="cf_override"&&x.cfid===id;})[0];
+  if(over){DB.ref("cfg/"+over._key).update({activo:false});}
+  else{DB.ref("cfg").push({tipo:"cf_override",cfid:id,activo:false,d:orig?orig.d:id});}
+  setTimeout(rConfig,300);
+}
+
+
+// ── USUARIOS Y CONTRASEÑAS ────────────────────────────────────────────────────
+function renderCfgUsuarios(){
+  var el=G("cfg-body"); if(!el) return;
+  var o="<div class='card'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:12px'>Usuarios del sistema</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:12px'>Como admin podes cambiar la contrasena de cualquier usuario.</p>";
+  USUARIOS.forEach(function(u){
+    o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155'>";
+    o+="<div><div style='font-weight:600;font-size:13px'>"+u.n+"</div>";
+    o+="<div style='color:#64748B;font-size:11px'>Usuario: "+u.u+"  |  Rol: "+(u.r==="admin"?"Admin":"Empleado")+"</div></div>";
+    o+="<button class='btn bp bsm' data-chpass='"+u.u+"'>Cambiar clave</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  o+="<div class='card' style='margin-top:10px'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Claves actuales</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Las claves se guardan en el dispositivo. Despues de cambiarlas el empleado tiene que borrar el icono viejo y volver a instalarlo.</p>";
+  USUARIOS.forEach(function(u){
+    o+="<div style='display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid #1E293B'>";
+    o+="<span style='color:#94A3B8'>"+u.n+"</span><span style='color:#F1F5F9;font-family:monospace'>"+u.p+"</span></div>";
+  });
+  o+="</div>";
+  el.innerHTML=o;
+  el.onclick=function(e){
+    var b=e.target.closest("[data-chpass]");
+    if(b)openCambiarClave(b.dataset.chpass);
+  };
+}
+
+function openCambiarClave(usuario){
+  var u=USUARIOS.filter(function(x){return x.u===usuario;})[0];
+  if(!u){alert("Usuario no encontrado");return;}
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Cambiando clave de: <b style='color:#F1F5F9'>"+u.n+"</b> ("+u.u+")</p>";
+  o+=fld("cp-nueva","Nueva contrasena *","","password");
+  o+=fld("cp-conf","Confirmar contrasena *","","password");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' data-saveclave='1'>Guardar</button>";
+  o+="</div>";
+  openModal("Cambiar clave - "+u.n,o);
+  var md=MODS[MODS.length-1];
+  var _usuarioActual=usuario;
+  md.onclick=function(e){
+    if(e.target.dataset.saveclave)guardarClave(_usuarioActual);
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+
+function guardarClave(usuario){
+  var nueva=G("cp-nueva").value;
+  var conf=G("cp-conf").value;
+  if(!nueva){alert("La nueva clave es obligatoria");return;}
+  if(nueva.length<4){alert("La clave debe tener al menos 4 caracteres");return;}
+  if(nueva!==conf){alert("Las claves no coinciden");return;}
+  var u=USUARIOS.filter(function(x){return x.u===usuario;})[0];
+  if(!u){alert("Usuario no encontrado");return;}
+  u.p=nueva;
+  // Save to Firebase so all devices get the update
+  DB.ref("usuarios/"+usuario).set({clave:nueva});
+  // Clear saved session for this user so they need to re-login
+  var saved=JSON.parse(localStorage.getItem("gp_rem")||"null");
+  if(saved&&saved.u===usuario){localStorage.removeItem("gp_rem");}
+  closeModal();
+  alert("Clave de "+u.n+" actualizada a: "+nueva+". Avisa al empleado que borre el icono y vuelva a instalar la app.");
+
+}
+
+
+// ── ADICIONAL POR INQUILINO ───────────────────────────────────────────────────
+function openAdicional(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var ki=kpush(key);
+  // Show existing additionals for this unit
+  var adicionales=oA(DATA.cfg).filter(function(x){return x.tipo==="adicional_iq"&&x.unidad===i.unidad&&x.activo!==false;});
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>"+i.unidad+" - "+esc(i.nombre)+"<br>Alquiler actual: <b style='color:#10B981'>"+fmt(i.alquiler)+"</b></p>";
+  if(adicionales.length){
+    o+="<div class='card' style='background:#0F172A;margin-bottom:10px'><div style='font-size:11px;color:#94A3B8;margin-bottom:6px;font-weight:700'>ADICIONALES ACTIVOS</div>";
+    adicionales.forEach(function(a){
+      var ak=kpush(a._key);
+      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #334155;font-size:12px'>";
+      o+="<div><span style='color:#F1F5F9'>"+esc(a.concepto)+"</span> <span style='color:#10B981;font-weight:700'>"+fmt(a.monto)+"/mes</span></div>";
+      o+="<button class='btn bx bsm' data-deladl='"+ak+"'>Quitar</button>";
+      o+="</div>";
+    });
+    o+="</div>";
+  }
+  o+="<h4 style='font-size:12px;font-weight:700;margin-bottom:8px;color:#8B5CF6'>Agregar nuevo adicional</h4>";
+  o+=fld("adl-con","Concepto *","Ej: Aire acondicionado, Cochera, Mascota...");
+  o+="<div class='g2'>";
+  o+="<div class='fld'><label class='lbl'>Tipo de adicional</label><select class='inp' id='adl-tipo'><option value='fijo'>Monto fijo $</option><option value='pct'>Porcentaje %</option></select></div>";
+  o+=fld("adl-val","Valor ($ o %)","","number");
+  o+="</div>";
+  o+=fld("adl-desde","Desde (mes)","","month");
+  o+=fld("adl-hasta","Hasta (mes, dejar vacio si es indefinido)","","month");
+  o+="<div class='wbx' style='font-size:11px'>El adicional se suma al alquiler en las cobranzas de los meses indicados.</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-saveadl='"+ki+"'>Agregar</button></div>";
+  openModal("Adicional por Inquilino - "+i.unidad,o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    if(e.target.dataset.saveadl)saveAdicional(kget(parseInt(e.target.dataset.saveadl)));
+    else if(e.target.dataset.deladl)quitarAdicional(kget(parseInt(e.target.dataset.deladl)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function saveAdicional(key){
+  var i=DATA.iq[key];
+  var con=G("adl-con").value; if(!con){alert("El concepto es obligatorio");return;}
+  var tipo=G("adl-tipo").value;
+  var val=Number(G("adl-val").value||0); if(!val){alert("El valor es obligatorio");return;}
+  var monto=tipo==="pct"?Math.round(i.alquiler*(val/100)):val;
+  var desde=G("adl-desde").value||mes();
+  var hasta=G("adl-hasta").value||"";
+  DB.ref("cfg").push({
+    tipo:"adicional_iq",unidad:i.unidad,id_ac:i.id_ac||"",
+    concepto:con,tipo_calculo:tipo,valor:val,monto:monto,
+    desde:desde,hasta:hasta,activo:true,fecha_alta:hoy()
+  });
+  // If current month is in range, add to cobranza
+  var m=mes();
+  if(m>=desde&&(!hasta||m<=hasta)){
+    var cobActual=oA(DATA.cob).filter(function(c){return c.mes===m&&c.unidad===i.unidad;})[0];
+    if(cobActual){
+      DB.ref("cob/"+cobActual._key+"/monto_total").set(cobActual.monto_total+monto);
+    }
+  }
+  closeModal();closeModal();
+  alert("Adicional registrado: "+fmt(monto)+"/mes por "+con+(tipo==="pct"?" ("+val+"% del alquiler)":"")+(hasta?" hasta "+hasta:"")+". Aplica desde "+desde+".");
+}
+function quitarAdicional(key){
+  if(!confirm("Quitar este adicional?"))return;
+  DB.ref("cfg/"+key).update({activo:false,fecha_baja:hoy()});
+  closeModal();
+  setTimeout(function(){go("acuerdos");},300);
+}
+
+// Apply additionals when generating cobranzas
+function aplicarAdicionales(unidad, montoBase, mesC){
+  var m=mesC||mes();
+  var adicionales=oA(DATA.cfg).filter(function(x){
+    return x.tipo==="adicional_iq"&&x.unidad===unidad&&x.activo!==false&&
+      m>=x.desde&&(!x.hasta||m<=x.hasta);
+  });
+  var extra=adicionales.reduce(function(s,a){return s+a.monto;},0);
+  return extra;
+}
+
+
+// ── HISTORIAL DE EVENTOS POR INQUILINO ───────────────────────────────────────
+function openHistorialEventos(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var ki=kpush(key);
+  var eventos=oA(DATA.cfg).filter(function(x){return x.tipo==="evento_iq"&&x.id_ac===i.id_ac;})
+    .sort(function(a,b){return (b.fecha||"").localeCompare(a.fecha||"");});
+  var o="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>"+i.unidad+" - "+esc(i.nombre)+" - ID #"+i.id_ac+"</p>";
+  // List existing events
+  if(eventos.length){
+    o+="<div style='max-height:220px;overflow-y:auto;margin-bottom:12px'>";
+    eventos.forEach(function(ev){
+      o+="<div style='background:#0F172A;border-radius:7px;padding:8px 10px;margin-bottom:6px;border-left:3px solid #3B82F6'>";
+      o+="<div style='display:flex;justify-content:space-between;font-size:11px;color:#64748B;margin-bottom:3px'>";
+      o+="<span>"+esc(ev.fecha||"")+"</span><span>"+esc(ev.usuario||"")+"</span></div>";
+      o+="<div style='font-size:12px;color:#F1F5F9'>"+esc(ev.texto||"")+"</div></div>";
+    });
+    o+="</div>";
+  } else {
+    o+="<p style='color:#64748B;font-size:12px;margin-bottom:10px'>Sin eventos registrados.</p>";
+  }
+  // Add new event
+  o+="<div style='border-top:1px solid #334155;padding-top:10px'>";
+  o+="<div class='lbl' style='margin-bottom:6px'>Agregar observacion / evento</div>";
+  o+=tad("ev-txt","Escribi lo que paso o lo que hay que recordar...","");
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:10px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cerrar</button>";
+  o+="<button class='btn bok bsm' data-saveev='"+ki+"'>Guardar</button></div>";
+  openModal("Historial - "+esc(i.nombre),o,true);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    if(e.target.dataset.saveev)saveEventoIq(kget(parseInt(e.target.dataset.saveev)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function saveEventoIq(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var txt=G("ev-txt").value.trim();
+  if(!txt){alert("Escribi algo");return;}
+  DB.ref("cfg").push({
+    tipo:"evento_iq",id_ac:i.id_ac,unidad:i.unidad,
+    texto:txt,fecha:hoy(),usuario:USER.n,fecha_ts:Date.now()
+  });
+  closeModal();
+  setTimeout(function(){openHistorialEventos(key);},300);
+}
+
+// ── DEVOLUCION DE DEPOSITO ────────────────────────────────────────────────────
+function openDevolverDeposito(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var ki=kpush(key);
+  var o="<div class='wbx' style='margin-bottom:12px'>Deposito original: <b>"+fmt(i.deposito||0)+"</b></div>";
+  o+=fld("dd-monto","Monto a devolver $",i.deposito||0,"number");
+  o+=fld("dd-fecha","Fecha de devolucion",hoy(),"date");
+  o+=sld("dd-cta","Cuenta desde donde se devuelve",CTAS);
+  o+=fld("dd-obs","Observacion (motivo, condiciones, etc.)","");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bx bsm' data-savedep='"+ki+"'>Registrar Devolucion</button></div>";
+  openModal("Devolucion de Deposito - "+i.unidad,o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    if(e.target.dataset.savedep)saveDevolucionDep(kget(parseInt(e.target.dataset.savedep)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function saveDevolucionDep(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var monto=Number(G("dd-monto").value||0);
+  if(!monto){alert("Ingresa el monto");return;}
+  if(!confirm("Registrar devolucion de "+fmt(monto)+" del deposito de "+i.nombre+"?"))return;
+  // Register as egreso in aj (caja)
+  DB.ref("aj").push({
+    fecha:G("dd-fecha").value,tipo:"egreso",sub:"Devolucion deposito",
+    cuenta:G("dd-cta").value,concepto:"Devolucion deposito - "+i.unidad+" - "+i.nombre,
+    monto:monto,obs:G("dd-obs").value
+  });
+  // Register evento in historial
+  DB.ref("cfg").push({
+    tipo:"evento_iq",id_ac:i.id_ac,unidad:i.unidad,
+    texto:"Devolucion de deposito: "+fmt(monto)+" desde "+G("dd-cta").value+". "+G("dd-obs").value,
+    fecha:G("dd-fecha").value,usuario:USER.n,fecha_ts:Date.now()
+  });
+  // Update inquilino deposito
+  DB.ref("iq/"+key).update({deposito_devuelto:monto,fecha_dev_dep:G("dd-fecha").value});
+  closeModal();closeModal();
+  alert("Devolucion de "+fmt(monto)+" registrada en Caja y en el historial del inquilino.");
+}
+
+
+// ── EDITAR PAGOS REGISTRADOS ──────────────────────────────────────────────────
+function openEditPagos(ckey){
+  var c=DATA.cob[ckey]; if(!c) return;
+  var ki=kpush(ckey);
+  var pagos=pA(c);
+  if(!pagos.length){alert("No hay pagos registrados");return;}
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>"+c.unidad+" - "+esc(c.inq)+" - "+esc(c.concepto||"Alquiler")+"</p>";
+  o+="<div id='ep-list'>";
+  pagos.forEach(function(p,idx){
+    var pk=Object.keys(c.pagos)[idx];
+    var pki=kpush(ckey+"__"+pk);
+    o+="<div style='background:#0F172A;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center'>";
+    o+="<div style='font-size:12px'>";
+    o+="<div style='color:#10B981;font-weight:700'>"+fmt(p.monto)+"</div>";
+    o+="<div style='color:#64748B;font-size:10px'>"+esc(p.fecha)+" - "+esc(p.cuenta)+"</div>";
+    o+="<div style='color:#94A3B8;font-size:10px'>"+esc(p.concepto||"")+"</div></div>";
+    o+="<button class='btn bx bsm' data-delpago='"+pki+"'>Borrar</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:10px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cerrar</button></div>";
+  openModal("Editar pagos - "+c.unidad,o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    var dp=e.target.closest("[data-delpago]");
+    if(dp){
+      var raw=kget(parseInt(dp.dataset.delpago));
+      var parts=raw.split("__");
+      var ck=parts[0],pk=parts[1];
+      if(confirm("Borrar este pago?"))deletePago(ck,pk);
+    }
+    if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function deletePago(ckey,pagoKey){
+  var c=DATA.cob[ckey]; if(!c) return;
+  var ups={};
+  ups["cob/"+ckey+"/pagos/"+pagoKey]=null;
+  // Recalculate state
+  var pagosRestantes=Object.assign({},c.pagos||{});
+  delete pagosRestantes[pagoKey];
+  var tot=c.monto_total+Number(c.sal_ant||0);
+  var pg=Object.values(pagosRestantes).reduce(function(s,p){return s+p.monto;},0);
+  ups["cob/"+ckey+"/estado"]=pg>=tot?"pagado":pg>0?"parcial":"pendiente";
+  DB.ref("/").update(ups);
+  closeModal();
+  alert("Pago eliminado.");
+  setTimeout(rCob,300);
+}
+
+
+render();
+</script>
+</body>
+</html>
