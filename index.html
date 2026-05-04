@@ -1349,86 +1349,149 @@ function rCaja(){
   o+="</div></div>";
 
   if(_cajaV==="dia"){
-    // DAY VIEW
     var subcDia=subcM.filter(function(s){return s.fecha===_cajaF;})[0];
+
     // Payments on this day
     var pagosD=[];
     cobM.forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
-        pagosD.push(Object.assign({},p,{concepto:(p.concepto||"Alquiler")+" "+c.unidad+" - "+c.inq}));
+        pagosD.push(Object.assign({},p,{
+          concepto:(p.concepto||"Alquiler")+" - "+c.unidad+" "+c.inq,
+          tipo:"ingreso"
+        }));
       });
     });
     var costosD=cstM.filter(function(c){return c.fec_venc===_cajaF;});
     var ajD=ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;});
+
     var iD=pagosD.reduce(function(s,p){return s+p.monto;},0)
             +ajD.filter(function(a){return a.tipo==="ingreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
     var eD=costosD.reduce(function(s,c){return s+Number(c.monto||0);},0)
             +ajD.filter(function(a){return a.tipo==="egreso";}).reduce(function(s,a){return s+Number(a.monto||0);},0);
 
+    // Saldo inicio del dia (acumulado hasta ayer)
+    var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);
+    var ayerStr=ayer.toISOString().split("T")[0];
+
     o+="<div style='display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap'>";
     o+="<input type='date' class='inp' value='"+_cajaF+"' style='max-width:160px' id='caja-fecha'/>";
-    o+="<span style='color:#64748B;font-size:12px'>"+(subcDia?"✅ Subcierre realizado":"Sin subcierre")+"</span></div>";
+    o+="<span style='color:#64748B;font-size:12px'>"+(subcDia?"✅ Caja cerrada - "+esc(subcDia.cerradoPor):"Caja abierta")+"</span></div>";
 
+    // Summary cards
     o+="<div class='g3' style='margin-bottom:12px'>";
-    o+=sc("$","Ingresos del dia",fmt(iD),"","#10B981");
-    o+=sc("X","Egresos del dia",fmt(eD),"","#EF4444");
-    o+=sc("=","Saldo del dia",fmt(iD-eD),"",(iD-eD)>=0?"#10B981":"#EF4444");
+    o+=sc("$","Ingresos dia",fmt(iD),"","#10B981");
+    o+=sc("X","Egresos dia",fmt(eD),"","#EF4444");
+    o+=sc("=","Resultado dia",fmt(iD-eD),"",(iD-eD)>=0?"#10B981":"#EF4444");
     o+="</div>";
 
-    // Saldos acumulados por cuenta hasta hoy
-    // Saldo inicial (hasta ayer) + movimientos hoy + saldo final
-    var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);var ayerStr=ayer.toISOString().split("T")[0];
+    // ── TABLA INTEGRADA: saldo inicio + movimientos + saldo cierre por cuenta
     o+="<div class='card' style='margin-bottom:10px;overflow-x:auto'>";
-    o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Saldos por cuenta — "+_cajaF+"</h3>";
-    o+="<table class='tbl'><thead><tr><th>Cuenta</th><th>Saldo inicio dia</th><th>Entro hoy</th><th>Salio hoy</th><th>Saldo cierre</th></tr></thead><tbody>";
-    var hayMovs=false;
+    o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+    o+="<h3 style='font-size:13px;font-weight:700'>Caja del dia — "+_cajaF+"</h3>";
+    if(!subcDia) o+="<button class='btn bok bsm' onclick='openSubc()'>Cerrar caja del dia</button>";
+    o+="</div>";
+
+    // Build all movements per account
+    var movsPorCta={};
     CTAS.forEach(function(cta){
       var salIni=saldoAcumulado(cta,ayerStr,m);
-      var ingHoy=pagosD.filter(function(p){return p.cuenta===cta;}).reduce(function(s,p){return s+p.monto;},0)+ajD.filter(function(a){return a.tipo==="ingreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
-      var egrHoy=costosD.filter(function(c){return c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)+ajD.filter(function(a){return a.tipo==="egreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
-      var salFin=salIni+ingHoy-egrHoy;
-      if(salIni!==0||ingHoy!==0||egrHoy!==0){
-        hayMovs=true;
-        o+="<tr><td style='font-weight:600'>"+cta+"</td>";
-        o+="<td style='color:#94A3B8'>"+fmt(salIni)+"</td>";
-        o+="<td style='color:#10B981'>"+(ingHoy>0?fmt(ingHoy):"--")+"</td>";
-        o+="<td style='color:#EF4444'>"+(egrHoy>0?fmt(egrHoy):"--")+"</td>";
-        o+="<td style='color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(salFin)+"</td></tr>";
+      var ingresos=[];
+      var egresos=[];
+
+      // Cobros del dia en esta cuenta
+      pagosD.filter(function(p){return p.cuenta===cta;}).forEach(function(p){
+        ingresos.push({desc:esc(p.concepto),monto:p.monto});
+      });
+      // Ajustes ingreso
+      ajD.filter(function(a){return a.tipo==="ingreso"&&a.cuenta===cta;}).forEach(function(a){
+        ingresos.push({desc:esc(a.concepto),monto:Number(a.monto||0)});
+      });
+      // Costos del dia en esta cuenta
+      costosD.filter(function(c){return c.cuenta===cta;}).forEach(function(c){
+        egresos.push({desc:esc(c.desc),monto:Number(c.monto||0)});
+      });
+      // Ajustes egreso
+      ajD.filter(function(a){return a.tipo==="egreso"&&a.cuenta===cta;}).forEach(function(a){
+        egresos.push({desc:esc(a.concepto),monto:Number(a.monto||0)});
+      });
+
+      var totalIng=ingresos.reduce(function(s,x){return s+x.monto;},0);
+      var totalEgr=egresos.reduce(function(s,x){return s+x.monto;},0);
+      var salFin=salIni+totalIng-totalEgr;
+
+      if(salIni!==0||totalIng!==0||totalEgr!==0){
+        movsPorCta[cta]={salIni:salIni,ingresos:ingresos,egresos:egresos,totalIng:totalIng,totalEgr:totalEgr,salFin:salFin};
       }
     });
-    if(!hayMovs) o+="<tr><td colspan='5' style='color:#64748B;text-align:center'>Sin movimientos</td></tr>";
-    o+="</tbody></table></div>";
 
-    // Movements of the day
-    if(pagosD.length||ajD.filter(function(a){return a.tipo==="ingreso";}).length){
-      o+="<div class='card' style='margin-bottom:8px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px;color:#10B981'>Ingresos del dia</h3>";
-      pagosD.forEach(function(p){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(p.concepto)+"<div style='color:#64748B;font-size:10px'>"+p.cuenta+"</div></div><span style='color:#10B981;font-weight:700'>"+fmt(p.monto)+"</span></div>";});
-      ajD.filter(function(a){return a.tipo==="ingreso";}).forEach(function(a){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(a.concepto)+"<div style='color:#64748B;font-size:10px'>"+a.cuenta+"</div></div><span style='color:#10B981;font-weight:700'>"+fmt(a.monto)+"</span></div>";});
-      o+="</div>";
-    }
-    if(costosD.length||ajD.filter(function(a){return a.tipo==="egreso";}).length){
-      o+="<div class='card' style='margin-bottom:8px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px;color:#EF4444'>Egresos del dia</h3>";
-      costosD.forEach(function(c){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(c.desc)+"<div style='color:#64748B;font-size:10px'>"+c.cuenta+" - "+c.ed+"</div></div><span style='color:#EF4444;font-weight:700'>"+fmt(c.monto)+"</span></div>";});
-      ajD.filter(function(a){return a.tipo==="egreso";}).forEach(function(a){o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'><div>"+esc(a.concepto)+"<div style='color:#64748B;font-size:10px'>"+a.cuenta+"</div></div><span style='color:#EF4444;font-weight:700'>"+fmt(a.monto)+"</span></div>";});
-      o+="</div>";
+    if(Object.keys(movsPorCta).length===0){
+      o+="<p style='color:#64748B;font-size:12px;text-align:center;padding:16px'>Sin movimientos registrados hoy</p>";
+    } else {
+      o+="<table class='tbl'><thead><tr>";
+      o+="<th>Cuenta</th><th style='color:#94A3B8'>Saldo inicio</th><th style='color:#10B981'>Ingresos</th><th style='color:#EF4444'>Egresos</th><th style='font-weight:800'>Saldo cierre</th>";
+      o+="</tr></thead><tbody>";
+
+      Object.keys(movsPorCta).forEach(function(cta){
+        var d=movsPorCta[cta];
+        var rows=Math.max(d.ingresos.length,d.egresos.length,1);
+
+        // First row with account name and totals
+        o+="<tr style='border-top:2px solid #334155'>";
+        o+="<td style='font-weight:700;vertical-align:top'>"+cta+"</td>";
+        o+="<td style='color:#94A3B8;vertical-align:top'>"+fmt(d.salIni)+"</td>";
+        o+="<td style='vertical-align:top'>";
+        if(d.ingresos.length){
+          d.ingresos.forEach(function(ing){
+            o+="<div style='font-size:11px;margin-bottom:2px'><span style='color:#10B981'>+"+fmt(ing.monto)+"</span> <span style='color:#94A3B8'>"+ing.desc+"</span></div>";
+          });
+          o+="<div style='font-size:10px;color:#10B981;font-weight:700;border-top:1px solid #334155;margin-top:3px;padding-top:3px'>Total: "+fmt(d.totalIng)+"</div>";
+        } else {
+          o+="<span style='color:#334155'>--</span>";
+        }
+        o+="</td><td style='vertical-align:top'>";
+        if(d.egresos.length){
+          d.egresos.forEach(function(egr){
+            o+="<div style='font-size:11px;margin-bottom:2px'><span style='color:#EF4444'>-"+fmt(egr.monto)+"</span> <span style='color:#94A3B8'>"+egr.desc+"</span></div>";
+          });
+          o+="<div style='font-size:10px;color:#EF4444;font-weight:700;border-top:1px solid #334155;margin-top:3px;padding-top:3px'>Total: "+fmt(d.totalEgr)+"</div>";
+        } else {
+          o+="<span style='color:#334155'>--</span>";
+        }
+        o+="</td>";
+        o+="<td style='font-weight:800;font-size:14px;color:"+(d.salFin>=0?"#10B981":"#EF4444")+";vertical-align:top'>"+fmt(d.salFin)+"</td>";
+        o+="</tr>";
+      });
+
+      // Total row
+      var totIni=Object.values(movsPorCta).reduce(function(s,d){return s+d.salIni;},0);
+      var totIng=Object.values(movsPorCta).reduce(function(s,d){return s+d.totalIng;},0);
+      var totEgr=Object.values(movsPorCta).reduce(function(s,d){return s+d.totalEgr;},0);
+      var totFin=Object.values(movsPorCta).reduce(function(s,d){return s+d.salFin;},0);
+      o+="<tr style='border-top:2px solid #F1F5F9;background:#0F172A;font-weight:700'>";
+      o+="<td>TOTAL</td><td style='color:#94A3B8'>"+fmt(totIni)+"</td>";
+      o+="<td style='color:#10B981'>"+fmt(totIng)+"</td><td style='color:#EF4444'>"+fmt(totEgr)+"</td>";
+      o+="<td style='color:"+(totFin>=0?"#10B981":"#EF4444")+";font-size:15px'>"+fmt(totFin)+"</td></tr>";
+      o+="</tbody></table>";
     }
 
-    // Subcierre
-    o+="<div class='card' style='border-left:3px solid "+(subcDia?"#10B981":"#3B82F6")+"'>";
-    o+="<div style='display:flex;justify-content:space-between;align-items:center'>";
-    o+="<div><h3 style='font-size:13px;font-weight:700'>Subcierre del dia</h3>";
-    o+="<p style='color:#64748B;font-size:11px'>"+(subcDia?"Realizado por "+esc(subcDia.cerradoPor):"Conta el efectivo y registra los saldos reales")+"</p></div>";
-    if(!subcDia) o+="<button class='btn bp bsm' onclick='openSubc()'>Hacer Subcierre</button>";
-    o+="</div>";
+    // If caja is closed, show the subcierre comparison
     if(subcDia&&subcDia.saldos){
-      o+="<table class='tbl' style='margin-top:8px'><thead><tr><th>Cuenta</th><th>Segun sistema</th><th>Real contado</th><th>Diferencia</th></tr></thead><tbody>";
+      o+="<div style='margin-top:12px;padding-top:12px;border-top:1px solid #334155'>";
+      o+="<div style='font-size:12px;font-weight:700;margin-bottom:6px;color:#10B981'>Verificacion del cierre</div>";
+      o+="<table class='tbl'><thead><tr><th>Cuenta</th><th>Sistema</th><th>Real contado</th><th>Diferencia</th></tr></thead><tbody>";
       Object.entries(subcDia.saldos).forEach(function(e){
         var s=e[1];
         o+="<tr><td style='font-weight:600'>"+e[0]+"</td><td>"+fmt(s.sistema)+"</td><td>"+fmt(s.real)+"</td>";
         o+="<td style='color:"+(s.dif===0?"#10B981":s.dif>0?"#F59E0B":"#EF4444")+";font-weight:700'>"+(s.dif>0?"+":"")+fmt(s.dif)+"</td></tr>";
       });
-      o+="</tbody></table>";
+      o+="</tbody></table></div>";
     }
+    o+="</div>";
+
+    // Quick links for adjustments
+    o+="<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px'>";
+    o+="<button class='btn bp bsm' onclick='openAj()'>+ Ajuste / Correcion</button>";
+    if(!subcDia) o+="<button class='btn bok' onclick='openSubc()'>✓ Cerrar caja del dia</button>";
     o+="</div>";
 
   } else {
@@ -1567,25 +1630,46 @@ function cerrarMes(){
 }
 
 function openSubc(){
-  var o="<div class='wbx' style='margin-bottom:12px;font-size:11px'>";
-  o+="<b>Instrucciones:</b> La columna <b>Calculado</b> muestra lo que deberia haber segun los movimientos registrados. ";
-  o+="Conta el dinero real de cada cuenta y escribilo en <b>Real contado</b>. Si hay diferencia queda registrada.";
-  o+="</div>";
-  o+="<table class='tbl' style='margin-bottom:12px'><thead><tr><th>Cuenta</th><th>Calculado (sistema)</th><th>Real contado $</th></tr></thead><tbody>";
+  // Calculate saldo per account at end of day
+  var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);
+  var ayerStr=ayer.toISOString().split("T")[0];
+  var m=_cajaMes;
+  var cobM2=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  var cstM2=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
+  var ajM2=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
+
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Verificá el efectivo y saldos reales de cada cuenta. El sistema calcula lo que deberia haber.</p>";
+  o+="<table class='tbl' style='margin-bottom:12px'><thead><tr><th>Cuenta</th><th>Saldo inicio</th><th>Movimientos hoy</th><th>Saldo cierre calculado</th><th>Real contado $</th></tr></thead><tbody>";
+
   CTAS.forEach(function(cta){
-    var sal=saldoAcumulado(cta,_cajaF,_cajaMes);
-    if(sal!==0||true){
-      o+="<tr><td style='font-weight:600'>"+cta+"</td>";
-      o+="<td style='color:"+(sal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(sal)+"</td>";
-      o+="<td><input class='inp' type='number' id='sc-"+cta.replace(/ /g,"-")+"' placeholder='Ingresar monto real...' style='padding:4px 8px;font-size:12px'/></td></tr>";
-    }
+    var salIni=saldoAcumulado(cta,ayerStr,m);
+    var ingHoy=cobM2.reduce(function(s,c){return s+pA(c).filter(function(p){return p.fecha===_cajaF&&p.cuenta===cta;}).reduce(function(a,p){return a+p.monto;},0);},0)
+              +ajM2.filter(function(a){return a.fecha===_cajaF&&a.tipo==="ingreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+    var egrHoy=cstM2.filter(function(c){return c.fec_venc===_cajaF&&c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)
+              +ajM2.filter(function(a){return a.fecha===_cajaF&&a.tipo==="egreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
+    var salCal=salIni+ingHoy-egrHoy;
+    var movStr=(ingHoy>0?"+"+fmt(ingHoy)+" ":"")+(egrHoy>0?"-"+fmt(egrHoy):"");
+    o+="<tr><td style='font-weight:600'>"+cta+"</td>";
+    o+="<td style='color:#94A3B8'>"+fmt(salIni)+"</td>";
+    o+="<td style='font-size:11px;color:#64748B'>"+(movStr||"Sin movimientos")+"</td>";
+    o+="<td style='color:"+(salCal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(salCal)+"</td>";
+    o+="<td><input class='inp' type='number' id='sc-"+cta.replace(/ /g,"-")+"' placeholder='"+salCal+"' style='padding:4px 8px;font-size:12px'/></td></tr>";
   });
   o+="</tbody></table>";
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveSubc()'>Confirmar Subcierre</button></div>";
-  openModal("Subcierre — "+_cajaF,o,true);
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' onclick='saveSubcWA()'>Cerrar y enviar por WA</button>";
+  o+="<button class='btn bok bsm' onclick='saveSubc()'>Cerrar sin WA</button>";
+  o+="</div>";
+  openModal("Cierre de caja — "+_cajaF,o,true);
 }
 
-function saveSubc(){
+function saveSubcWA(){
+  // Save and generate WA message
+  saveSubc(true);
+}
+
+function saveSubc(sendWA){
   var saldos={},ups={};
   CTAS.forEach(function(cta){
     var sistema=saldoAcumulado(cta,_cajaF,_cajaMes);
@@ -1604,7 +1688,20 @@ function saveSubc(){
   ups["subc/"+sk]={fecha:_cajaF,cerradoPor:USER.n,saldos:saldos};
   DB.ref("/").update(ups);
   closeModal();
-  alert("Subcierre registrado para "+_cajaF+".");
+  if(sendWA){
+    // Build WA summary message
+    var msg="Cierre de caja "+_cajaF+"\n";
+    msg+="Sistema | Real | Diferencia\n";
+    Object.entries(saldos).forEach(function(e){
+      var s=e[1];
+      msg+=e[0]+": "+fmt(s.sistema)+" | "+fmt(s.real)+(s.dif!==0?" | "+(s.dif>0?"+":"")+fmt(s.dif):"")+"\n";
+    });
+    msg+="\nCerrado por: "+USER.n;
+    var waUrl="https://wa.me/?text="+encodeURIComponent(msg);
+    window.open(waUrl,"_blank");
+  } else {
+    alert("Cierre registrado para "+_cajaF+".");
+  }
   setTimeout(rCaja,300);
 }
 
