@@ -233,9 +233,30 @@ function startDB(){
   DKEYS.forEach(function(k){
     DB.ref(k).on("value",function(s){
       DATA[k]=s.exists()?s.val():{};
+      if(k==="cst") setTimeout(autoLimpiarDupCst,500);
       render();
     });
   });
+}
+
+function autoLimpiarDupCst(){
+  var cstA=oA(DATA.cst);
+  var seen={},toDelete=[];
+  cstA.forEach(function(c){
+    var key=(c.mes||"")+"__"+(c.desc||"").trim().toLowerCase();
+    if(seen[key]){
+      // Delete the one without data
+      if(Number(c.monto||0)===0&&!c.pagado) toDelete.push(c._key);
+      else if(Number((DATA.cst[seen[key]]||{}).monto||0)===0&&!(DATA.cst[seen[key]]||{}).pagado){
+        toDelete.push(seen[key]);seen[key]=c._key;
+      }
+    } else seen[key]=c._key;
+  });
+  if(toDelete.length){
+    var ups={};
+    toDelete.forEach(function(k){ups["cst/"+k]=null;});
+    DB.ref("/").update(ups);
+  }
 }
 function stopDB(){DKEYS.forEach(function(k){DB.ref(k).off();});}
 
@@ -1001,9 +1022,11 @@ function rCostos(){
   var cfActual=getCF(); // Get CF with overrides applied
   var existingCst=oA(DATA.cst).filter(function(c){return c.mes===_cstMes;});
   var existingIds=existingCst.map(function(c){return c.cfid;});
-  var existingDescs=existingCst.map(function(c){return c.desc;});
+  var existingDescs=existingCst.map(function(c){return (c.desc||"").trim().toLowerCase();});
   // Filter out items that already exist by cfid OR by description (prevents duplicates)
-  var nuevos=cfActual.filter(function(c){return !existingIds.includes(c.id)&&!existingDescs.includes(c.d);});
+  var nuevos=cfActual.filter(function(c){
+    return !existingIds.includes(c.id) && !existingDescs.includes((c.d||"").trim().toLowerCase());
+  });
   if(nuevos.length){nuevos.forEach(function(c){DB.ref("cst").push({cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:0,nro_fact:"",fec_venc:"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"});});setTimeout(rCostos,800);return;}
   var cstA=oA(DATA.cst).filter(function(c){return c.mes===_cstMes&&(_cstCat==="Todas"||c.cat===_cstCat)&&(_cstEd==="Todos"||c.ed===_cstEd);});
   var totP=cstA.filter(function(c){return c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
@@ -1630,44 +1653,44 @@ function cerrarMes(){
 }
 
 function openSubc(){
-  // Calculate saldo per account at end of day
+  var m=_cajaMes;
   var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);
   var ayerStr=ayer.toISOString().split("T")[0];
-  var m=_cajaMes;
   var cobM2=oA(DATA.cob).filter(function(c){return c.mes===m;});
   var cstM2=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
   var ajM2=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
 
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Verificá el efectivo y saldos reales de cada cuenta. El sistema calcula lo que deberia haber.</p>";
-  o+="<table class='tbl' style='margin-bottom:12px'><thead><tr><th>Cuenta</th><th>Saldo inicio</th><th>Movimientos hoy</th><th>Saldo cierre calculado</th><th>Real contado $</th></tr></thead><tbody>";
-
+  var saldosDia={};
   CTAS.forEach(function(cta){
     var salIni=saldoAcumulado(cta,ayerStr,m);
     var ingHoy=cobM2.reduce(function(s,c){return s+pA(c).filter(function(p){return p.fecha===_cajaF&&p.cuenta===cta;}).reduce(function(a,p){return a+p.monto;},0);},0)
               +ajM2.filter(function(a){return a.fecha===_cajaF&&a.tipo==="ingreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
     var egrHoy=cstM2.filter(function(c){return c.fec_venc===_cajaF&&c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)
               +ajM2.filter(function(a){return a.fecha===_cajaF&&a.tipo==="egreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
-    var salCal=salIni+ingHoy-egrHoy;
-    var movStr=(ingHoy>0?"+"+fmt(ingHoy)+" ":"")+(egrHoy>0?"-"+fmt(egrHoy):"");
-    o+="<tr><td style='font-weight:600'>"+cta+"</td>";
-    o+="<td style='color:#94A3B8'>"+fmt(salIni)+"</td>";
-    o+="<td style='font-size:11px;color:#64748B'>"+(movStr||"Sin movimientos")+"</td>";
-    o+="<td style='color:"+(salCal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(salCal)+"</td>";
-    o+="<td><input class='inp' type='number' id='sc-"+cta.replace(/ /g,"-")+"' placeholder='"+salCal+"' style='padding:4px 8px;font-size:12px'/></td></tr>";
+    saldosDia[cta]=salIni+ingHoy-egrHoy;
   });
+
+  var o="<div class='wbx' style='margin-bottom:12px'>Al confirmar, la caja del dia <b>"+_cajaF+"</b> queda cerrada por <b>"+USER.n+"</b>. No se puede modificar.</div>";
+  o+="<table class='tbl' style='margin-bottom:14px'><thead><tr><th>Cuenta</th><th>Saldo al cierre</th></tr></thead><tbody>";
+  var total=0;
+  CTAS.forEach(function(cta){
+    var sal=saldosDia[cta];
+    if(sal!==0){
+      total+=sal;
+      o+="<tr><td style='font-weight:600'>"+cta+"</td>";
+      o+="<td style='color:"+(sal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(sal)+"</td></tr>";
+    }
+  });
+  o+="<tr style='border-top:2px solid #334155;font-weight:700'><td>TOTAL</td><td style='color:"+(total>=0?"#10B981":"#EF4444")+"'>"+fmt(total)+"</td></tr>";
   o+="</tbody></table>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px'>";
   o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
-  o+="<button class='btn bok bsm' onclick='saveSubcWA()'>Cerrar y enviar por WA</button>";
-  o+="<button class='btn bok bsm' onclick='saveSubc()'>Cerrar sin WA</button>";
+  o+="<button class='btn bok' onclick='saveSubc(false)'>Confirmar cierre</button>";
+  o+="<button class='btn bp' onclick='saveSubc(true)'>Confirmar y enviar WA</button>";
   o+="</div>";
   openModal("Cierre de caja — "+_cajaF,o,true);
 }
 
-function saveSubcWA(){
-  // Save and generate WA message
-  saveSubc(true);
-}
 
 function saveSubc(sendWA){
   var saldos={},ups={};
