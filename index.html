@@ -1117,6 +1117,8 @@ function rCostos(){
     row+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:4px'><div style='color:"+(Number(c.monto||0)>0?"#F87171":"#64748B")+";font-weight:700;font-size:14px'>"+(Number(c.monto||0)>0?fmt(c.monto):"--")+"</div>";
     if(!c.pagado)row+="<button class='btn bp bsm' data-ec='"+ki+"'>Cargar</button>";
     if(c.pagado&&esA)row+="<button class='btn bg bsm' data-rev='"+ki+"'>Revertir</button>";
+    // Allow adding another invoice for same cost (gas double bill, multiple combustible, etc)
+    row+="<button class='btn bpu bsm' data-extra='"+ki+"' title='Agregar otra factura del mismo concepto'>+ Factura</button>";
     row+="</div></div>";
     if(isE){
     var pagosC=c.pagos?Object.values(c.pagos):[];
@@ -1153,6 +1155,7 @@ function rCostos(){
     if(b.dataset.ec){_editC=kget(parseInt(b.dataset.ec));rCostos();}
     else if(b.dataset.sc)saveCosto(kget(parseInt(b.dataset.sc)));
     else if(b.dataset.rev)revCosto(kget(parseInt(b.dataset.rev)));
+    else if(b.dataset.extra)addExtraFactura(kget(parseInt(b.dataset.extra)));
   };
 }
 function saveCosto(ckey){
@@ -1182,6 +1185,44 @@ function saveCosto(ckey){
   DB.ref("/").update(ups);
   _editC=null;setTimeout(rCostos,400);
 }
+function addExtraFactura(ckey){
+  var c=DATA.cst[ckey];if(!c)return;
+  var cats=Object.keys(CATC);
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Se agrega una nueva instancia de <b>"+esc(c.desc)+"</b> para el mes "+_cstMes+"</p>";
+  o+="<div class='g2'>";
+  o+=fld("ef-m","Monto $","","number");
+  o+=fld("ef-f","Nro. Factura","");
+  o+=fld("ef-v","Fecha vencimiento","","date");
+  o+=sld("ef-c","Cuenta",CTAS,"Banco");
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' onclick='saveExtraFactura("+JSON.stringify(ckey)+")'>Agregar</button>";
+  o+="</div>";
+  openModal("+ Factura adicional: "+esc(c.desc),o);
+}
+
+function saveExtraFactura(ckey){
+  var c=DATA.cst[ckey];if(!c)return;
+  var m=Number(G("ef-m").value||0);
+  if(!m){alert("Ingresa el monto");return;}
+  // Create a new cst record (copy of original, different instance)
+  DB.ref("cst").push({
+    cfid:c.cfid+"_extra_"+Date.now(),
+    desc:c.desc+" (2da factura)",
+    pv:c.pv||"",ed:c.ed||"General",cat:c.cat||"Otro",
+    mes:_cstMes,monto:m,
+    nro_fact:G("ef-f").value,
+    fec_venc:G("ef-v").value,
+    pagado:false,cta_num:c.cta_num||"",
+    dv:c.dv||15,cuenta:G("ef-c").value
+  });
+  closeModal();
+  alert("Factura adicional agregada: "+fmt(m));
+  setTimeout(rCostos,400);
+}
+
+
 function revCosto(ckey){if(!confirm("Revertir pago?"))return;DB.ref("cst/"+ckey).update({pagado:false,nro_fact:"",monto:0});setTimeout(rCostos,400);}
 
 // ALERTAS
