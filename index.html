@@ -675,10 +675,13 @@ function saveRecargo(ckey){
 
 function openNA(){
   var udl=uds().filter(function(u){return !oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length;});
+  var mesActual=mes();
+  var mesAnterior=(function(){var d=new Date();d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);})();
+
   var o="<div class='fld' style='grid-column:1/-1;margin-bottom:4px'>";
-  o+="<div style='display:flex;gap:12px;background:#0F172A;padding:10px;border-radius:8px;border:1px solid #334155'>";
-  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-nuevo' checked onchange='toggleModoNA()'> <b>Contrato nuevo</b> (genera cobros de ingreso)</label>";
-  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-vigente' onchange='toggleModoNA()'> <b>Contrato vigente</b> (solo cobra alquiler mensual)</label>";
+  o+="<div style='display:flex;gap:12px;background:#0F172A;padding:10px;border-radius:8px;border:1px solid #334155;flex-wrap:wrap'>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-nuevo' checked onchange='toggleModoNA()'> <b>Contrato nuevo</b></label>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-vigente' onchange='toggleModoNA()'> <b>Contrato vigente</b> (ya firmado, cargar al sistema)</label>";
   o+="</div></div>";
   o+="<div class='g2'>";
   o+="<div class='fld' style='grid-column:1/-1'><label class='lbl'>Unidad *</label><select class='inp' id='na-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
@@ -686,145 +689,171 @@ function openNA(){
   o+=fld("na-ce","Contacto emergencia")+fld("na-te","Tel. emergencia");
   o+="<div class='fld' style='grid-column:1/-1'>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px solid #3B82F633'>";
-  o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:10px'>MONTOS AL INGRESO</div>";
+  o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:10px'>MONTOS</div>";
   o+="<div class='g2'>";
-  o+=fld("na-alq","Alquiler mensual $","","number");
+  o+=fld("na-alq","Alquiler mensual actual $","","number");
+  // Contrato nuevo fields
+  o+="<div id='na-bloque-nuevo'>";
   o+=fld("na-dep","Deposito $","","number");
   o+=fld("na-gs","Gastos de gestion $","","number");
   o+=fld("na-desc-gs","Descuento en gastos $","0","number");
   o+=fld("na-pc","Reserva / Pago a cuenta $","0","number");
   o+=sld("na-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
-  o+=sld("na-cuotas-gs","Gastos de gestion en cuotas",["1 cuota (contado)","2 cuotas"]);
+  o+=sld("na-cuotas-gs","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
   o+="</div>";
-  o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:8px'>Completa los montos para ver el resumen</div>";
+  // Contrato vigente fields
+  o+="<div id='na-bloque-vigente' style='display:none'>";
+  o+="<div style='background:#10B98111;border-radius:8px;padding:10px;margin-bottom:8px;font-size:11px;color:#6EE7B7;border:1px solid #10B98133'>El deposito y gastos ya fueron cobrados. Solo se genera la cobranza del mes en curso.</div>";
+  o+=fld("na-dep-info","Deposito cobrado al ingreso (informativo) $","","number");
+  o+=fld("na-gs-info","Gastos de gestion cobrados al ingreso (informativo) $","","number");
+  o+="<div style='background:#F59E0B11;border-radius:8px;padding:10px;margin-bottom:8px;border:1px solid #F59E0B33'>";
+  o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:6px'>DEUDA PENDIENTE (opcional)</div>";
+  o+=fld("na-deuda-mes","Mes con deuda (ej: 2026-04)","","month");
+  o+=fld("na-deuda-monto","Monto adeudado $","0","number");
   o+="</div></div>";
-  o+="<div id='na-vigente-info' style='display:none;background:#10B98111;border-left:3px solid #10B981;border-radius:0 8px 8px 0;padding:10px;font-size:11px;color:#6EE7B7;margin-bottom:8px'>Solo se genera cobranza de alquiler del mes de inicio. El deposito y gastos ya fueron cobrados al inicio del contrato original.</div>";
-  o+=fld("na-ing","Inicio contrato","","date")+fld("na-egr","Fin contrato (1 año)","","date");
+  o+="</div></div></div>";
+  o+=fld("na-ing","Inicio del contrato (fecha real de ingreso)","","date")+fld("na-egr","Fin del contrato","","date");
   o+="<div class='fld' style='grid-column:1/-1'>"+tad("na-obs","Observaciones al ingreso")+"</div>";
   o+="</div>";
+  o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:4px'>Completa los montos para ver el resumen</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNA()'>Crear Acuerdo</button></div>";
   openModal("Nuevo Acuerdo",o,true);
-  // Live preview
   setTimeout(function(){
-    ["na-alq","na-dep","na-gs","na-desc-gs","na-pc"].forEach(function(id){
-      var el=G(id); if(el) el.oninput=actualizarResumenNA;
+    ["na-alq","na-dep","na-gs","na-desc-gs","na-pc","na-dep-info","na-gs-info","na-deuda-monto"].forEach(function(id){
+      var el=G(id);if(el)el.oninput=actualizarResumenNA;
     });
   },100);
 }
+
 function toggleModoNA(){
   var vigente=G("na-vigente")&&G("na-vigente").checked;
-  // Hide deposit and gastos fields in vigente mode
-  ["na-dep","na-gs","na-desc-gs","na-pc","na-cuotas-dep","na-cuotas-gs"].forEach(function(id){
-    var el=G(id);
-    if(el){
-      var wrap=el.closest(".fld");
-      if(wrap) wrap.style.display=vigente?"none":"block";
-    }
-  });
-  var info=G("na-vigente-info");
-  if(info) info.style.display=vigente?"block":"none";
+  var bNuevo=G("na-bloque-nuevo");
+  var bVigente=G("na-bloque-vigente");
+  if(bNuevo) bNuevo.style.display=vigente?"none":"block";
+  if(bVigente) bVigente.style.display=vigente?"block":"none";
   actualizarResumenNA();
 }
+
 function actualizarResumenNA(){
+  var vigente=G("na-vigente")&&G("na-vigente").checked;
   var alq=Number((G("na-alq")||{value:0}).value||0);
-  var dep=Number((G("na-dep")||{value:0}).value||0);
-  var gs=Number((G("na-gs")||{value:0}).value||0);
-  var desc=Number((G("na-desc-gs")||{value:0}).value||0);
-  var pc=Number((G("na-pc")||{value:0}).value||0);
-  var gsNeto=Math.max(0,gs-desc);
-  var total=alq+dep+gsNeto;
-  var saldo=Math.max(0,total-pc);
-  var el=G("na-resumen"); if(!el) return;
-  el.innerHTML="<b style='color:#F1F5F9'>Total al ingreso: "+fmt(total)+"</b>"
-    +"<br>Alquiler: "+fmt(alq)
-    +(dep>0?" | Deposito: "+fmt(dep):"")
-    +(gsNeto>0?" | Gastos: "+fmt(gsNeto)+(desc>0?" (desc. "+fmt(desc)+")":""):"")
-    +(pc>0?"<br><span style='color:#10B981'>Reserva/Pago a cuenta: "+fmt(pc)+"</span><br><b style='color:#F59E0B'>Saldo pendiente: "+fmt(saldo)+"</b>":"");
+  var el=G("na-resumen");if(!el)return;
+  if(vigente){
+    var dep=Number((G("na-dep-info")||{value:0}).value||0);
+    var gs=Number((G("na-gs-info")||{value:0}).value||0);
+    var deuda=Number((G("na-deuda-monto")||{value:0}).value||0);
+    el.innerHTML="<b style='color:#F1F5F9'>Contrato vigente</b>"
+      +"<br>Alquiler mensual: "+fmt(alq)
+      +(dep>0?"<br>Deposito (informativo): "+fmt(dep):"")
+      +(gs>0?"<br>Gastos (informativo): "+fmt(gs):"")
+      +(deuda>0?"<br><span style='color:#F59E0B'>Deuda pendiente: "+fmt(deuda)+"</span>":"")
+      +"<br><span style='color:#10B981'>Se genera cobranza de alquiler para el mes en curso</span>";
+  } else {
+    var dep2=Number((G("na-dep")||{value:0}).value||0);
+    var gs2=Number((G("na-gs")||{value:0}).value||0);
+    var desc=Number((G("na-desc-gs")||{value:0}).value||0);
+    var pc=Number((G("na-pc")||{value:0}).value||0);
+    var gsNeto=Math.max(0,gs2-desc);
+    var total=alq+dep2+gsNeto;
+    var saldo=Math.max(0,total-pc);
+    el.innerHTML="<b style='color:#F1F5F9'>Total al ingreso: "+fmt(total)+"</b>"
+      +"<br>Alquiler: "+fmt(alq)
+      +(dep2>0?" | Deposito: "+fmt(dep2):"")
+      +(gsNeto>0?" | Gastos: "+fmt(gsNeto)+(desc>0?" (desc. "+fmt(desc)+")":""):"")
+      +(pc>0?"<br><span style='color:#10B981'>Pago a cuenta: "+fmt(pc)+"</span>"
+            +"<br><b style='color:#F59E0B'>Saldo pendiente: "+fmt(saldo)+"</b>":"");
+  }
 }
+
 
 function saveNA(){
   var u=G("na-u").value,n=G("na-n").value,d=G("na-d").value;
   if(!u||!n||!d){alert("Unidad, nombre y DNI son obligatorios");return;}
+  var vigente=G("na-vigente")&&G("na-vigente").checked;
   var hist=oA(DATA.hist).filter(function(h){return h.dni===d;});
   if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
 
   var id=nid();
   var alq=Number(G("na-alq").value||0);
-  var dep=Number(G("na-dep").value||0);
-  var gs=Number(G("na-gs").value||0);
-  var desc=Number(G("na-desc-gs").value||0);
-  var gsNeto=Math.max(0,gs-desc);
-  var pc=Number(G("na-pc").value||0);
   var ing=G("na-ing").value;
-  var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
-  var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
   var mesInicio=ing?ing.slice(0,7):mes();
 
   function getMesN(start,n){
     var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+n;
-    while(mo>12){mo-=12;yr++;} return yr+"-"+String(mo).padStart(2,"0");
+    while(mo>12){mo-=12;yr++;}return yr+"-"+String(mo).padStart(2,"0");
   }
 
-  // Save inquilino
-  DB.ref("iq").push({
-    id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
-    tel:G("na-t").value,email:G("na-e").value,
-    ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
-    alquiler:alq,deposito:dep,gastos:gs,gastos_neto:gsNeto,
-    descuento_gs:desc,pago_cuenta:pc,
-    total_ingreso:alq+dep+gsNeto,
-    ingreso:ing,egreso:G("na-egr").value,
-    ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",
-    eventos:[],fecha_reg:hoy()
-  });
+  if(vigente){
+    // CONTRATO VIGENTE - save with historical data, generate current month cobro
+    var depInfo=Number((G("na-dep-info")||{value:0}).value||0);
+    var gsInfo=Number((G("na-gs-info")||{value:0}).value||0);
+    var deudaMes=G("na-deuda-mes")?G("na-deuda-mes").value:"";
+    var deudaMonto=Number((G("na-deuda-monto")||{value:0}).value||0);
 
-  var pcRestante=pc;
-  function aplicarPC(monto){
-    if(pcRestante<=0) return {monto:monto,pagos:{},estado:"pendiente"};
-    var aplicado=Math.min(pcRestante,monto);
-    pcRestante-=aplicado;
-    var pagos={};
-    pagos[Date.now()+Math.random()]=({fecha:hoy(),monto:aplicado,cuenta:"Efectivo",concepto:"Reserva / pago a cuenta"});
-    return {monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
-  }
+    DB.ref("iq").push({
+      id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
+      tel:G("na-t").value,email:G("na-e").value,
+      ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
+      alquiler:alq,deposito:depInfo,gastos:gsInfo,
+      pago_cuenta:0,ingreso:ing,egreso:G("na-egr").value,
+      ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",
+      fecha_reg:hoy(),tipo_carga:"vigente"
+    });
 
-  var esVigente=G("na-vigente")&&G("na-vigente").checked;
-
-  // Alquiler primer mes (siempre)
-  if(alq>0){
-    var ca=aplicarPC(alq);
-    DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,
-      monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,
-      concepto:"Alquiler"});
-  }
-  // Deposito y Gastos: solo en contratos NUEVOS
-  if(!esVigente&&dep>0){
-    var cuotaDep=Math.round(dep/cuotasDep);
-    for(var cd=0;cd<cuotasDep;cd++){
-      var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};
-      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),
-        monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,
-        concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});
+    // Generate current month alquiler cobro
+    if(alq>0){
+      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mes(),
+        monto_total:alq,sal_ant:0,estado:"pendiente",pagos:{},concepto:"Alquiler"});
     }
-  }
-  // Gastos gestion en cuotas (solo contratos nuevos)
-  if(!esVigente&&gsNeto>0){
-    var cuotaGs=Math.round(gsNeto/cuotasGs);
-    for(var cg=0;cg<cuotasGs;cg++){
-      var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};
-      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),
-        monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,
-        concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/descuento "+fmt(desc)+")":"")});
+    // Generate debt from previous month if any
+    if(deudaMes&&deudaMonto>0){
+      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:deudaMes,
+        monto_total:deudaMonto,sal_ant:0,estado:"pendiente",pagos:{},
+        concepto:"Saldo pendiente "+deudaMes});
     }
-  }
+    closeModal();
+    alert("Contrato vigente cargado. Alquiler de "+mes()+" generado"+(deudaMonto>0?" + deuda de "+deudaMes+": "+fmt(deudaMonto):"")+".");
 
-  closeModal();
-  var msg="Acuerdo #"+id+" creado.";
-  if(alq>0) msg+=" Alquiler "+fmt(alq)+".";
-  if(dep>0) msg+=" Deposito "+fmt(dep)+(cuotasDep>1?" en "+cuotasDep+" cuotas":"")+" .";
-  if(gsNeto>0) msg+=" Gastos "+fmt(gsNeto)+(cuotasGs>1?" en "+cuotasGs+" cuotas":"")+(desc>0?" (desc. "+fmt(desc)+")":"")+" .";
-  if(pc>0) msg+=" Reserva "+fmt(pc)+" aplicada.";
-  alert(msg);
+  } else {
+    // CONTRATO NUEVO - full flow
+    var dep=Number(G("na-dep").value||0);
+    var gs=Number(G("na-gs").value||0);
+    var desc=Number(G("na-desc-gs").value||0);
+    var gsNeto=Math.max(0,gs-desc);
+    var pc=Number(G("na-pc").value||0);
+    var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
+    var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
+
+    DB.ref("iq").push({
+      id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
+      tel:G("na-t").value,email:G("na-e").value,
+      ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
+      alquiler:alq,deposito:dep,gastos:gs,gastos_neto:gsNeto,
+      descuento_gs:desc,pago_cuenta:pc,total_ingreso:alq+dep+gsNeto,
+      ingreso:ing,egreso:G("na-egr").value,
+      ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",fecha_reg:hoy()
+    });
+
+    var pcRestante=pc;
+    function aplicarPC(monto){
+      if(pcRestante<=0)return{monto:monto,pagos:{},estado:"pendiente"};
+      var aplicado=Math.min(pcRestante,monto);pcRestante-=aplicado;
+      var pagos={};pagos[Date.now()+Math.random()]={fecha:hoy(),monto:aplicado,cuenta:"Efectivo",concepto:"Pago a cuenta"};
+      return{monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
+    }
+
+    if(alq>0){var ca=aplicarPC(alq);DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,concepto:"Alquiler"});}
+    if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
+    if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
+
+    closeModal();
+    var msg="Acuerdo #"+id+" creado. ";
+    if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
+    if(dep>0)msg+="Deposito "+fmt(dep)+(cuotasDep>1?" en "+cuotasDep+" cuotas":"")+". ";
+    if(gsNeto>0)msg+="Gastos "+fmt(gsNeto)+(cuotasGs>1?" en "+cuotasGs+" cuotas":"")+(desc>0?" (desc. "+fmt(desc)+")":"")+". ";
+    if(pc>0)msg+="Pago a cuenta "+fmt(pc)+" aplicado.";
+    alert(msg);
+  }
 }
 
 
