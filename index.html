@@ -213,7 +213,7 @@ function getCF(){
   var extras = oA(DATA.cfg).filter(function(x){return (x.tipo==="otro_gasto"||x.tipo==="costo_extra"||x.tipo==="costo_fijo_extra")&&x.activo!==false;});
   extras.forEach(function(x){
     var already = result.filter(function(c){return c.id===x._key;}).length;
-    if(!already) result.push({id:x._key,d:x.desc,pv:x.pv||"",e:x.ed||"General",c:x.cat||"Otro",ct:x.cta_num||"",dv:x.dv||15});
+    if(!already) result.push({id:x._key,d:x.desc,pv:x.pv||"",e:x.ed||"General",c:x.cat||"Otro",ct:x.cta_num||"",dv:x.dv||15,monto_cfg:x.monto||0});
   });
   return result;
 }
@@ -1087,7 +1087,7 @@ function rCostos(){
   var nuevos=cfActual.filter(function(c){
     return !existingIds.includes(c.id) && !existingDescs.includes((c.d||"").trim().toLowerCase());
   });
-  if(nuevos.length){nuevos.forEach(function(c){DB.ref("cst").push({cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:0,nro_fact:"",fec_venc:"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"});});setTimeout(rCostos,800);return;}
+  if(nuevos.length){nuevos.forEach(function(c){DB.ref("cst").push({cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:Number(c.monto_cfg||0),nro_fact:"",fec_venc:c.dv?(_cstMes+"-"+String(c.dv).padStart(2,"0")):"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"});});setTimeout(rCostos,800);return;}
   var cstA=oA(DATA.cst).filter(function(c){return c.mes===_cstMes&&(_cstCat==="Todas"||c.cat===_cstCat)&&(_cstEd==="Todos"||c.ed===_cstEd);});
   var totP=cstA.filter(function(c){return c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
   var totPend=cstA.filter(function(c){return !c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
@@ -2188,18 +2188,22 @@ function openAddCosto(){
     +fld("nc-ed","Edificio o General","General")
     +fld("nc-cta","Nro. cuenta / contrato","")
     +fld("nc-dv","Dia de vencimiento","15","number");
+  o+="<div id='nc-monto-wrap'><div style='height:8px'></div>"+fld("nc-monto","Monto $ (solo para eventuales)","","number")+"</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNuevoCosto()'>Agregar</button></div>";
   openModal("Agregar Costo",o,true);
 }
 function saveNuevoCosto(){
   var desc=G("nc-desc").value; if(!desc){alert("La descripcion es obligatoria");return;}
   var fijo=G("nc-fijo")&&G("nc-fijo").checked;
+  var fijo=G("nc-fijo")&&G("nc-fijo").checked;
+  var monto=Number((G("nc-monto")||{value:0}).value||0);
   var nuevo={
     tipo:fijo?"costo_fijo_extra":"otro_gasto",
     desc:desc,pv:G("nc-prov").value,cat:G("nc-cat").value,
     ed:G("nc-ed").value||"General",cta_num:G("nc-cta").value,
     dv:Number(G("nc-dv").value||15),activo:true,fecha_alta:hoy()
   };
+  if(!fijo&&monto>0) nuevo.monto=monto;
   DB.ref("cfg").push(nuevo);
   closeModal(); setTimeout(rConfig,300);
 }
