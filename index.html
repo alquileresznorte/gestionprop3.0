@@ -1659,12 +1659,34 @@ function rCaja(){
     o+="<tr style='border-top:2px solid #334155;font-weight:700'><td>TOTAL</td><td style='color:#10B981'>"+fmt(iM)+"</td><td style='color:#EF4444'>"+fmt(eM)+"</td><td style='color:"+(util>=0?"#10B981":"#EF4444")+"'>"+fmt(util)+"</td><td></td></tr>";
     o+="</tbody></table></div>";
 
-    // Subcierres del mes
+    // Subcierres del mes - con detalle expandible
     if(subcM.length){
-      o+="<div class='card' style='margin-bottom:10px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Subcierres del mes</h3>";
-      subcM.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(s){
-        o+="<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:12px'>";
-        o+="<span>"+s.fecha+" - "+esc(s.cerradoPor)+"</span><span style='color:#10B981'>✅</span></div>";
+      o+="<div class='card' style='margin-bottom:10px'>";
+      o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Cierres diarios del mes ("+subcM.length+")</h3>";
+      subcM.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(s,idx){
+        var sid="subc-det-"+idx;
+        o+="<div style='border-bottom:1px solid #1E293B;padding:6px 0'>";
+        o+="<div style='display:flex;justify-content:space-between;align-items:center;cursor:pointer' data-subcid='"+sid+"'>";
+        o+="<div><span style='font-weight:600;font-size:12px'>"+s.fecha+"</span> <span style='color:#64748B;font-size:11px'>Cerrado por "+esc(s.cerradoPor)+"</span></div>";
+        o+="<span style='color:#10B981'>✅ ver detalle ▼</span></div>";
+        // Detail panel
+        o+="<div id='"+sid+"' style='display:none;margin-top:6px;background:#0F172A;border-radius:7px;padding:10px'>";
+        if(s.saldos){
+          o+="<table class='tbl' style='font-size:11px'><thead><tr><th>Cuenta</th><th>Sistema</th><th>Real</th><th>Diferencia</th></tr></thead><tbody>";
+          Object.entries(s.saldos).forEach(function(e){
+            var sv=e[1];
+            if(sv.sistema!==0||sv.real!==0){
+              o+="<tr><td style='font-weight:600'>"+e[0]+"</td>";
+              o+="<td>"+fmt(sv.sistema)+"</td>";
+              o+="<td>"+fmt(sv.real)+"</td>";
+              o+="<td style='color:"+(sv.dif===0?"#10B981":sv.dif>0?"#F59E0B":"#EF4444")+";font-weight:700'>"+(sv.dif>0?"+":"")+fmt(sv.dif)+"</td></tr>";
+            }
+          });
+          o+="</tbody></table>";
+        } else {
+          o+="<p style='color:#64748B;font-size:11px'>Sin detalle de saldos</p>";
+        }
+        o+="</div></div>";
       });
       o+="</div>";
     }
@@ -1707,6 +1729,7 @@ function rCaja(){
   }
 
   G("main").innerHTML=o;
+    G("main").onclick=function(e){var b=e.target.closest("[data-subcid]");if(b)toggleSubcDet(b.dataset.subcid);};
   // Wire view toggle buttons
   G("main").addEventListener("click",function(e){
     var cv=e.target.closest("[data-cv]");
@@ -2722,6 +2745,11 @@ function deletePago(ckey,pagoKey){
   setTimeout(rCob,300);
 }
 
+
+function toggleSubcDet(id){
+  var el=G(id);
+  if(el) el.style.display=el.style.display==="none"?"block":"none";
+}
 
 render();
 </script>
