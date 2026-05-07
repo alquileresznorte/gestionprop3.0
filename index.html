@@ -1479,137 +1479,119 @@ function rCaja(){
   if(_cajaV==="dia"){
     var subcDia=subcM.filter(function(s){return s.fecha===_cajaF;})[0];
 
-    // Payments on this day
-    var movimientosD=[];
-
-    // Cobros del dia
-    cobM.forEach(function(c){
-      pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
-        movimientosD.push({
-          concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0],
-          ingreso:p.monto,egreso:0,
-          cuenta:p.cuenta,tipo:"cobro"
-        });
-      });
-    });
-
-    // Costos del dia
-    cstM.filter(function(c){return c.fec_venc===_cajaF;}).forEach(function(c){
-      movimientosD.push({
-        concepto:esc(c.desc||""),
-        ingreso:0,egreso:Number(c.monto||0),
-        cuenta:c.cuenta,tipo:"costo"
-      });
-    });
-
-    // Ajustes del dia
-    ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
-      movimientosD.push({
-        concepto:esc(a.concepto||""),
-        ingreso:a.tipo==="ingreso"?Number(a.monto||0):0,
-        egreso:a.tipo==="egreso"?Number(a.monto||0):0,
-        cuenta:a.cuenta,tipo:"ajuste"
-      });
-    });
-
-    // Saldo inicio del dia por cuenta (acumulado hasta ayer)
     var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);
     var ayerStr=ayer.toISOString().split("T")[0];
 
-    // Get all accounts that have activity
-    var cuentasActivas=[];
-    CTAS.forEach(function(cta){
-      var salIni=saldoAcumulado(cta,ayerStr,m);
-      var hayMov=movimientosD.filter(function(mv){return mv.cuenta===cta;}).length>0;
-      if(salIni!==0||hayMov) cuentasActivas.push(cta);
+    // Build all movements for this day
+    var movimientosD=[];
+
+    // Cobros
+    cobM.forEach(function(c){
+      pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
+        movimientosD.push({concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0],mov:p.monto,cuenta:p.cuenta,tipo:"cobro"});
+      });
+    });
+    // Costos
+    cstM.filter(function(c){return c.fec_venc===_cajaF;}).forEach(function(c){
+      movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta,tipo:"costo"});
+    });
+    // Ajustes manuales
+    ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
+      movimientosD.push({concepto:esc(a.concepto||""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste"});
+    });
+    // Aportes y retiros de socios (afectan cuentas aunque no sean costo/ganancia)
+    movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
+      movimientosD.push({
+        concepto:esc((mv.tipo==="retiro"?"Retiro":"Aporte")+" "+(mv.cuenta||"")+(mv.nota?" - "+mv.nota:"")),
+        mov:mv.tipo==="aporte"?Number(mv.monto||0):-Number(mv.monto||0),
+        cuenta:mv.cuenta,tipo:"movimiento"
+      });
     });
 
-    var totIng=movimientosD.reduce(function(s,mv){return s+mv.ingreso;},0);
-    var totEgr=movimientosD.reduce(function(s,mv){return s+mv.egreso;},0);
+    // Always show all main accounts
+    var cuentasTabla=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo"];
+    // Add any extra accounts that have activity
+    movimientosD.forEach(function(mv){
+      if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta) cuentasTabla.push(mv.cuenta);
+    });
+
+    var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
+    var fondoTotal=cuentasTabla.reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
 
     o+="<div style='display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap'>";
     o+="<input type='date' class='inp' value='"+_cajaF+"' style='max-width:160px' id='caja-fecha'/>";
-    o+="<span style='color:#64748B;font-size:12px'>"+(subcDia?"✅ Cerrada por "+esc(subcDia.cerradoPor):"Abierta")+"</span>";
-    o+="<button class='btn bp bsm' onclick='openAj()'>+ Ajuste</button>";
-    if(!subcDia) o+="<button class='btn bok bsm' onclick='openSubc()'>Cerrar caja</button>";
+    if(subcDia){
+      o+="<span style='color:#10B981;font-size:12px'>✅ Cerrada por "+esc(subcDia.cerradoPor)+"</span>";
+    } else {
+      o+="<span style='color:#F59E0B;font-size:12px'>Abierta</span>";
+      o+="<button class='btn bp bsm' onclick='openAj()'>+ Ajuste</button>";
+      o+="<button class='btn bpu bsm' onclick='openMov()'>+ Aporte/Retiro</button>";
+    }
     o+="</div>";
 
-    // ── TABLA ESTILO PLANILLA ──────────────────────────────────────────────
     o+="<div class='card' style='overflow-x:auto;padding:0'>";
     o+="<table style='width:100%;border-collapse:collapse;font-size:12px'>";
 
-    // Header
+    // Header row
     o+="<thead><tr style='background:#0F172A'>";
-    o+="<th style='padding:8px 10px;text-align:left;color:#94A3B8;font-size:11px;min-width:160px'>Concepto</th>";
-    o+="<th style='padding:8px 10px;text-align:right;color:#10B981;font-size:11px'>Ingreso</th>";
-    o+="<th style='padding:8px 10px;text-align:right;color:#EF4444;font-size:11px'>Egreso</th>";
-    cuentasActivas.forEach(function(cta){
-      o+="<th style='padding:8px 10px;text-align:right;color:#94A3B8;font-size:10px;white-space:nowrap'>"+cta+"</th>";
+    o+="<th style='padding:8px 10px;text-align:left;color:#94A3B8;font-size:11px;min-width:180px'>Concepto</th>";
+    o+="<th style='padding:8px 10px;text-align:right;color:#F1F5F9;font-size:11px;min-width:100px'>Movimiento</th>";
+    cuentasTabla.forEach(function(cta){
+      o+="<th style='padding:8px 10px;text-align:right;color:#94A3B8;font-size:10px;white-space:nowrap;min-width:90px'>"+cta+"</th>";
     });
     o+="</tr></thead><tbody>";
 
-    // Fila 1: FONDO DE CAJA (saldo inicio del dia)
+    // FONDO DE CAJA row
     o+="<tr style='background:#1E293B;border-bottom:2px solid #3B82F6'>";
-    o+="<td style='padding:7px 10px;font-weight:700;color:#3B82F6'>FONDO DE CAJA</td>";
-    var totalFondo=0;
-    cuentasActivas.forEach(function(cta){totalFondo+=saldoAcumulado(cta,ayerStr,m);});
-    o+="<td style='padding:7px 10px;text-align:right;color:#3B82F6;font-weight:700'>"+fmt(totalFondo)+"</td>";
-    o+="<td style='padding:7px 10px;text-align:right;color:#64748B'>$0</td>";
-    cuentasActivas.forEach(function(cta){
+    o+="<td style='padding:8px 10px;font-weight:700;color:#3B82F6'>FONDO DE CAJA</td>";
+    o+="<td style='padding:8px 10px;text-align:right;color:#3B82F6;font-weight:700'>"+fmt(fondoTotal)+"</td>";
+    cuentasTabla.forEach(function(cta){
       var sal=saldoAcumulado(cta,ayerStr,m);
-      o+="<td style='padding:7px 10px;text-align:right;color:#3B82F6;font-weight:600'>"+(sal!==0?fmt(sal):"--")+"</td>";
+      o+="<td style='padding:8px 10px;text-align:right;color:#3B82F6;font-weight:600'>"+(sal!==0?fmt(sal):"--")+"</td>";
     });
     o+="</tr>";
 
-    // Filas de movimientos
+    // Movement rows
     movimientosD.forEach(function(mv,idx){
-      var esIngreso=mv.ingreso>0;
       var bg=idx%2===0?"#1E293B":"#162032";
+      var colorMov=mv.mov>=0?"#10B981":"#EF4444";
       o+="<tr style='background:"+bg+";border-bottom:1px solid #334155'>";
       o+="<td style='padding:6px 10px;color:#F1F5F9'>"+mv.concepto+"</td>";
-      o+="<td style='padding:6px 10px;text-align:right;color:#10B981'>"+(mv.ingreso>0?fmt(mv.ingreso):"")+"</td>";
-      o+="<td style='padding:6px 10px;text-align:right;color:#EF4444'>"+(mv.egreso>0?"-"+fmt(mv.egreso):"")+"</td>";
-      cuentasActivas.forEach(function(cta){
-        var val=mv.cuenta===cta?(esIngreso?mv.ingreso:-mv.egreso):0;
-        o+="<td style='padding:6px 10px;text-align:right;color:"+(val>0?"#10B981":val<0?"#EF4444":"#334155")+"'>"+(val!==0?(val>0?fmt(val):"-"+fmt(-val)):"")+"</td>";
+      o+="<td style='padding:6px 10px;text-align:right;color:"+colorMov+";font-weight:600'>"+(mv.mov>=0?"+":"")+fmt(mv.mov)+"</td>";
+      cuentasTabla.forEach(function(cta){
+        var val=mv.cuenta===cta?mv.mov:0;
+        o+="<td style='padding:6px 10px;text-align:right;color:"+(val>0?"#10B981":val<0?"#EF4444":"#334155")+"'>"+(val!==0?(val>0?"+"+fmt(val):fmt(val)):"")+"</td>";
       });
       o+="</tr>";
     });
 
-    // Fila subtotal
+    // Subtotal row
     o+="<tr style='background:#0F172A;border-top:1px solid #64748B'>";
-    o+="<td style='padding:6px 10px;color:#94A3B8;font-size:11px'></td>";
-    o+="<td style='padding:6px 10px;text-align:right;color:#10B981;font-weight:700'>"+fmt(totIng)+"</td>";
-    o+="<td style='padding:6px 10px;text-align:right;color:#EF4444;font-weight:700'>"+(totEgr>0?"-"+fmt(totEgr):"")+"</td>";
-    cuentasActivas.forEach(function(cta){
-      var ing=movimientosD.filter(function(mv){return mv.cuenta===cta&&mv.ingreso>0;}).reduce(function(s,mv){return s+mv.ingreso;},0);
-      var egr=movimientosD.filter(function(mv){return mv.cuenta===cta&&mv.egreso>0;}).reduce(function(s,mv){return s+mv.egreso;},0);
-      var net=ing-egr;
-      o+="<td style='padding:6px 10px;text-align:right;color:"+(net>0?"#10B981":net<0?"#EF4444":"#64748B")+";font-size:11px'>"+(net!==0?(net>0?fmt(net):"-"+fmt(-net)):"")+"</td>";
+    o+="<td style='padding:5px 10px;color:#64748B;font-size:10px'></td>";
+    o+="<td style='padding:5px 10px;text-align:right;color:"+(totMov>=0?"#10B981":"#EF4444")+";font-weight:700'>"+(totMov>=0?"+":"")+fmt(totMov)+"</td>";
+    cuentasTabla.forEach(function(cta){
+      var net=movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
+      o+="<td style='padding:5px 10px;text-align:right;color:"+(net>0?"#10B981":net<0?"#EF4444":"#64748B")+";font-size:11px'>"+(net!==0?(net>0?"+"+fmt(net):fmt(net)):"")+"</td>";
     });
     o+="</tr>";
 
-    // Fila TOTAL DEL DIA (fondo + movimientos = saldo cierre)
+    // TOTAL DEL DIA row
     o+="<tr style='background:#1E293B;border-top:2px solid #F1F5F9'>";
     o+="<td style='padding:8px 10px;font-weight:800;color:#F1F5F9'>Total del dia "+_cajaF.split("-").reverse().join("/")+"</td>";
-    var totalDia=totalFondo+totIng-totEgr;
-    o+="<td style='padding:8px 10px;text-align:right;color:#10B981;font-weight:800'>"+fmt(totalDia)+"</td>";
-    o+="<td></td>";
-    cuentasActivas.forEach(function(cta){
+    o+="<td style='padding:8px 10px;text-align:right;color:"+(fondoTotal+totMov>=0?"#10B981":"#EF4444")+";font-weight:800'>"+fmt(fondoTotal+totMov)+"</td>";
+    cuentasTabla.forEach(function(cta){
       var salFin=saldoAcumulado(cta,_cajaF,m);
-      o+="<td style='padding:8px 10px;text-align:right;color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:800'>"+(salFin!==0?fmt(salFin):"--")+"</td>";
+      o+="<td style='padding:8px 10px;text-align:right;color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:800'>"+fmt(salFin)+"</td>";
     });
     o+="</tr>";
 
     o+="</tbody></table></div>";
 
-    // WA button to send summary
     o+="<div style='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center'>";
     if(!subcDia){
       o+="<button class='btn bok' onclick='openSubc()'>✓ Cerrar caja del dia</button>";
-      o+="<button class='btn bp bsm' onclick='openAj()'>+ Ajuste</button>";
     } else {
-      o+="<div style='background:#10B98122;border:1px solid #10B981;border-radius:8px;padding:8px 14px;font-size:12px;color:#10B981;font-weight:700'>🔒 Caja cerrada — no se puede modificar</div>";
+      o+="<div style='background:#10B98122;border:1px solid #10B981;border-radius:8px;padding:8px 14px;font-size:12px;color:#10B981;font-weight:700'>🔒 Caja cerrada</div>";
     }
     o+="<button class='btn bg bsm' onclick='enviarCajaWA()'>Enviar WA</button>";
     o+="</div>";
