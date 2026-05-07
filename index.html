@@ -1170,6 +1170,7 @@ function saveCosto(ckey){
   ups["cst/"+ckey+"/nro_fact"]=f;
   ups["cst/"+ckey+"/fec_venc"]=(G("ec-v")||{value:""}).value;
   ups["cst/"+ckey+"/pagado"]=p;
+  ups["cst/"+ckey+"/cuenta"]=pc; // save selected account
   
   // Register partial payment if amount entered
   if(pm>0){
@@ -1565,7 +1566,8 @@ function rCaja(){
       o+="<span style='color:#10B981;font-size:12px'>✅ Cerrada por "+esc(subcDia.cerradoPor)+"</span>";
     } else {
       o+="<span style='color:#F59E0B;font-size:12px'>Abierta</span>";
-      o+="<button class='btn bp bsm' onclick='openAj()'>+ Ajuste</button>";
+      o+="<button class='btn bp bsm' onclick='openGastoCaja()'>+ Gasto</button>";
+      o+="<button class='btn bpu bsm' onclick='openAj()'>+ Ajuste</button>";
       o+="<button class='btn bpu bsm' onclick='openMov()'>+ Aporte/Retiro</button>";
       o+="<button class='btn bsm' style='background:#06B6D4;color:#fff' onclick='openAhorro()'>+ Compra USD</button>";
     }
@@ -2819,6 +2821,51 @@ function deletePago(ckey,pagoKey){
   closeModal();
   alert("Pago eliminado.");
   setTimeout(rCob,300);
+}
+
+
+function openGastoCaja(){
+  var cats=Object.keys(CATC);
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Registra un gasto puntual directamente en la caja del dia "+_cajaF+".</p>";
+  o+="<div class='g2'>";
+  o+=fld("gc-desc","Descripcion / Concepto *","");
+  o+=fld("gc-monto","Monto $","","number");
+  o+=fld("gc-fact","Nro. Factura (opcional)","");
+  o+=sld("gc-cat","Categoria",cats,"Otro");
+  o+=sld("gc-cta","Cuenta",CTAS,"Efectivo");
+  o+="<div class='fld'><label class='lbl'>Edificio</label><select class='inp' id='gc-ed'><option value='General'>General</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div>";
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' onclick='saveGastoCaja()'>Registrar gasto</button>";
+  o+="</div>";
+  openModal("+ Gasto del dia",o);
+}
+
+function saveGastoCaja(){
+  var desc=G("gc-desc").value;
+  var monto=Number(G("gc-monto").value||0);
+  if(!desc){alert("La descripcion es obligatoria");return;}
+  if(!monto){alert("El monto es obligatorio");return;}
+  // Save directly to cst for current month
+  DB.ref("cst").push({
+    cfid:"ev_"+Date.now(),
+    desc:desc,
+    pv:"",
+    ed:G("gc-ed").value||"General",
+    cat:G("gc-cat").value||"Otro",
+    mes:_cstMes,
+    monto:monto,
+    nro_fact:G("gc-fact").value||"",
+    fec_venc:_cajaF,
+    pagado:true,
+    cuenta:G("gc-cta").value||"Efectivo",
+    fecha_pago:_cajaF,
+    tipo:"eventual_caja"
+  });
+  closeModal();
+  alert("Gasto registrado: "+desc+" — "+fmt(monto));
+  setTimeout(rCaja,400);
 }
 
 
