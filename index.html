@@ -192,7 +192,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -1526,6 +1526,7 @@ function rCaja(){
       o+="<span style='color:#F59E0B;font-size:12px'>Abierta</span>";
       o+="<button class='btn bp bsm' onclick='openAj()'>+ Ajuste</button>";
       o+="<button class='btn bpu bsm' onclick='openMov()'>+ Aporte/Retiro</button>";
+      o+="<button class='btn bsm' style='background:#06B6D4;color:#fff' onclick='openAhorro()'>+ Compra USD</button>";
     }
     o+="</div>";
 
@@ -1670,7 +1671,31 @@ function rCaja(){
       o+="</div>";
     }
 
+// Fondo de Ahorro USD
+    var ahoM=oA(DATA.aho||{});
+    var totalUSD=oA(DATA.aho||{}).reduce(function(s,a){return s+Number(a.usd||0);},0);
+    o+="<div class='card' style='margin-bottom:10px;border-left:3px solid #06B6D4'>";
+    o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+    o+="<div><h3 style='font-size:13px;font-weight:700'>Fondo de Ahorro</h3>";
+    o+="<p style='color:#06B6D4;font-size:13px;font-weight:800;margin-top:2px'>U$S "+totalUSD.toLocaleString()+"</p></div>";
+    o+="<button class='btn bp bsm' onclick='openAhorro()'>+ Compra USD</button></div>";
+    if(ahoM.length){
+      o+="<table class='tbl'><thead><tr><th>Fecha</th><th>USD</th><th>TC</th><th>Pesos</th><th>Cuenta</th></tr></thead><tbody>";
+      ahoM.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");}).forEach(function(a){
+        o+="<tr><td>"+esc(a.fecha||"")+"</td>";
+        o+="<td style='color:#06B6D4;font-weight:700'>U$S "+Number(a.usd||0).toLocaleString()+"</td>";
+        o+="<td style='color:#94A3B8'>$"+Number(a.tc||0).toLocaleString()+"</td>";
+        o+="<td style='color:#F59E0B'>"+fmt(a.pesos||0)+"</td>";
+        o+="<td style='color:#64748B;font-size:11px'>"+esc(a.cuenta||"")+"</td></tr>";
+      });
+      o+="</tbody></table>";
+    } else {
+      o+="<p style='color:#64748B;font-size:12px'>Sin compras de dólares registradas</p>";
+    }
+    o+="</div>";
+
     // Retiros y Aportes personales
+
     o+="<div class='card' style='margin-bottom:10px;border-left:3px solid #8B5CF6'>";
     o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
     o+="<div><h3 style='font-size:13px;font-weight:700'>Posicion de socios — "+m+"</h3>";
@@ -2749,6 +2774,49 @@ function deletePago(ckey,pagoKey){
   closeModal();
   alert("Pago eliminado.");
   setTimeout(rCob,300);
+}
+
+
+function openAhorro(){
+  var o="<div class='g2'>";
+  o+=fld("ah-f","Fecha",hoy(),"date");
+  o+=fld("ah-usd","Monto USD $","","number");
+  o+=fld("ah-tc","TC (pesos por dolar)","","number");
+  o+=sld("ah-cta","Cuenta de origen",CTAS,"Efectivo");
+  o+="</div>";
+  o+="<div id='ah-total' style='background:#0F172A;border-radius:8px;padding:10px;font-size:12px;color:#94A3B8;margin-top:8px'>Completa los campos para ver el total en pesos</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' onclick='saveAhorro()'>Registrar compra</button>";
+  o+="</div>";
+  openModal("Compra de dólares — Fondo de Ahorro",o);
+  setTimeout(function(){
+    ["ah-usd","ah-tc"].forEach(function(id){
+      var el=G(id);
+      if(el) el.oninput=function(){
+        var usd=Number((G("ah-usd")||{value:0}).value||0);
+        var tc=Number((G("ah-tc")||{value:0}).value||0);
+        var t=G("ah-total");
+        if(t&&usd>0&&tc>0) t.innerHTML="<b style='color:#F1F5F9'>Total en pesos: "+fmt(usd*tc)+"</b><br><span style='color:#06B6D4'>U$S "+usd.toLocaleString()+" x $"+tc.toLocaleString()+" = "+fmt(usd*tc)+"</span>";
+      };
+    });
+  },100);
+}
+
+function saveAhorro(){
+  var f=G("ah-f").value;
+  var usd=Number(G("ah-usd").value||0);
+  var tc=Number(G("ah-tc").value||0);
+  var cta=G("ah-cta").value;
+  if(!usd||!tc){alert("Ingresa monto USD y TC");return;}
+  var pesos=usd*tc;
+  var m=f.slice(0,7);
+  // Save to ahorro
+  DB.ref("aho").push({fecha:f,mes:m,usd:usd,tc:tc,pesos:pesos,cuenta:cta});
+  // Register as egreso in caja (aporte/retiro style - not cost not income)
+  DB.ref("aj").push({fecha:f,mes:m,tipo:"egreso",concepto:"Compra USD U$S"+usd+" (TC $"+tc+")",monto:pesos,cuenta:cta,auto:false,esAhorro:true});
+  closeModal();
+  alert("Compra registrada: U$S "+usd.toLocaleString()+" = "+fmt(pesos)+". Sale de "+cta+".");
 }
 
 
