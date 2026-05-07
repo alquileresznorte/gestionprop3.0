@@ -1552,8 +1552,9 @@ function rCaja(){
 
     // Always show all main accounts
     var cuentasTabla=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo"];
-    // Add any extra accounts that have activity
+    // Add any extra accounts that have activity (except "Banco" which was a bug - remap to Efectivo)
     movimientosD.forEach(function(mv){
+      if(mv.cuenta==="Banco") mv.cuenta="Efectivo"; // fix old records
       if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta) cuentasTabla.push(mv.cuenta);
     });
 
@@ -2049,7 +2050,7 @@ var _cfgTab = "propiedades"; // propiedades | costos | ingresos
 function rConfig(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
 
-  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["usuarios","Usuarios"]];
+  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"]];
   var o = "<h2 style='font-size:20px;font-weight:800;margin-bottom:12px'>Configuracion</h2>";
   o += "<div style='display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap'>";
   tabs.forEach(function(t){
@@ -2536,6 +2537,80 @@ function quitarCF(cfid){
 
 
 // ── USUARIOS Y CONTRASEÑAS ────────────────────────────────────────────────────
+function renderCfgCategorias(){
+  var cats=Object.keys(getCatC());
+  var custom=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";});
+  var COLORS=["#EF4444","#F97316","#F59E0B","#10B981","#06B6D4","#3B82F6","#8B5CF6","#EC4899","#84CC16","#14B8A6","#6366F1","#64748B","#475569"];
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Categorias de costos</h3>";
+  o+="<button class='btn bp bsm' onclick='openNuevaCat()'>+ Nueva categoria</button></div>";
+  o+="<table class='tbl' style='margin-bottom:12px'><thead><tr><th>Categoria</th><th>Color</th><th>Tipo</th><th></th></tr></thead><tbody>";
+  // Base categories (read only)
+  Object.entries(CATC_BASE).forEach(function(e){
+    o+="<tr><td style='font-weight:600'>"+e[0]+"</td>";
+    o+="<td><div style='width:24px;height:24px;border-radius:6px;background:"+e[1]+"'></div></td>";
+    o+="<td style='color:#64748B;font-size:11px'>Base</td><td></td></tr>";
+  });
+  // Custom categories (editable)
+  custom.forEach(function(c){
+    var ki=kpush(c._key);
+    o+="<tr><td style='font-weight:600'>"+esc(c.nombre)+"</td>";
+    o+="<td><div style='width:24px;height:24px;border-radius:6px;background:"+(c.color||"#475569")+"'></div></td>";
+    o+="<td style='color:#8B5CF6;font-size:11px'>Personalizada</td>";
+    o+="<td><button class='btn br bsm' data-delcat='"+ki+"'>Eliminar</button></td></tr>";
+  });
+  o+="</tbody></table>";
+  G("cfg-body").innerHTML=o;
+  G("cfg-body").onclick=function(e){
+    var d=e.target.closest("[data-delcat]");
+    if(d){
+      if(!confirm("Eliminar esta categoria?"))return;
+      DB.ref("cfg/"+kget(parseInt(d.dataset.delcat))).remove();
+      setTimeout(rConfig,300);
+    }
+  };
+}
+
+function openNuevaCat(){
+  var COLORS=["#EF4444","#F97316","#F59E0B","#10B981","#06B6D4","#3B82F6","#8B5CF6","#EC4899","#84CC16","#14B8A6","#6366F1","#64748B","#475569"];
+  var o=fld("nc2-nombre","Nombre de la categoria *","");
+  o+="<div class='fld'><label class='lbl'>Color</label><div style='display:flex;flex-wrap:wrap;gap:6px;margin-top:4px' id='nc2-colors'>";
+  COLORS.forEach(function(col){
+    o+="<div data-color='"+col+"' style='width:28px;height:28px;border-radius:6px;background:"+col+";cursor:pointer;border:2px solid transparent'></div>";
+  });
+  o+="</div></div>";
+  o+="<input type='hidden' id='nc2-color' value='#475569'/>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' onclick='saveNuevaCat()'>Guardar</button></div>";
+  openModal("Nueva categoria",o);
+}
+
+function colClick(e){
+  var el=e.target.closest("[data-color]");
+  if(!el)return;
+  var col=el.dataset.color;
+  document.querySelectorAll("#nc2-colors div").forEach(function(d){d.style.border="2px solid transparent";});
+  el.style.border="2px solid #F1F5F9";
+  if(G("nc2-color"))G("nc2-color").value=col;
+}
+function selectColor(el,col){
+  document.querySelectorAll("#nc2-colors div").forEach(function(d){d.style.border="2px solid transparent";});
+  el.style.border="2px solid #F1F5F9";
+  G("nc2-color").value=col;
+}
+
+function saveNuevaCat(){
+  var n=G("nc2-nombre").value.trim();
+  if(!n){alert("Ingresa un nombre");return;}
+  if(CATC_BASE[n]){alert("Esta categoria ya existe en las base");return;}
+  var col=G("nc2-color").value||"#475569";
+  DB.ref("cfg").push({tipo:"categoria",nombre:n,color:col});
+  closeModal();
+  setTimeout(rConfig,300);
+}
+
+
 function renderCfgUsuarios(){
   var el=G("cfg-body"); if(!el) return;
   var o="<div class='card'>";
