@@ -1688,31 +1688,53 @@ function rCaja(){
       o+="</div>";
     }
 
-    // Retiros y Aportes
-    o+="<div class='card' style='margin-bottom:10px'>";
-    o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
-    o+="<h3 style='font-size:13px;font-weight:700'>Retiros y Aportes personales</h3>";
+    // Retiros y Aportes personales
+    o+="<div class='card' style='margin-bottom:10px;border-left:3px solid #8B5CF6'>";
+    o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+    o+="<div><h3 style='font-size:13px;font-weight:700'>Posicion de socios — "+m+"</h3>";
+    o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Aportes y retiros no afectan resultado de la empresa</p></div>";
     o+="<button class='btn bpu bsm' onclick='openMov()'>+ Registrar</button></div>";
+
+    // Summary table per socio
+    o+="<table class='tbl' style='margin-bottom:12px'><thead><tr>";
+    o+="<th>Socio</th><th style='color:#10B981'>Aportes</th><th style='color:#EF4444'>Retiros</th><th>Posicion neta</th><th style='color:#8B5CF6'>Utilidad x socio</th><th style='color:#06B6D4'>Total a favor</th>";
+    o+="</tr></thead><tbody>";
+
+    var utilXSocio=esA?Math.round(util/2):0;
     CTAP.forEach(function(cta){
       var mc=movsM.filter(function(mv){return mv.cuenta===cta;});
       var ap=mc.filter(function(mv){return mv.tipo==="aporte";}).reduce(function(s,mv){return s+Number(mv.monto||0);},0);
       var ret=mc.filter(function(mv){return mv.tipo==="retiro";}).reduce(function(s,mv){return s+Number(mv.monto||0);},0);
-      o+="<div style='margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #334155'>";
-      o+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'>";
-      o+="<b style='font-size:12px'>"+cta+"</b>";
-      o+="<div style='font-size:11px'><span style='color:#10B981'>+"+fmt(ap)+"</span> aportes  <span style='color:#EF4444'>-"+fmt(ret)+"</span> retiros</div></div>";
-      if(mc.length){
-        o+="<table class='tbl'>";
-        mc.forEach(function(mv){
-          o+="<tr><td style='font-size:10px;color:#64748B'>"+mv.fecha+"</td>";
-          o+="<td style='font-size:11px'>"+(mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" - "+esc(mv.nota):"")+"</td>";
-          o+="<td style='color:"+(mv.tipo==="retiro"?"#EF4444":"#10B981")+";font-weight:600;font-size:12px'>"+(mv.tipo==="retiro"?"-":"+")+fmt(mv.monto)+"</td></tr>";
-        });
-        o+="</table>";
-      }
-      o+="</div>";
+      var posNeta=ap-ret;
+      var totalFavor=utilXSocio+posNeta;
+      o+="<tr>";
+      o+="<td style='font-weight:700'>"+cta.replace("Cuenta ","")+"</td>";
+      o+="<td style='color:#10B981'>"+(ap>0?fmt(ap):"--")+"</td>";
+      o+="<td style='color:#EF4444'>"+(ret>0?"-"+fmt(ret):"--")+"</td>";
+      o+="<td style='color:"+(posNeta>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(posNeta)+"</td>";
+      o+="<td style='color:#8B5CF6'>"+(esA?fmt(utilXSocio):"--")+"</td>";
+      o+="<td style='color:#06B6D4;font-weight:700'>"+(esA?fmt(totalFavor):"--")+"</td>";
+      o+="</tr>";
+    });
+    o+="</tbody></table>";
+
+    // Detail of movements
+    CTAP.forEach(function(cta){
+      var mc=movsM.filter(function(mv){return mv.cuenta===cta;});
+      if(!mc.length) return;
+      o+="<div style='margin-bottom:10px'>";
+      o+="<div style='font-size:11px;font-weight:700;color:#8B5CF6;margin-bottom:4px'>"+cta+"</div>";
+      o+="<table class='tbl'><tbody>";
+      mc.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");}).forEach(function(mv){
+        o+="<tr><td style='color:#64748B;font-size:11px'>"+esc(mv.fecha||"")+"</td>";
+        o+="<td style='font-size:12px'>"+(mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" — "+esc(mv.nota):"")+"</td>";
+        o+="<td style='color:"+(mv.tipo==="retiro"?"#EF4444":"#10B981")+";font-weight:600'>"+(mv.tipo==="retiro"?"-":"+")+fmt(mv.monto)+"</td>";
+        o+="</tr>";
+      });
+      o+="</tbody></table></div>";
     });
     o+="</div>";
+
 
     // Cierre mensual
     if(esA){
