@@ -1113,7 +1113,31 @@ function rCostos(){
     if(!c.pagado)row+="<button class='btn bp bsm' data-ec='"+ki+"'>Cargar</button>";
     if(c.pagado&&esA)row+="<button class='btn bg bsm' data-rev='"+ki+"'>Revertir</button>";
     row+="</div></div>";
-    if(isE){row+="<div style='margin-top:10px;padding-top:10px;border-top:1px solid #334155' class='g3'>"+fld("ec-m","Monto $",c.monto||"","number")+fld("ec-f","Nro. Factura *",c.nro_fact||"")+fld("ec-v","Fecha venc.",c.fec_venc||"","date")+sld("ec-c","Cuenta",CTAS,c.cuenta||"Banco")+"<div class='fld' style='padding-top:18px'><label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#94A3B8'><input type='checkbox' id='ec-p' "+(c.pagado?"checked":"")+" > Pagado</label></div><div style='display:flex;gap:6px;padding-top:16px'><button class='btn bok bsm' data-sc='"+ki+"'>Guardar</button><button class='btn bg bsm' onclick='_editC=null;rCostos()'>X</button></div></div>";}
+    if(isE){
+    var pagosC=c.pagos?Object.values(c.pagos):[];
+    var pagadoC=pagosC.reduce(function(s,p){return s+Number(p.monto||0);},0);
+    var saldoC=Number(c.monto||0)-pagadoC;
+    row+="<div style='margin-top:10px;padding-top:10px;border-top:1px solid #334155'>";
+    row+="<div class='g2' style='margin-bottom:8px'>"+fld("ec-m","Monto total $",c.monto||"","number")+fld("ec-f","Nro. Factura",c.nro_fact||"")+fld("ec-v","Fecha venc.",c.fec_venc||"","date")+"</div>";
+    // Show existing payments
+    if(pagosC.length){
+      row+="<div style='background:#0F172A;border-radius:7px;padding:8px;margin-bottom:8px;font-size:11px'>";
+      row+="<div style='color:#94A3B8;margin-bottom:4px'>Pagos registrados:</div>";
+      pagosC.forEach(function(p){
+        row+="<div style='display:flex;justify-content:space-between;padding:2px 0'><span style='color:#10B981'>"+fmt(p.monto)+"</span><span style='color:#64748B'>"+esc(p.cuenta||"")+" — "+esc(p.fecha||"")+"</span></div>";
+      });
+      row+="<div style='color:#F59E0B;font-weight:700;margin-top:4px'>Saldo: "+fmt(Math.max(0,saldoC))+"</div>";
+      row+="</div>";
+    }
+    // Add payment form
+    row+="<div class='g2' style='margin-bottom:8px'>";
+    row+=fld("ec-pm","Pagar ahora $",saldoC>0?saldoC:"","number");
+    row+=sld("ec-pc","Cuenta",CTAS,c.cuenta||"Efectivo");
+    row+="</div>";
+    row+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#94A3B8;margin-bottom:8px'><input type='checkbox' id='ec-p' "+(c.pagado?"checked":"")+" > Marcar como totalmente pagado</label>";
+    row+="<div style='display:flex;gap:6px'><button class='btn bok bsm' data-sc='"+ki+"'>Guardar</button><button class='btn bg bsm' onclick='_editC=null;rCostos()'>X</button></div>";
+    row+="</div>";
+  }
     row+="</div>";
     rows.push(row);
   });
@@ -1127,9 +1151,30 @@ function rCostos(){
   };
 }
 function saveCosto(ckey){
-  var m=Number(G("ec-m").value||0),f=G("ec-f").value,p=G("ec-p").checked;
-  if(p&&m>0&&!f){alert("El numero de factura es obligatorio");return;}
-  DB.ref("cst/"+ckey).update({monto:m,nro_fact:f,fec_venc:G("ec-v").value,cuenta:G("ec-c").value,pagado:p});
+  var m=Number(G("ec-m").value||0);
+  var f=G("ec-f").value;
+  var p=G("ec-p").checked;
+  var pm=Number((G("ec-pm")||{value:0}).value||0);
+  var pc=(G("ec-pc")||{value:"Efectivo"}).value;
+  
+  var ups={};
+  ups["cst/"+ckey+"/monto"]=m;
+  ups["cst/"+ckey+"/nro_fact"]=f;
+  ups["cst/"+ckey+"/fec_venc"]=(G("ec-v")||{value:""}).value;
+  ups["cst/"+ckey+"/pagado"]=p;
+  
+  // Register partial payment if amount entered
+  if(pm>0){
+    var ts=Date.now();
+    ups["cst/"+ckey+"/pagos/"+ts]={fecha:hoy(),monto:pm,cuenta:pc};
+    // Check if fully paid
+    var c=DATA.cst[ckey];
+    var pagosExist=c&&c.pagos?Object.values(c.pagos):[];
+    var totalPagado=pagosExist.reduce(function(s,x){return s+Number(x.monto||0);},0)+pm;
+    if(totalPagado>=m) ups["cst/"+ckey+"/pagado"]=true;
+  }
+  
+  DB.ref("/").update(ups);
   _editC=null;setTimeout(rCostos,400);
 }
 function revCosto(ckey){if(!confirm("Revertir pago?"))return;DB.ref("cst/"+ckey).update({pagado:false,nro_fact:"",monto:0});setTimeout(rCostos,400);}
