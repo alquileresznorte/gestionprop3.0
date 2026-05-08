@@ -1571,7 +1571,8 @@ function rCaja(){
     // Socios columns only in monthly balance, not in daily caja table
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
-    var fondoTotal=cuentasTabla.reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
+    // fondoTotal = sum of ALL accounts at start of day
+    var fondoTotal=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"].reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
 
     o+="<div style='display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap'>";
     o+="<input type='date' class='inp' value='"+_cajaF+"' style='max-width:160px' id='caja-fecha'/>";
