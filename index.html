@@ -1072,12 +1072,10 @@ function regPago(ckey){
   var c=DATA.cob[ckey],ts=Date.now(),ups={};
   var fecha=G("p-f").value,cta1=G("p-c").value;
   ups["cob/"+ckey+"/pagos/"+ts]={fecha:fecha,monto:m,cuenta:cta1,concepto:"Alquiler "+c.unidad};
-  if(CTAS_SOCIO_MAP[cta1]) ups["movs/"+(ts+10)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro",cuenta:CTAS_SOCIO_MAP[cta1],cuenta_caja:cta1,monto:m,nota:"Cobro "+c.unidad,auto:true};
   if(G("p-d").checked){
     var m2=Number((G("p-m2")||{value:0}).value||0),cta2=(G("p-c2")||{value:""}).value;
     if(m2){
       ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:fecha,monto:m2,cuenta:cta2,concepto:"Alquiler "+c.unidad};
-      if(CTAS_SOCIO_MAP[cta2]) ups["movs/"+(ts+11)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro",cuenta:CTAS_SOCIO_MAP[cta2],cuenta_caja:cta2,monto:m2,nota:"Cobro "+c.unidad,auto:true};
     }
   }
   var allP=Object.assign({},c.pagos||{});Object.keys(ups).forEach(function(k){allP[k.split("/").pop()]=ups[k];});
