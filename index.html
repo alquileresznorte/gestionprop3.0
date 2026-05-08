@@ -1541,12 +1541,13 @@ function rCaja(){
     ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
       movimientosD.push({concepto:esc(a.concepto||""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste"});
     });
-    // Aportes y retiros de socios (afectan cuentas aunque no sean costo/ganancia)
+    // Aportes y retiros de socios - solo admin los ve en la tabla
     movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
+      if(USER.r!=="admin") return; // empleados no ven retiros/aportes de socios
       movimientosD.push({
         concepto:esc((mv.tipo==="retiro"?"Retiro":"Aporte")+" "+(mv.cuenta||"")+(mv.nota?" - "+mv.nota:"")),
         mov:mv.tipo==="aporte"?Number(mv.monto||0):-Number(mv.monto||0),
-        cuenta:mv.cuenta,tipo:"movimiento"
+        cuenta:mv.cuenta_caja||mv.cuenta,tipo:"movimiento"
       });
     });
 
@@ -1580,7 +1581,7 @@ function rCaja(){
     // Header row
     o+="<thead><tr style='background:#0F172A'>";
     o+="<th style='padding:8px 10px;text-align:left;color:#94A3B8;font-size:11px;min-width:180px'>Concepto</th>";
-    o+="<th style='padding:8px 10px;text-align:right;color:#F1F5F9;font-size:11px;min-width:100px'>Movimiento</th>";
+
     cuentasTabla.forEach(function(cta){
       o+="<th style='padding:8px 10px;text-align:right;color:#94A3B8;font-size:10px;white-space:nowrap;min-width:90px'>"+cta+"</th>";
     });
@@ -1602,7 +1603,7 @@ function rCaja(){
       var colorMov=mv.mov>=0?"#10B981":"#EF4444";
       o+="<tr style='background:"+bg+";border-bottom:1px solid #334155'>";
       o+="<td style='padding:6px 10px;color:#F1F5F9'>"+mv.concepto+"</td>";
-      o+="<td style='padding:6px 10px;text-align:right;color:"+colorMov+";font-weight:600'>"+(mv.mov>=0?"+":"")+fmt(mv.mov)+"</td>";
+
       cuentasTabla.forEach(function(cta){
         var val=mv.cuenta===cta?mv.mov:0;
         o+="<td style='padding:6px 10px;text-align:right;color:"+(val>0?"#10B981":val<0?"#EF4444":"#334155")+"'>"+(val!==0?(val>0?"+"+fmt(val):fmt(val)):"")+"</td>";
@@ -1613,7 +1614,7 @@ function rCaja(){
     // Subtotal row
     o+="<tr style='background:#0F172A;border-top:1px solid #64748B'>";
     o+="<td style='padding:5px 10px;color:#64748B;font-size:10px'></td>";
-    o+="<td style='padding:5px 10px;text-align:right;color:"+(totMov>=0?"#10B981":"#EF4444")+";font-weight:700'>"+(totMov>=0?"+":"")+fmt(totMov)+"</td>";
+
     cuentasTabla.forEach(function(cta){
       var net=movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
       o+="<td style='padding:5px 10px;text-align:right;color:"+(net>0?"#10B981":net<0?"#EF4444":"#64748B")+";font-size:11px'>"+(net!==0?(net>0?"+"+fmt(net):fmt(net)):"")+"</td>";
@@ -1945,13 +1946,16 @@ function saveAj(){
 function openMov(){
   var o="<div class='g2'>"+fld("mv-f","Fecha",hoy(),"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro</option><option value='aporte'>Aporte</option></select></div>";
-  o+=sld("mv-c","Cuenta",CTAP)+fld("mv-m","Monto $","","number")+"</div>"+fld("mv-n","Nota");
+  o+=sld("mv-caja","Cuenta",CTAS,"Efectivo");
+  o+=fld("mv-m","Monto $","","number")+"</div>"+fld("mv-n","Concepto (ej: medicamentos, viaje, gasoil)");
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
   openModal("Retiro / Aporte",o);
 }
 function saveMov(){
   var m=Number(G("mv-m").value);if(!m){alert("Ingresa el monto");return;}
-  DB.ref("movs").push({fecha:G("mv-f").value,tipo:G("mv-t").value,cuenta:G("mv-c").value,monto:m,nota:G("mv-n").value});
+  var caja=(G("mv-caja")||{value:"Efectivo"}).value;
+  var mes=G("mv-f").value.slice(0,7);
+  DB.ref("movs").push({fecha:G("mv-f").value,mes:mes,tipo:G("mv-t").value,cuenta_caja:caja,monto:m,nota:G("mv-n").value});
   closeModal();setTimeout(rCaja,300);
 }
 
