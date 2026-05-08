@@ -1553,13 +1553,20 @@ function rCaja(){
       // Socio account handled in monthly balance only - not shown in daily caja
     });
 
-    // Always show all main accounts
-    var cuentasTabla=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo"];
-    // Add any extra accounts that have activity (except socio accounts and Banco)
+    // Build accounts list - only show accounts with actual activity or non-zero fondo
+    var todasCtas=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
     movimientosD.forEach(function(mv){
-      if(mv.cuenta==="Banco") mv.cuenta="Efectivo"; // fix old records
+      if(mv.cuenta==="Banco") mv.cuenta="Efectivo";
       if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
-      if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta&&["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)<0) cuentasTabla.push(mv.cuenta);
+    });
+    var cuentasTabla=todasCtas.filter(function(cta){
+      var fondo=saldoAcumulado(cta,ayerStr,m);
+      var hayMov=movimientosD.filter(function(mv){return mv.cuenta===cta;}).length>0;
+      return fondo!==0||hayMov;
+    });
+    // Add any extra accounts not in the list
+    movimientosD.forEach(function(mv){
+      if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta) cuentasTabla.push(mv.cuenta);
     });
     // Socios columns only in monthly balance, not in daily caja table
 
@@ -1615,15 +1622,7 @@ function rCaja(){
       o+="</tr>";
     });
 
-    // Subtotal row
-    o+="<tr style='background:#0F172A;border-top:1px solid #64748B'>";
-    o+="<td style='padding:5px 10px;color:#64748B;font-size:10px'></td>";
 
-    cuentasTabla.forEach(function(cta){
-      var net=movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
-      o+="<td style='padding:5px 10px;text-align:right;color:"+(net>0?"#10B981":net<0?"#EF4444":"#64748B")+";font-size:11px'>"+(net!==0?(net>0?"+"+fmt(net):fmt(net)):"")+"</td>";
-    });
-    o+="</tr>";
 
     // TOTAL DEL DIA row
     o+="<tr style='background:#1E293B;border-top:2px solid #F1F5F9'>";
