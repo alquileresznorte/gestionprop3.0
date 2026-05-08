@@ -71,10 +71,13 @@ var ED={
 };
 var COL={R1:"#3B82F6",R2:"#8B5CF6",BN:"#F59E0B",LT:"#84CC16",SC:"#06B6D4",WT:"#10B981",RC:"#EF4444",LP:"#F97316",OT:"#6B7280"};
 var CTAS=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
-var CTAS_CAJA=["Efectivo","Bco Hugo","Bco Loli"]; // show with balance
-var CTAS_SOCIOS=["MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"]; // all map to MP/TJ column
+var CTAS_CAJA=["Efectivo","Bco Hugo","Bco Loli"];
+var CTAS_SOCIOS=["MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
 var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
-var CTAS_MPTJ="MP/TJ"; // unified column name in caja
+var CTAS_MPTJ="MP/TJ";
+var CTAS_CAJA=["Efectivo","Bco Hugo","Bco Loli"]; // show with balance
+var CTAS_SOCIOS=["MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"]; // movements only, map to socio
+var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
 var CTAP=["Cuenta Loli","Cuenta Hugo"];
 var CATC={Tarjetas:"#8B5CF6",Sueldos:"#10B981",ARBA:"#EF4444",ARCA:"#F43F5E",Municipal:"#FB923C",Electricidad:"#F59E0B",Gas:"#F97316",Agua:"#06B6D4",Administrativo:"#64748B",Salud:"#EC4899",Personal:"#84CC16",Seguros:"#14B8A6","Gastos bancarios":"#6366F1",Cable:"#3B82F6",Internet:"#3B82F6"};
 var CF=[
@@ -1067,25 +1070,14 @@ function openPago(ckey){
 function regPago(ckey){
   var m=Number(G("p-m").value);if(!m){alert("Ingresa el monto");return;}
   var c=DATA.cob[ckey],ts=Date.now(),ups={};
-  var fecha=G("p-f").value;
-  var cta1=G("p-c").value;
+  var fecha=G("p-f").value,cta1=G("p-c").value;
   ups["cob/"+ckey+"/pagos/"+ts]={fecha:fecha,monto:m,cuenta:cta1,concepto:"Alquiler "+c.unidad};
-  // Auto-register in socio cta cte if paid via socio account
-  if(CTAS_SOCIO_MAP[cta1]){
-    ups["movs/"+(ts+10)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro_empresa",
-      cuenta:CTAS_SOCIO_MAP[cta1],cuenta_caja:cta1,monto:m,
-      nota:"Cobro "+c.unidad+" "+esc(c.inq||""),auto:true};
-  }
+  if(CTAS_SOCIO_MAP[cta1]) ups["movs/"+(ts+10)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro",cuenta:CTAS_SOCIO_MAP[cta1],cuenta_caja:cta1,monto:m,nota:"Cobro "+c.unidad,auto:true};
   if(G("p-d").checked){
-    var m2=Number((G("p-m2")||{value:0}).value||0);
-    var cta2=(G("p-c2")||{value:""}).value;
+    var m2=Number((G("p-m2")||{value:0}).value||0),cta2=(G("p-c2")||{value:""}).value;
     if(m2){
       ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:fecha,monto:m2,cuenta:cta2,concepto:"Alquiler "+c.unidad};
-      if(CTAS_SOCIO_MAP[cta2]){
-        ups["movs/"+(ts+11)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro_empresa",
-          cuenta:CTAS_SOCIO_MAP[cta2],cuenta_caja:cta2,monto:m2,
-          nota:"Cobro "+c.unidad+" "+esc(c.inq||""),auto:true};
-      }
+      if(CTAS_SOCIO_MAP[cta2]) ups["movs/"+(ts+11)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro",cuenta:CTAS_SOCIO_MAP[cta2],cuenta_caja:cta2,monto:m2,nota:"Cobro "+c.unidad,auto:true};
     }
   }
   var allP=Object.assign({},c.pagos||{});Object.keys(ups).forEach(function(k){allP[k.split("/").pop()]=ups[k];});
@@ -1576,17 +1568,18 @@ function rCaja(){
       // Socio account handled in monthly balance only - not shown in daily caja
     });
 
-    // Fix old records + remap all socio accounts to "MP/TJ"
+    // Fix old records
     movimientosD.forEach(function(mv){
       if(mv.cuenta==="Banco") mv.cuenta="Efectivo";
       if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
-      if(CTAS_SOCIOS.indexOf(mv.cuenta)>=0) mv.cuenta=CTAS_MPTJ; // unify all MP/TJ
     });
-    // Caja accounts always shown
+    // Caja accounts: always show with balance
     var cuentasTabla=CTAS_CAJA.slice();
-    // Add MP/TJ column only if there are movements
-    var hayMPTJ=movimientosD.filter(function(mv){return mv.cuenta===CTAS_MPTJ;}).length>0;
-    if(hayMPTJ) cuentasTabla.push(CTAS_MPTJ);
+    // Socio accounts: show only if they have movements today
+    CTAS_SOCIOS.forEach(function(cta){
+      var hayMov=movimientosD.filter(function(mv){return mv.cuenta===cta;}).length>0;
+      if(hayMov&&cuentasTabla.indexOf(cta)<0) cuentasTabla.push(cta);
+    });
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
     // fondoTotal = sum of ALL accounts at start of day
@@ -1621,11 +1614,12 @@ function rCaja(){
     o+="<tr style='background:#1E293B;border-bottom:2px solid #3B82F6'>";
     o+="<td style='padding:8px 10px;font-weight:700;color:#3B82F6'>FONDO DE CAJA</td>";
     cuentasTabla.forEach(function(cta){
-      if(CTAS_CAJA.indexOf(cta)>=0){
+      var esCaja=CTAS_CAJA.indexOf(cta)>=0;
+      if(esCaja){
         var sal=saldoAcumulado(cta,ayerStr,m);
         o+="<td style='padding:8px 10px;text-align:right;color:#3B82F6;font-weight:600'>"+(sal!==0?fmt(sal):"--")+"</td>";
       } else {
-        o+="<td style='padding:8px 10px;text-align:right;color:#64748B;font-style:italic'>--</td>";
+        o+="<td style='padding:8px 10px;text-align:right;color:#64748B'>--</td>";
       }
     });
     o+="</tr>";
@@ -1649,12 +1643,14 @@ function rCaja(){
     o+="<tr style='background:#1E293B;border-top:2px solid #F1F5F9'>";
     o+="<td style='padding:8px 10px;font-weight:800;color:#F1F5F9'>Total del dia "+_cajaF.split("-").reverse().join("/")+"</td>";
     cuentasTabla.forEach(function(cta){
-      if(CTAS_CAJA.indexOf(cta)>=0){
+      var esCaja=CTAS_CAJA.indexOf(cta)>=0;
+      if(esCaja){
         var salFin=saldoAcumulado(cta,_cajaF,m);
         o+="<td style='padding:8px 10px;text-align:right;color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:800'>"+fmt(salFin)+"</td>";
       } else {
+        // Socio accounts: just show total movements, no accumulated balance
         var movCta=movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
-        o+="<td style='padding:8px 10px;text-align:right;color:#8B5CF6;font-weight:700'>"+(movCta!==0?fmt(movCta):"--")+"</td>";
+        o+="<td style='padding:8px 10px;text-align:right;color:#64748B;font-style:italic;font-size:11px'>"+(movCta!==0?fmt(movCta):"")+"</td>";
       }
     });
     o+="</tr>";
@@ -3109,6 +3105,80 @@ function enviarCajaWA(){
 
   var msg=lines.join("\n");
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+}
+
+function rCtaCte(){
+  if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
+  var movs=oA(DATA.movs||{});
+  var cobA=oA(DATA.cob);
+  var cstA=oA(DATA.cst||{});
+  var movLoli=[],movHugo=[];
+
+  // Manual aportes/retiros
+  movs.forEach(function(mv){
+    var socio=mv.cuenta||"";
+    var entry={fecha:mv.fecha,tipo:mv.tipo,
+      concepto:(mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" — "+mv.nota:""),
+      medio:mv.cuenta_caja||mv.cuentaCaja||"",
+      monto:mv.tipo==="retiro"?Number(mv.monto||0):-Number(mv.monto||0)};
+    if(socio==="Cuenta Loli") movLoli.push(entry);
+    else if(socio==="Cuenta Hugo") movHugo.push(entry);
+  });
+
+  // Cobros via socio accounts
+  cobA.forEach(function(c){
+    pA(c).forEach(function(p){
+      var socio=CTAS_SOCIO_MAP[p.cuenta]||"";
+      if(!socio) return;
+      var entry={fecha:p.fecha,tipo:"cobro",
+        concepto:"Cobro "+c.unidad+" "+(c.inq||"").split(",")[0],
+        medio:p.cuenta,monto:p.monto};
+      if(socio==="Cuenta Loli") movLoli.push(entry);
+      else if(socio==="Cuenta Hugo") movHugo.push(entry);
+    });
+  });
+
+  // Costs paid via socio accounts
+  cstA.forEach(function(c){
+    if(!c.pagado||!c.cuenta) return;
+    var socio=CTAS_SOCIO_MAP[c.cuenta]||"";
+    if(!socio) return;
+    var entry={fecha:c.fec_venc||c.mes+"-01",tipo:"pago",
+      concepto:"Pago "+(c.desc||""),
+      medio:c.cuenta,monto:-Number(c.monto||0)};
+    if(socio==="Cuenta Loli") movLoli.push(entry);
+    else if(socio==="Cuenta Hugo") movHugo.push(entry);
+  });
+
+  movLoli.sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
+  movHugo.sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
+
+  var totLoli=movLoli.reduce(function(s,m){return s+m.monto;},0);
+  var totHugo=movHugo.reduce(function(s,m){return s+m.monto;},0);
+
+  var o="<h2 style='font-size:20px;font-weight:800;margin-bottom:4px'>Cuenta Corriente Socios</h2>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:14px'>Movimientos en nombre de Loli y Hugo. Solo Admin.</p>";
+
+  function socioTable(nombre,movs,total,color){
+    var r="<div class='card' style='margin-bottom:14px;border-left:3px solid "+color+"'>";
+    r+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+    r+="<h3 style='font-size:14px;font-weight:700;color:"+color+"'>"+nombre+"</h3>";
+    r+="<span style='font-size:16px;font-weight:800;color:"+(total>=0?"#10B981":"#EF4444")+"'>"+fmt(total)+"</span></div>";
+    if(!movs.length){r+="<p style='color:#64748B;font-size:12px'>Sin movimientos</p></div>";return r;}
+    r+="<table class='tbl'><thead><tr><th>Fecha</th><th>Concepto</th><th>Medio</th><th>Monto</th></tr></thead><tbody>";
+    movs.forEach(function(mv){
+      r+="<tr><td style='color:#64748B;font-size:11px'>"+fecDisp(mv.fecha)+"</td>";
+      r+="<td style='font-size:12px'>"+esc(mv.concepto||"")+"</td>";
+      r+="<td style='color:#64748B;font-size:11px'>"+esc(mv.medio||"")+"</td>";
+      r+="<td style='color:"+(mv.monto>=0?"#10B981":"#EF4444")+";font-weight:700'>"+(mv.monto>=0?"+":"")+fmt(mv.monto)+"</td></tr>";
+    });
+    r+="</tbody></table></div>";
+    return r;
+  }
+
+  o+=socioTable("Loli",movLoli,totLoli,"#EC4899");
+  o+=socioTable("Hugo",movHugo,totHugo,"#3B82F6");
+  G("main").innerHTML=o;
 }
 
 render();
