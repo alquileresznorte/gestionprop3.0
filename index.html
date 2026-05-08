@@ -2966,7 +2966,7 @@ function deletePago(ckey,pagoKey){
 
 
 function openGastoCaja(){
-  var cats=Object.keys(CATC);
+  var cats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Registra un gasto puntual directamente en la caja del dia "+_cajaF+".</p>";
   o+="<div class='g2'>";
   o+=fld("gc-desc","Descripcion / Concepto *","");
