@@ -1174,28 +1174,31 @@ function rCostos(){
 function saveCosto(ckey){
   var m=Number(G("ec-m").value||0);
   var f=G("ec-f").value;
-  var p=G("ec-p").checked;
+  var checkboxPagado=G("ec-p").checked;
   var pm=Number((G("ec-pm")||{value:0}).value||0);
   var pc=(G("ec-pc")||{value:"Efectivo"}).value;
-  
+  var c=DATA.cst[ckey];
+  var pagosExist=c&&c.pagos?Object.values(c.pagos):[];
+  var totalYaPagado=pagosExist.reduce(function(s,x){return s+Number(x.monto||0);},0);
   var ups={};
   ups["cst/"+ckey+"/monto"]=m;
   ups["cst/"+ckey+"/nro_fact"]=f;
   ups["cst/"+ckey+"/fec_venc"]=(G("ec-v")||{value:""}).value;
-  ups["cst/"+ckey+"/pagado"]=p;
-  ups["cst/"+ckey+"/cuenta"]=pc; // save selected account
-  
-  // Register partial payment if amount entered
+  ups["cst/"+ckey+"/cuenta"]=pc;
+  // Registrar pago si se ingreso monto
   if(pm>0){
     var ts=Date.now();
     ups["cst/"+ckey+"/pagos/"+ts]={fecha:hoy(),monto:pm,cuenta:pc};
-    // Check if fully paid
-    var c=DATA.cst[ckey];
-    var pagosExist=c&&c.pagos?Object.values(c.pagos):[];
-    var totalPagado=pagosExist.reduce(function(s,x){return s+Number(x.monto||0);},0)+pm;
-    if(totalPagado>=m) ups["cst/"+ckey+"/pagado"]=true;
+    totalYaPagado+=pm;
   }
-  
+  // Si checkbox marcado pero no hay ningun pago, registrar el total como pagado ahora
+  if(checkboxPagado&&totalYaPagado===0&&m>0){
+    var ts2=Date.now()+1;
+    ups["cst/"+ckey+"/pagos/"+ts2]={fecha:hoy(),monto:m,cuenta:pc};
+    totalYaPagado=m;
+  }
+  // Pagado = suma de pagos cubre el monto, O checkbox marcado con al menos algun pago
+  ups["cst/"+ckey+"/pagado"]=totalYaPagado>=m||(checkboxPagado&&totalYaPagado>0);
   DB.ref("/").update(ups);
   _editC=null;setTimeout(rCostos,400);
 }
@@ -1492,13 +1495,26 @@ function saldoAcumulado(cta, hastaFecha, hastaM){
     }
   });
   oA(DATA.cst).forEach(function(c){
-    if(c.pagado&&c.cuenta===cta&&c.fec_venc&&c.fec_venc<=hastaFecha) egr+=Number(c.monto||0);
+    if(!c.fec_venc||c.fec_venc>hastaFecha) return;
+    if(c.pagos&&Object.keys(c.pagos).length>0){
+      // Pagos individuales: cada uno tiene su propia cuenta
+      Object.values(c.pagos).forEach(function(pg){
+        if(pg.cuenta===cta&&pg.fecha&&pg.fecha<=hastaFecha) egr+=Number(pg.monto||0);
+      });
+    } else if(c.pagado&&c.cuenta===cta){
+      // Sin pagos individuales: usar monto total en cuenta del costo
+      egr+=Number(c.monto||0);
+    }
   });
   // Subtract withdrawals, add deposits (movs)
   oA(DATA.movs).forEach(function(mv){
-    if(mv.cuenta===cta&&mv.fecha<=hastaFecha){
-      if(mv.tipo==="retiro") egr+=Number(mv.monto||0);
-      else ing+=Number(mv.monto||0);
+    if(mv.fecha<=hastaFecha){
+      // Para cuentas de caja: el impacto es en cuenta_caja (o en mv.cuenta si no hay cuenta_caja y no es "Cuenta Hugo/Loli")
+      var ctaCajaDelMov=mv.cuenta_caja||(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta);
+      if(ctaCajaDelMov===cta){
+        if(mv.tipo==="retiro") egr+=Number(mv.monto||0);
+        else ing+=Number(mv.monto||0);
+      }
     }
   });
   return ing-egr;
@@ -1543,12 +1559,28 @@ function rCaja(){
     // Cobros
     cobM.forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
-        movimientosD.push({concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0],mov:p.monto,cuenta:p.cuenta,tipo:"cobro"});
+        // Si el pago fue en cuenta de socio (MP Loli, MP Hugo, etc), va a columna Socios
+        var esCuentaSocio=CTAS_SOCIOS.indexOf(p.cuenta)>=0;
+        movimientosD.push({
+          concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0],
+          mov:p.monto,
+          cuenta:esCuentaSocio?"_socios_cobro":p.cuenta,
+          socioMov:esCuentaSocio?p.monto:undefined,
+          tipo:"cobro"
+        });
       });
     });
-    // Costos
+    // Costos - mostrar pagos reales del dia, no el monto total
     cstM.filter(function(c){return c.fec_venc===_cajaF;}).forEach(function(c){
-      movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta,tipo:"costo"});
+      if(c.pagos&&Object.keys(c.pagos).length>0){
+        // Si tiene pagos registrados, mostrar cada pago del dia
+        Object.values(c.pagos).filter(function(pg){return pg.fecha===_cajaF;}).forEach(function(pg){
+          movimientosD.push({concepto:esc(c.desc||""),mov:-Number(pg.monto||0),cuenta:pg.cuenta||c.cuenta,tipo:"costo"});
+        });
+      } else if(c.pagado){
+        // Pagado sin registro de pagos individuales - usar monto total
+        movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta,tipo:"costo"});
+      }
     });
     // Ajustes manuales
     ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
@@ -1557,13 +1589,12 @@ function rCaja(){
     // Aportes y retiros de socios
     movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
       var ctaCaja=mv.cuenta_caja||(["Cuenta Loli","Cuenta Hugo"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta);
-      var ctaSocio=mv.cuenta||""; // Cuenta Hugo / Cuenta Loli
       var monto=Number(mv.monto||0);
       var esRetiro=mv.tipo==="retiro";
-      var concepto=esc((esRetiro?"Retiro":"Aporte")+(mv.nota?" - "+mv.nota:""));
-      // Row 1: affects caja account (visible to all)
-      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,tipo:"movimiento"});
-      // Socio account handled in monthly balance only - not shown in daily caja
+      var socioNombre=mv.cuenta==="Cuenta Hugo"?"Hugo":mv.cuenta==="Cuenta Loli"?"Loli":"Socio";
+      var concepto=esc((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:""));
+      // Impacto en cuenta de caja (Efectivo, Bco Hugo, etc.) + columna Socios en la misma fila
+      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,socioMov:esRetiro?-monto:monto,tipo:"movimiento"});
     });
 
     // Fix old records
@@ -1573,11 +1604,9 @@ function rCaja(){
     });
     // Caja accounts: always show with balance
     var cuentasTabla=CTAS_CAJA.slice();
-    // Socio accounts: show only if they have movements today
-    CTAS_SOCIOS.forEach(function(cta){
-      var hayMov=movimientosD.filter(function(mv){return mv.cuenta===cta;}).length>0;
-      if(hayMov&&cuentasTabla.indexOf(cta)<0) cuentasTabla.push(cta);
-    });
+    // Columna Socios: solo si hay retiros/aportes hoy
+    var hayMovSocios=movimientosD.filter(function(mv){return mv.socioMov!==undefined;}).length>0;
+    if(hayMovSocios) cuentasTabla.push("_socios");
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
     // fondoTotal = sum of ALL accounts at start of day
@@ -1604,7 +1633,8 @@ function rCaja(){
     o+="<th style='padding:8px 10px;text-align:left;color:#94A3B8;font-size:11px;min-width:180px'>Concepto</th>";
 
     cuentasTabla.forEach(function(cta){
-      o+="<th style='padding:8px 10px;text-align:right;color:#94A3B8;font-size:10px;white-space:nowrap;min-width:90px'>"+cta+"</th>";
+      var ctaLabel=cta==="_socios"?"Socios":cta;
+      o+="<th style='padding:8px 10px;text-align:right;color:#94A3B8;font-size:10px;white-space:nowrap;min-width:90px'>"+ctaLabel+"</th>";
     });
     o+="</tr></thead><tbody>";
 
@@ -1629,7 +1659,7 @@ function rCaja(){
       o+="<tr style='background:"+bg+";border-bottom:1px solid #334155'>";
       o+="<td style='padding:6px 10px;color:#F1F5F9'>"+mv.concepto+"</td>";
       cuentasTabla.forEach(function(cta){
-        var val=mv.cuenta===cta?mv.mov:0;
+        var val=cta==="_socios"?(mv.socioMov!==undefined?mv.socioMov:0):(mv.cuenta===cta?mv.mov:0);
         o+="<td style='padding:6px 10px;text-align:right;color:"+(val>0?"#10B981":val<0?"#EF4444":"#334155")+"'>"+(val!==0?(val>0?"+"+fmt(val):fmt(val)):"")+"</td>";
       });
       o+="</tr>";
@@ -1646,8 +1676,10 @@ function rCaja(){
         var salFin=saldoAcumulado(cta,_cajaF,m);
         o+="<td style='padding:8px 10px;text-align:right;color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:800'>"+fmt(salFin)+"</td>";
       } else {
-        // Socio accounts: just show total movements, no accumulated balance
-        var movCta=movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
+        // Columna Socios: suma de socioMov del dia
+        var movCta=cta==="_socios"
+          ?movimientosD.filter(function(mv){return mv.socioMov!==undefined;}).reduce(function(s,mv){return s+mv.socioMov;},0)
+          :movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
         o+="<td style='padding:8px 10px;text-align:right;color:#64748B;font-style:italic;font-size:11px'>"+(movCta!==0?fmt(movCta):"")+"</td>";
       }
     });
