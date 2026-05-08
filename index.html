@@ -1552,7 +1552,8 @@ function rCaja(){
       movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,tipo:"movimiento"});
       // Row 2: affects socio account (opposite sign, admin only)
       if(USER.r==="admin"){
-        var ctaDestino=ctaSocio&&["Cuenta Loli","Cuenta Hugo"].indexOf(ctaSocio)>=0?ctaSocio:"Cuenta Loli";
+        if(!ctaSocio||["Cuenta Loli","Cuenta Hugo"].indexOf(ctaSocio)<0) return; // skip if no socio defined
+        var ctaDestino=ctaSocio;
         movimientosD.push({
           concepto:"→ "+ctaDestino.replace("Cuenta ",""),
           mov:esRetiro?monto:-monto,
@@ -1961,9 +1962,7 @@ function saveAj(){
 function openMov(){
   var o="<div class='g2'>"+fld("mv-f","Fecha",hoy(),"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro</option><option value='aporte'>Aporte</option></select></div>";
-  if(USER.r==="admin"){
-    o+="<div class='fld'><label class='lbl'>Socio</label><select class='inp' id='mv-c'><option value='Cuenta Loli'>Loli</option><option value='Cuenta Hugo'>Hugo</option></select></div>";
-  }
+  o+="<div class='fld'><label class='lbl'>Socio</label><select class='inp' id='mv-c'><option value='Cuenta Loli'>Loli</option><option value='Cuenta Hugo'>Hugo</option></select></div>";
   o+=sld("mv-caja","Cuenta de caja",CTAS,"Efectivo");
   o+=fld("mv-m","Monto $","","number")+"</div>"+fld("mv-n","Concepto (ej: medicamentos, viaje, gasoil)");
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
