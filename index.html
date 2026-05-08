@@ -1550,18 +1550,7 @@ function rCaja(){
       var concepto=esc((esRetiro?"Retiro":"Aporte")+(mv.nota?" - "+mv.nota:""));
       // Row 1: affects caja account (visible to all)
       movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,tipo:"movimiento"});
-      // Row 2: affects socio account (opposite sign, admin only)
-      if(USER.r==="admin"){
-        if(!ctaSocio||["Cuenta Loli","Cuenta Hugo"].indexOf(ctaSocio)<0) return; // skip if no socio defined
-        var ctaDestino=ctaSocio;
-        movimientosD.push({
-          concepto:"→ "+ctaDestino.replace("Cuenta ",""),
-          mov:esRetiro?monto:-monto,
-          cuenta:ctaDestino,
-          tipo:"movimiento_socio",
-          skipConcepto:false
-        });
-      }
+      // Socio account handled in monthly balance only - not shown in daily caja
     });
 
     // Always show all main accounts
@@ -1572,8 +1561,7 @@ function rCaja(){
       if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
       if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta&&["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)<0) cuentasTabla.push(mv.cuenta);
     });
-    // Admin sees socios columns too - always at the end
-    if(USER.r==="admin"){cuentasTabla=cuentasTabla.filter(function(c){return ["Cuenta Loli","Cuenta Hugo"].indexOf(c)<0;});CTAP.forEach(function(c){cuentasTabla.push(c);});}
+    // Socios columns only in monthly balance, not in daily caja table
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
     var fondoTotal=cuentasTabla.reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
