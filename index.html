@@ -71,6 +71,10 @@ var ED={
 };
 var COL={R1:"#3B82F6",R2:"#8B5CF6",BN:"#F59E0B",LT:"#84CC16",SC:"#06B6D4",WT:"#10B981",RC:"#EF4444",LP:"#F97316",OT:"#6B7280"};
 var CTAS=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+var CTAS_CAJA=["Efectivo","Bco Hugo","Bco Loli"]; // show with balance
+var CTAS_SOCIOS=["MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"]; // all map to MP/TJ column
+var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
+var CTAS_MPTJ="MP/TJ"; // unified column name in caja
 var CTAP=["Cuenta Loli","Cuenta Hugo"];
 var CATC={Tarjetas:"#8B5CF6",Sueldos:"#10B981",ARBA:"#EF4444",ARCA:"#F43F5E",Municipal:"#FB923C",Electricidad:"#F59E0B",Gas:"#F97316",Agua:"#06B6D4",Administrativo:"#64748B",Salud:"#EC4899",Personal:"#84CC16",Seguros:"#14B8A6","Gastos bancarios":"#6366F1",Cable:"#3B82F6",Internet:"#3B82F6"};
 var CF=[
@@ -263,7 +267,7 @@ function stopDB(){DKEYS.forEach(function(k){DB.ref(k).off();});}
 function render(){
   if(!USER){rLogin();return;}
   rShell();
-  var fn={panel:rPanel,alertas:rAlertas,acuerdos:rAcuerdos,historial:rHistorial,cobranzas:rCob,costos:rCostos,caja:rCaja,stats:rStats,config:rConfig};
+  var fn={panel:rPanel,alertas:rAlertas,acuerdos:rAcuerdos,historial:rHistorial,cobranzas:rCob,costos:rCostos,caja:rCaja,ctacte:rCtaCte,stats:rStats,config:rConfig};
   if(fn[SEC])fn[SEC]();
 }
 function go(s){SEC=s;render();}
@@ -305,7 +309,7 @@ function rShell(){
   var m=mes(),al=oA(DATA.cob).filter(function(c){return c.mes===m&&c.estado!=="pagado";}).length;
   var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
   var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).length;
-  var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["stats","Stats"],["config","Config"]];
+  var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["ctacte","Cta Socios"],["stats","Stats"],["config","Config"]];
   var navE=[["alertas","Alertas"],["acuerdos","Acuerdos"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"]];
   var nav=esA?navA:navE;
   var nh=nav.map(function(n){
@@ -480,7 +484,7 @@ function openFicha(key){
   var o="<div class='g2' style='margin-bottom:12px'>";
   rows.forEach(function(r){o+="<div><div class='lbl'>"+r[0]+"</div><div style='font-size:12px'>"+esc(r[1])+"</div></div>";});
   o+="</div>";
-  if(dias>=0&&dias<=15)o+="<div class='wbx'>Vencimiento en "+dias+" dias - "+i.egreso+"</div>";
+  if(dias>=0&&dias<=15)o+="<div class='wbx'>Vencimiento en "+dias+" dias - "+fecDisp(i.egreso)+"</div>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'><div class='lbl'>Obs. al ingreso</div><div style='font-size:12px;margin-top:3px'>"+esc(i.obs_ingreso||"Sin observaciones")+"</div></div>";
   o+="<div style='display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #334155'>";
   if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank'>WhatsApp</a>";
@@ -1063,8 +1067,27 @@ function openPago(ckey){
 function regPago(ckey){
   var m=Number(G("p-m").value);if(!m){alert("Ingresa el monto");return;}
   var c=DATA.cob[ckey],ts=Date.now(),ups={};
-  ups["cob/"+ckey+"/pagos/"+ts]={fecha:G("p-f").value,monto:m,cuenta:G("p-c").value,concepto:"Alquiler "+c.unidad};
-  if(G("p-d").checked){var m2=Number((G("p-m2")||{value:0}).value||0);if(m2)ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:G("p-f").value,monto:m2,cuenta:G("p-c2").value,concepto:"Alquiler "+c.unidad};}
+  var fecha=G("p-f").value;
+  var cta1=G("p-c").value;
+  ups["cob/"+ckey+"/pagos/"+ts]={fecha:fecha,monto:m,cuenta:cta1,concepto:"Alquiler "+c.unidad};
+  // Auto-register in socio cta cte if paid via socio account
+  if(CTAS_SOCIO_MAP[cta1]){
+    ups["movs/"+(ts+10)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro_empresa",
+      cuenta:CTAS_SOCIO_MAP[cta1],cuenta_caja:cta1,monto:m,
+      nota:"Cobro "+c.unidad+" "+esc(c.inq||""),auto:true};
+  }
+  if(G("p-d").checked){
+    var m2=Number((G("p-m2")||{value:0}).value||0);
+    var cta2=(G("p-c2")||{value:""}).value;
+    if(m2){
+      ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:fecha,monto:m2,cuenta:cta2,concepto:"Alquiler "+c.unidad};
+      if(CTAS_SOCIO_MAP[cta2]){
+        ups["movs/"+(ts+11)]={fecha:fecha,mes:fecha.slice(0,7),tipo:"cobro_empresa",
+          cuenta:CTAS_SOCIO_MAP[cta2],cuenta_caja:cta2,monto:m2,
+          nota:"Cobro "+c.unidad+" "+esc(c.inq||""),auto:true};
+      }
+    }
+  }
   var allP=Object.assign({},c.pagos||{});Object.keys(ups).forEach(function(k){allP[k.split("/").pop()]=ups[k];});
   var tot=Object.values(allP).reduce(function(s,p){return s+p.monto;},0);
   ups["cob/"+ckey+"/estado"]=tot>=c.monto_total?"pagado":tot>0?"parcial":"pendiente";
@@ -1265,7 +1288,7 @@ function rAlertas(){
       var d=Math.round((new Date(inq.egreso)-h)/86400000);
       if(d>=0&&d<=30){
         grupos.renovacion.push({key:key+"_ren",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
-          msg:"Hola "+nom+"! Tu contrato vence el "+inq.egreso+" (en "+d+" dia"+(d!==1?"s":"")+"). Contactanos para gestionar la renovacion. Adm: 1555787641"});
+          msg:"Hola "+nom+"! Tu contrato vence el "+fecDisp(inq.egreso)+" (en "+d+" dia"+(d!==1?"s":"")+"). Contactanos para gestionar la renovacion. Adm: 1555787641"});
       }
     }
     // Ajuste cuatrimestral
@@ -1553,22 +1576,17 @@ function rCaja(){
       // Socio account handled in monthly balance only - not shown in daily caja
     });
 
-    // Build accounts list - only show accounts with actual activity or non-zero fondo
-    var todasCtas=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+    // Fix old records + remap all socio accounts to "MP/TJ"
     movimientosD.forEach(function(mv){
       if(mv.cuenta==="Banco") mv.cuenta="Efectivo";
       if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
+      if(CTAS_SOCIOS.indexOf(mv.cuenta)>=0) mv.cuenta=CTAS_MPTJ; // unify all MP/TJ
     });
-    var cuentasTabla=todasCtas.filter(function(cta){
-      var fondo=saldoAcumulado(cta,ayerStr,m);
-      var hayMov=movimientosD.filter(function(mv){return mv.cuenta===cta;}).length>0;
-      return fondo!==0||hayMov;
-    });
-    // Add any extra accounts not in the list
-    movimientosD.forEach(function(mv){
-      if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta) cuentasTabla.push(mv.cuenta);
-    });
-    // Socios columns only in monthly balance, not in daily caja table
+    // Caja accounts always shown
+    var cuentasTabla=CTAS_CAJA.slice();
+    // Add MP/TJ column only if there are movements
+    var hayMPTJ=movimientosD.filter(function(mv){return mv.cuenta===CTAS_MPTJ;}).length>0;
+    if(hayMPTJ) cuentasTabla.push(CTAS_MPTJ);
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
     // fondoTotal = sum of ALL accounts at start of day
@@ -1603,8 +1621,12 @@ function rCaja(){
     o+="<tr style='background:#1E293B;border-bottom:2px solid #3B82F6'>";
     o+="<td style='padding:8px 10px;font-weight:700;color:#3B82F6'>FONDO DE CAJA</td>";
     cuentasTabla.forEach(function(cta){
-      var sal=saldoAcumulado(cta,ayerStr,m);
-      o+="<td style='padding:8px 10px;text-align:right;color:#3B82F6;font-weight:600'>"+(sal!==0?fmt(sal):"--")+"</td>";
+      if(CTAS_CAJA.indexOf(cta)>=0){
+        var sal=saldoAcumulado(cta,ayerStr,m);
+        o+="<td style='padding:8px 10px;text-align:right;color:#3B82F6;font-weight:600'>"+(sal!==0?fmt(sal):"--")+"</td>";
+      } else {
+        o+="<td style='padding:8px 10px;text-align:right;color:#64748B;font-style:italic'>--</td>";
+      }
     });
     o+="</tr>";
 
@@ -1627,8 +1649,13 @@ function rCaja(){
     o+="<tr style='background:#1E293B;border-top:2px solid #F1F5F9'>";
     o+="<td style='padding:8px 10px;font-weight:800;color:#F1F5F9'>Total del dia "+_cajaF.split("-").reverse().join("/")+"</td>";
     cuentasTabla.forEach(function(cta){
-      var salFin=saldoAcumulado(cta,_cajaF,m);
-      o+="<td style='padding:8px 10px;text-align:right;color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:800'>"+fmt(salFin)+"</td>";
+      if(CTAS_CAJA.indexOf(cta)>=0){
+        var salFin=saldoAcumulado(cta,_cajaF,m);
+        o+="<td style='padding:8px 10px;text-align:right;color:"+(salFin>=0?"#10B981":"#EF4444")+";font-weight:800'>"+fmt(salFin)+"</td>";
+      } else {
+        var movCta=movimientosD.filter(function(mv){return mv.cuenta===cta;}).reduce(function(s,mv){return s+mv.mov;},0);
+        o+="<td style='padding:8px 10px;text-align:right;color:#8B5CF6;font-weight:700'>"+(movCta!==0?fmt(movCta):"--")+"</td>";
+      }
     });
     o+="</tr>";
 
@@ -1693,7 +1720,7 @@ function rCaja(){
         var sid="subc-det-"+idx;
         o+="<div style='border-bottom:1px solid #1E293B;padding:6px 0'>";
         o+="<div style='display:flex;justify-content:space-between;align-items:center;cursor:pointer' data-subcid='"+sid+"'>";
-        o+="<div><span style='font-weight:600;font-size:12px'>"+s.fecha+"</span> <span style='color:#64748B;font-size:11px'>Cerrado por "+esc(s.cerradoPor)+"</span></div>";
+        o+="<div><span style='font-weight:600;font-size:12px'>"+fecDisp(s.fecha)+"</span> <span style='color:#64748B;font-size:11px'>Cerrado por "+esc(s.cerradoPor)+"</span></div>";
         o+="<span style='color:#10B981'>✅ ver detalle ▼</span></div>";
         // Detail panel
         o+="<div id='"+sid+"' style='display:none;margin-top:6px;background:#0F172A;border-radius:7px;padding:10px'>";
