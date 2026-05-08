@@ -1547,7 +1547,7 @@ function rCaja(){
       movimientosD.push({
         concepto:esc((mv.tipo==="retiro"?"Retiro":"Aporte")+" "+(mv.cuenta||"")+(mv.nota?" - "+mv.nota:"")),
         mov:mv.tipo==="aporte"?Number(mv.monto||0):-Number(mv.monto||0),
-        cuenta:mv.cuenta_caja||mv.cuenta,tipo:"movimiento"
+        cuenta:(mv.cuenta_caja||(["Cuenta Loli","Cuenta Hugo"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta)),tipo:"movimiento"
       });
     });
 
