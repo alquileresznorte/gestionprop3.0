@@ -1541,23 +1541,31 @@ function rCaja(){
     ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
       movimientosD.push({concepto:esc(a.concepto||""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste"});
     });
-    // Aportes y retiros de socios - solo admin los ve en la tabla
+    // Aportes y retiros de socios
     movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
-      if(USER.r!=="admin") return; // empleados no ven retiros/aportes de socios
-      movimientosD.push({
-        concepto:esc((mv.tipo==="retiro"?"Retiro":"Aporte")+" "+(mv.cuenta||"")+(mv.nota?" - "+mv.nota:"")),
-        mov:mv.tipo==="aporte"?Number(mv.monto||0):-Number(mv.monto||0),
-        cuenta:(mv.cuenta_caja||(["Cuenta Loli","Cuenta Hugo"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta)),tipo:"movimiento"
-      });
+      var ctaCaja=mv.cuenta_caja||(["Cuenta Loli","Cuenta Hugo"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta);
+      var ctaSocio=mv.cuenta||""; // Cuenta Hugo / Cuenta Loli
+      var monto=Number(mv.monto||0);
+      var esRetiro=mv.tipo==="retiro";
+      var concepto=esc((esRetiro?"Retiro":"Aporte")+(mv.nota?" - "+mv.nota:""));
+      // Row 1: affects caja account (visible to all)
+      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,tipo:"movimiento"});
+      // Row 2: affects socio account (opposite sign, admin only)
+      if(USER.r==="admin"&&ctaSocio&&["Cuenta Loli","Cuenta Hugo"].indexOf(ctaSocio)>=0){
+        movimientosD.push({concepto:"",mov:esRetiro?monto:-monto,cuenta:ctaSocio,tipo:"movimiento_socio",skipConcepto:true});
+      }
     });
 
     // Always show all main accounts
     var cuentasTabla=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo"];
-    // Add any extra accounts that have activity (except "Banco" which was a bug - remap to Efectivo)
+    // Add any extra accounts that have activity (except socio accounts and Banco)
     movimientosD.forEach(function(mv){
       if(mv.cuenta==="Banco") mv.cuenta="Efectivo"; // fix old records
-      if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta) cuentasTabla.push(mv.cuenta);
+      if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
+      if(cuentasTabla.indexOf(mv.cuenta)<0&&mv.cuenta&&["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)<0) cuentasTabla.push(mv.cuenta);
     });
+    // Admin sees socios columns too
+    if(USER.r==="admin") CTAP.forEach(function(c){if(cuentasTabla.indexOf(c)<0) cuentasTabla.push(c);});
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
     var fondoTotal=cuentasTabla.reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
@@ -1602,7 +1610,7 @@ function rCaja(){
       var bg=idx%2===0?"#1E293B":"#162032";
       var colorMov=mv.mov>=0?"#10B981":"#EF4444";
       o+="<tr style='background:"+bg+";border-bottom:1px solid #334155'>";
-      o+="<td style='padding:6px 10px;color:#F1F5F9'>"+mv.concepto+"</td>";
+      o+="<td style='padding:6px 10px;color:#F1F5F9'>"+(mv.skipConcepto?"":mv.concepto)+"</td>";
 
       cuentasTabla.forEach(function(cta){
         var val=mv.cuenta===cta?mv.mov:0;
