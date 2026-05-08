@@ -2283,6 +2283,55 @@ function borrarCosto(key){
 }
 
 // ── TAB INGRESOS EXTRAS ───────────────────────────────────────────────────────
+function renderCfgCats(){
+  var el=G("cfg-body");if(!el)return;
+  var customCats=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";});
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Categorias del sistema:</p>";
+  o+="<div style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px'>";
+  Object.keys(CATC).forEach(function(cat){
+    o+="<span style='background:"+CATC[cat]+"22;color:"+CATC[cat]+";border:1px solid "+CATC[cat]+"44;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700'>"+cat+"</span>";
+  });
+  o+="</div>";
+  o+="<p style='color:#94A3B8;font-size:12px;margin-bottom:8px'>Categorias personalizadas:</p>";
+  if(customCats.length){
+    customCats.forEach(function(cat){
+      var ki=kpush(cat._key);
+      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #334155'>";
+      o+="<span style='background:"+(cat.color||"#64748B")+"22;color:"+(cat.color||"#64748B")+";border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700'>"+esc(cat.nombre)+"</span>";
+      o+="<button class='btn br bsm' data-delcat='"+ki+"'>Quitar</button></div>";
+    });
+  } else {
+    o+="<p style='color:#64748B;font-size:12px;margin-bottom:10px'>Sin categorias personalizadas aun</p>";
+  }
+  o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px solid #334155;margin-top:12px'>";
+  o+="<div style='font-size:12px;font-weight:700;margin-bottom:8px;color:#F1F5F9'>+ Nueva categoria</div>";
+  o+="<div class='g2'>";
+  o+=fld("ncat-nombre","Nombre *","");
+  o+="<div class='fld'><label class='lbl'>Color</label><input type='color' id='ncat-color' value='#8B5CF6' style='width:100%;height:38px;border:1px solid #334155;border-radius:8px;cursor:pointer;padding:2px'></div>";
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;margin-top:8px'><button class='btn bok bsm' onclick='saveCatPersonalizada()'>Agregar</button></div>";
+  o+="</div>";
+  el.innerHTML=o;
+  // Wire delete buttons
+  el.onclick=function(e){
+    var b=e.target.closest("[data-delcat]");
+    if(b){
+      if(!confirm("Quitar esta categoria?"))return;
+      DB.ref("cfg/"+kget(parseInt(b.dataset.delcat))).remove();
+      setTimeout(rConfig,300);
+    }
+  };
+}
+
+function saveCatPersonalizada(){
+  var nombre=(G("ncat-nombre")||{value:""}).value.trim();
+  if(!nombre){alert("El nombre es obligatorio");return;}
+  var color=(G("ncat-color")||{value:"#8B5CF6"}).value;
+  DB.ref("cfg").push({tipo:"categoria",nombre:nombre,color:color});
+  setTimeout(rConfig,300);
+}
+
+
 function renderCfgIngresos(){
   var el=G("cfg-body"); if(!el) return;
   var extras=oA(DATA.cfg).filter(function(x){return x.tipo==="ingreso_extra";});
