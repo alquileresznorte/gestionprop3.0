@@ -2234,7 +2234,7 @@ function renderCfgCostos(){
   };
 }
 function openAddCosto(){
-  var cats=["Electricidad","Gas","Agua","Impuestos","Sueldos","Tarjetas","Seguros","Administrativo","Salud","Personal","Vehiculos","Otro"];
+  var cats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
   var o="<div class='fld'><label class='lbl'>Tipo de costo</label><div style='display:flex;gap:16px;margin-top:4px'>";
   o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-fijo' value='fijo' checked> <b>Fijo mensual</b></label>";
   o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-eventual' value='eventual'> <b>Eventual</b></label>";
@@ -2268,7 +2268,7 @@ function saveNuevoCosto(){
 function openEditCosto(key){
   var c=DATA.cfg[key]; if(!c) return;
   var ki=kpush(key);
-  var cats=["Electricidad","Gas","Agua","Impuestos","Sueldos","Tarjetas","Seguros","Administrativo","Salud","Personal","Vehiculos","Otro"];
+  var cats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
   var o=fld("ece-desc","Descripcion *",c.desc||"")
        +fld("ece-prov","Proveedor",c.pv||"")
        +sld("ece-cat","Categoria",cats,c.cat)
@@ -2562,7 +2562,7 @@ function openEditCF(cfid){
   // Check if there's already an override
   var over = oA(DATA.cfg).filter(function(x){return x.tipo==="cf_override"&&x.cfid===id;})[0];
   var current = over||orig;
-  var cats=["Electricidad","Gas","Agua","Impuestos","Sueldos","Tarjetas","Seguros","Administrativo","Salud","Personal","Vehiculos","Otro"];
+  var cats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
   var ki = kpush(id+"__editcf");
   var o = fld("ecf-desc","Descripcion",current.d||current.desc||"")
         + fld("ecf-prov","Proveedor",current.pv||current.prov||"")
