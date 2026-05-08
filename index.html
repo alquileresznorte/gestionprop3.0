@@ -1954,7 +1954,10 @@ function saveAj(){
 function openMov(){
   var o="<div class='g2'>"+fld("mv-f","Fecha",hoy(),"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro</option><option value='aporte'>Aporte</option></select></div>";
-  o+=sld("mv-caja","Cuenta",CTAS,"Efectivo");
+  if(USER.r==="admin"){
+    o+="<div class='fld'><label class='lbl'>Socio</label><select class='inp' id='mv-c'><option value='Cuenta Loli'>Loli</option><option value='Cuenta Hugo'>Hugo</option></select></div>";
+  }
+  o+=sld("mv-caja","Cuenta de caja",CTAS,"Efectivo");
   o+=fld("mv-m","Monto $","","number")+"</div>"+fld("mv-n","Concepto (ej: medicamentos, viaje, gasoil)");
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
   openModal("Retiro / Aporte",o);
@@ -1963,7 +1966,8 @@ function saveMov(){
   var m=Number(G("mv-m").value);if(!m){alert("Ingresa el monto");return;}
   var caja=(G("mv-caja")||{value:"Efectivo"}).value;
   var mes=G("mv-f").value.slice(0,7);
-  DB.ref("movs").push({fecha:G("mv-f").value,mes:mes,tipo:G("mv-t").value,cuenta_caja:caja,monto:m,nota:G("mv-n").value});
+  var socio=(G("mv-c")||{value:""}).value;
+  DB.ref("movs").push({fecha:G("mv-f").value,mes:mes,tipo:G("mv-t").value,cuenta:socio,cuenta_caja:caja,monto:m,nota:G("mv-n").value});
   closeModal();setTimeout(rCaja,300);
 }
 
