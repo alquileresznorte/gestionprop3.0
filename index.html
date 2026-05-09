@@ -1570,6 +1570,7 @@ function rCostos(){
     row+="</div>";
     row+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#94A3B8;margin-bottom:8px'><input type='checkbox' id='ec-p' "+(c.pagado?"checked":"")+" > Marcar como totalmente pagado</label>";
     row+=fld("ec-fp","Fecha de pago",c.fecha_pago||hoy(),"date");
+    row+="<div class='fld'><label class='lbl'>Observaciones</label><textarea class='inp' id='ec-obs' style='min-height:48px;font-size:11px' placeholder='Ej: Pago anual enero-diciembre, 3 facturas incluidas...'>"+esc(c.obs||"")+"</textarea></div>";
     row+="<div style='display:flex;gap:6px'><button class='btn bok bsm' data-sc='"+ki+"'>Guardar</button><button class='btn bg bsm' onclick='_editC=null;rCostos()'>X</button></div>";
     row+="</div>";
   }
@@ -1584,6 +1585,7 @@ function rCostos(){
     else if(b.dataset.sc)saveCosto(kget(parseInt(b.dataset.sc)));
     else if(b.dataset.rev)revCosto(kget(parseInt(b.dataset.rev)));
     else if(b.dataset.vpagos)verPagosCosto(kget(parseInt(b.dataset.vpagos)));
+    else if(b.dataset.savecobs){var obs=G('vp-obs');if(obs)DB.ref('cst/'+b.dataset.savecobs).update({obs:obs.value});closeModal();alert('Observaciones guardadas.');}
     else if(b.dataset.extra)addExtraFactura(kget(parseInt(b.dataset.extra)));
   };
 }
@@ -1604,6 +1606,7 @@ function saveCosto(ckey){
   ups["cst/"+ckey+"/fec_venc"]=(G("ec-v")||{value:""}).value;
   ups["cst/"+ckey+"/cuenta"]=pc;
   ups["cst/"+ckey+"/fecha_pago"]=fechaPago;
+  if(G("ec-obs")) ups["cst/"+ckey+"/obs"]=G("ec-obs").value||"";
   // Registrar pago parcial si se ingreso monto
   if(pm>0){
     var ts=Date.now();
@@ -1662,13 +1665,15 @@ function verPagosCosto(ckey){
   var c=DATA.cst[ckey];if(!c)return;
   var pagos=c.pagos?Object.values(c.pagos).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");}):[];
   var total=pagos.reduce(function(s,p){return s+Number(p.monto||0);},0);
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'><b>"+esc(c.desc||"")+"</b> — Total: "+fmt(c.monto||0)+"</p>";
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:8px'><b>"+esc(c.desc||"")+"</b> — Total: "+fmt(c.monto||0)+"</p>";
+  // Observaciones del costo
+  if(c.obs) o+="<div style='background:#1E293B;border-radius:8px;padding:8px;font-size:11px;color:#94A3B8;margin-bottom:10px'>"+esc(c.obs)+"</div>";
   if(pagos.length){
     o+="<table class='tbl'><thead><tr><th>Fecha</th><th>Monto</th><th>Cuenta</th></tr></thead><tbody>";
     pagos.forEach(function(p){
       o+="<tr><td style='color:#64748B;font-size:11px'>"+fecDisp(p.fecha||"")+"</td>";
       o+="<td style='color:#F87171;font-weight:700'>"+fmt(p.monto||0)+"</td>";
-      o+="<td style='color:#94A3B8;font-size:11px'>"+esc(p.cuenta||"")+"</td></tr>";
+      o+="<td style='color:#94A3B8;font-size:11px'>"+esc(p.cuenta||"")+(p.obs?" — "+esc(p.obs):"")+"</td></tr>";
     });
     o+="<tr style='border-top:1px solid #334155'><td style='font-weight:700'>Total pagado</td>";
     o+="<td style='color:"+(total>=Number(c.monto||0)?"#10B981":"#F59E0B")+";font-weight:700'>"+fmt(total)+"</td><td></td></tr>";
@@ -1677,9 +1682,17 @@ function verPagosCosto(ckey){
       o+="<p style='color:#F59E0B;font-size:11px;margin-top:8px'>Saldo pendiente: "+fmt(Number(c.monto||0)-total)+"</p>";
     }
   } else {
-    o+="<p style='color:#64748B'>Sin pagos individuales registrados.</p>";
+    o+="<p style='color:#64748B;margin-bottom:8px'>Sin pagos individuales registrados.</p>";
   }
-  o+="<div style='display:flex;justify-content:flex-end;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cerrar</button></div>";
+  // Campo para agregar/editar observaciones
+  o+="<div style='margin-top:12px;border-top:1px solid #334155;padding-top:10px'>";
+  o+="<label class='lbl'>Observaciones (pago anual, facturas incluidas, etc.)</label>";
+  o+="<textarea class='inp' id='vp-obs' style='min-height:60px' placeholder='Ej: Pago anual que cubre enero-diciembre. 3 facturas incluidas.'>"+esc(c.obs||"")+"</textarea>";
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:10px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cerrar</button>";
+  o+="<button class='btn bok bsm' data-savecobs='"+ckey+"'>Guardar obs.</button>";
+  o+="</div>";
   openModal("Detalle de pagos",o);
 }
 
@@ -1722,7 +1735,7 @@ function verRenovacionesMes(){
   o+="<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:6px'>";
   mesesOrdenados.forEach(function(m){
     var activo=m===mesSeleccionado;
-    o+="<button class='btn bsm' style='background:"+(activo?"#06B6D4":"#334155")+";color:"+(activo?"#000":"#94A3B8")+"' onclick='selRenMes(this.dataset.m)' data-m='"+m+">"+m+" ("+porMes[m].length+")</button>";
+    o+="<button class='btn bsm' style='background:"+(activo?"#06B6D4":"#334155")+";color:"+(activo?"#000":"#94A3B8")+"' onclick='selRenMes(this.dataset.m)' data-m='"+m+"'>"+m+" ("+porMes[m].length+")</button>";
   });
 
   // Tambien agregar selector manual para meses sin vencimientos
