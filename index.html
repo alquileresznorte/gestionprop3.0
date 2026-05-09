@@ -1334,7 +1334,7 @@ function saveExtraFactura(ckey){
 }
 
 
-function revCosto(ckey){if(!confirm("Revertir pago?"))return;DB.ref("cst/"+ckey).update({pagado:false,nro_fact:"",monto:0});setTimeout(rCostos,400);}
+function revCosto(ckey){if(!confirm("Revertir pago? Se borraran todos los pagos registrados."))return;DB.ref("cst/"+ckey).update({pagado:false,fecha_pago:null});DB.ref("cst/"+ckey+"/pagos").remove();setTimeout(rCostos,400);}
 
 // ALERTAS
 function rAlertas(){
@@ -1664,17 +1664,22 @@ function rCaja(){
         });
       });
     });
-    // Costos - mostrar por fecha de PAGO o fecha de vencimiento si no tiene pagos
+    // Costos - agrupar pagos del mismo costo en una sola fila por dia
     oA(DATA.cst).forEach(function(c){
       if(c.pagos&&Object.keys(c.pagos).length>0){
-        // Tiene pagos individuales: mostrar cada pago del dia
-        Object.values(c.pagos).filter(function(pg){
-          return (pg.fecha||"")===_cajaF;
-        }).forEach(function(pg){
-          movimientosD.push({concepto:esc(c.desc||""),mov:-Number(pg.monto||0),cuenta:pg.cuenta||c.cuenta||"Efectivo",tipo:"costo"});
+        // Agrupar pagos del dia por cuenta
+        var pagosDia=Object.values(c.pagos).filter(function(pg){return (pg.fecha||"")===_cajaF;});
+        // Sumar por cuenta
+        var porCuenta={};
+        pagosDia.forEach(function(pg){
+          var ct=pg.cuenta||c.cuenta||"Efectivo";
+          porCuenta[ct]=(porCuenta[ct]||0)+Number(pg.monto||0);
+        });
+        Object.keys(porCuenta).forEach(function(ct){
+          if(porCuenta[ct]>0)
+            movimientosD.push({concepto:esc(c.desc||""),mov:-porCuenta[ct],cuenta:ct,tipo:"costo"});
         });
       } else {
-        // Sin pagos individuales: comparar fec_venc Y fecha_pago (por si se guardo de otra forma)
         var fechaPago=c.fecha_pago||c.fec_venc||"";
         if(c.pagado&&fechaPago===_cajaF){
           movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta||"Efectivo",tipo:"costo"});
@@ -2214,7 +2219,7 @@ var _cfgTab = "propiedades"; // propiedades | costos | ingresos
 function rConfig(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
 
-  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"]];
+  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"],["limpieza","🗑 Limpieza"]];
   var o = "<h2 style='font-size:20px;font-weight:800;margin-bottom:12px'>Configuracion</h2>";
   o += "<div style='display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap'>";
   tabs.forEach(function(t){
@@ -2233,6 +2238,7 @@ function rConfig(){
   else if(_cfgTab==="costos") renderCfgCostos();
   else if(_cfgTab==="ingresos") renderCfgIngresos();
   else if(_cfgTab==="categorias") renderCfgCats();
+  else if(_cfgTab==="limpieza") renderCfgLimpieza();
   else if(_cfgTab==="usuarios") renderCfgUsuarios();
 }
 
@@ -3240,6 +3246,73 @@ function enviarCajaWA(){
   var msg=lines.join("\n");
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
 }
+
+function renderCfgLimpieza(){
+  var el=G("cfg-body");if(!el)return;
+  var o="<div class='card' style='border-left:3px solid #EF4444'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:4px;color:#EF4444'>⚠ Zona de limpieza de datos</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:14px'>Estas acciones son irreversibles. Los datos borrados no se pueden recuperar.</p>";
+
+  // Borrar solo costos
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar solo COSTOS del mes</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Borra todos los costos. No afecta cobros, caja ni acuerdos. Se regeneran solos al entrar a Costos.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'>";
+  o+="<input type='month' class='inp' id='limp-mes-cst' value='"+mes()+"' style='max-width:150px'/>";
+  o+="<button class='btn bsm' style='background:#F59E0B;color:#000;font-weight:700' onclick='borrarSoloCostos()'>Borrar costos del mes</button>";
+  o+="</div></div>";
+
+  // Borrar pagos duplicados
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#3B82F6;font-size:12px;font-weight:700;margin-bottom:4px'>Limpiar pagos duplicados en costos</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Elimina pagos duplicados del mismo dia en el mismo costo, conservando uno solo por dia.</p>";
+  o+="<button class='btn bp bsm' onclick='limpiarDuplicadosCostos()'>Limpiar duplicados</button>";
+  o+="</div>";
+
+  o+="</div>";
+  el.innerHTML=o;
+}
+
+function borrarSoloCostos(){
+  var mes=G("limp-mes-cst")?G("limp-mes-cst").value:null;
+  if(!mes){alert("Selecciona el mes");return;}
+  if(!confirm("Borrar TODOS los costos de "+mes+"? Esta accion no se puede deshacer."))return;
+  var acst=oA(DATA.cst).filter(function(c){return c.mes===mes;});
+  if(!acst.length){alert("No hay costos para ese mes.");return;}
+  var ups={};
+  acst.forEach(function(c){ups["cst/"+c._key]=null;});
+  DB.ref("/").update(ups,function(){
+    alert("Costos de "+mes+" borrados. Entra a la seccion Costos para regenerarlos.");
+    setTimeout(rConfig,300);
+  });
+}
+
+function limpiarDuplicadosCostos(){
+  if(!confirm("Limpiar pagos duplicados en todos los costos?"))return;
+  var ups={};
+  oA(DATA.cst).forEach(function(c){
+    if(!c.pagos)return;
+    var pagos=Object.entries(c.pagos);
+    // Agrupar por fecha — conservar solo el primero de cada fecha
+    var vistas={};
+    pagos.forEach(function(entry){
+      var key=entry[0],pg=entry[1];
+      var fecha=pg.fecha||"";
+      if(vistas[fecha]){
+        // Duplicado — borrar
+        ups["cst/"+c._key+"/pagos/"+key]=null;
+      } else {
+        vistas[fecha]=true;
+      }
+    });
+  });
+  if(!Object.keys(ups).length){alert("No se encontraron duplicados.");return;}
+  DB.ref("/").update(ups,function(){
+    alert("Duplicados eliminados: "+Object.keys(ups).length+" pagos borrados.");
+    setTimeout(rConfig,300);
+  });
+}
+
 
 function rCtaCte(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
