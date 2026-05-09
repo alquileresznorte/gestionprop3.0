@@ -3314,32 +3314,34 @@ function rCtaCte(){
 
   // Panel de Inversiones
   var invTodos=oA(DATA.inv||{}).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
-  var tcRef=Number((DATA.cfg||{}).tc||0);
   o+="<div class='card' style='margin-bottom:14px;border-left:3px solid #F59E0B'>";
   o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
   o+="<div><h3 style='font-size:14px;font-weight:700;color:#F59E0B'>Inversiones</h3>";
-  o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Activos en dolares — compra/venta dolarizada al TC del momento</p></div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Activos dolarizados al TC de compra</p></div>";
   o+="<button class='btn bsm' style='background:#F59E0B;color:#000' onclick='openNuevaInversion()'>+ Nueva</button></div>";
   if(invTodos.length){
     var totalInvUSD=invTodos.filter(function(i){return !i.vendido;}).reduce(function(s,i){return s+Number(i.usd||0);},0);
     o+="<p style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:8px'>Stock activo: U$S "+totalInvUSD.toLocaleString()+"</p>";
-    o+="<table class='tbl'><thead><tr><th>Activo</th><th>Fecha</th><th>Pesos</th><th>TC</th><th>U$S compra</th><th>Estado</th><th></th></tr></thead><tbody>";
+    o+="<table class='tbl'><thead><tr><th>Activo</th><th>Fecha</th><th>Pesos</th><th>U$S compra</th><th>Estado</th><th></th></tr></thead><tbody>";
     invTodos.forEach(function(inv){
       var usdCompra=Number(inv.usd||0);
-      var vendido=inv.vendido;
-      var ganancia="";
+      var vendido=!!inv.vendido;
+      var ganStr="";
       if(vendido&&inv.usd_venta){
         var diff=Number(inv.usd_venta)-usdCompra;
-        ganancia=diff>=0?"<span style='color:#10B981'>+U$S "+diff.toFixed(0)+"</span>":"<span style='color:#EF4444'>-U$S "+Math.abs(diff).toFixed(0)+"</span>";
+        ganStr=diff>=0?"<span style='color:#10B981'>+U$S "+diff.toFixed(0)+"</span>":"<span style='color:#EF4444'>U$S "+diff.toFixed(0)+"</span>";
+      }
+      var btnVender="";
+      if(!vendido){
+        btnVender="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-invkey='"+inv._key+"' onclick='openVenderInversion(this.dataset.invkey)'>Vender</button>";
       }
       o+="<tr>";
       o+="<td style='font-weight:600'>"+esc(inv.desc||"")+"</td>";
       o+="<td style='color:#64748B;font-size:11px'>"+fecDisp(inv.fecha||"")+"</td>";
       o+="<td style='color:#F59E0B'>"+fmt(inv.pesos||0)+"</td>";
-      o+="<td style='color:#94A3B8;font-size:11px'>$"+Number(inv.tc||0).toLocaleString()+"</td>";
       o+="<td style='color:#06B6D4;font-weight:700'>U$S "+usdCompra.toLocaleString()+"</td>";
-      o+="<td>"+(vendido?"<span style='color:#64748B;font-size:11px'>Vendido "+fecDisp(inv.fecha_venta||"")+"<br>"+ganancia+"</span>":"<span style='color:#10B981;font-size:11px'>Activo</span>")+"</td>";
-      o+="<td>"+(vendido?"":"<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' onclick='openVenderInversion(\""+inv._key+"\")'>Vender</button>")+"</td>";
+      o+="<td>"+(vendido?"<span style='color:#64748B;font-size:11px'>Vendido "+fecDisp(inv.fecha_venta||"")+"<br>"+ganStr+"</span>":"<span style='color:#10B981;font-size:11px'>Activo</span>")+"</td>";
+      o+="<td>"+btnVender+"</td>";
       o+="</tr>";
     });
     o+="</tbody></table>";
@@ -3399,7 +3401,7 @@ function openVenderInversion(key){
   o+=fld("vnd-tc","TC al momento de venta","","number");
   o+="</div>";
   o+="<div id='vnd-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver resultado</div>";
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveVentaInversion(this.dataset.k)' data-k='"+key+"'>Registrar venta</button></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-invkey='"+key+"' onclick='saveVentaInversion(this.dataset.invkey)'>Registrar venta</button></div>";
   openModal("Registrar venta — "+esc(inv.desc),o);
   setTimeout(function(){
     ["vnd-pesos","vnd-tc"].forEach(function(id){
