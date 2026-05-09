@@ -1183,7 +1183,7 @@ function rCostos(){
   var nuevos=cfActual.filter(function(c){
     return !existingIds.includes(c.id) && !existingDescs.includes((c.d||"").trim().toLowerCase());
   });
-  if(nuevos.length){nuevos.forEach(function(c){DB.ref("cst").push({cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:Number(c.monto_cfg||0),nro_fact:"",fec_venc:c.dv?(_cstMes+"-"+String(c.dv).padStart(2,"0")):"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"});});setTimeout(rCostos,800);return;}
+  if(nuevos.length&&!window._generandoCostos){window._generandoCostos=true;var batch={};nuevos.forEach(function(c){var k=DB.ref("cst").push().key;batch["cst/"+k]={cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:Number(c.monto_cfg||0),nro_fact:"",fec_venc:c.dv?(_cstMes+"-"+String(c.dv).padStart(2,"0")):"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"};});DB.ref("/").update(batch,function(){window._generandoCostos=false;setTimeout(rCostos,600);});return;}
   var _busq=(window._cstBusq||"").toLowerCase().trim();
   var cstA=oA(DATA.cst).filter(function(c){
     if(c.mes!==_cstMes) return false;
@@ -3288,27 +3288,37 @@ function borrarSoloCostos(){
 }
 
 function limpiarDuplicadosCostos(){
-  if(!confirm("Limpiar pagos duplicados en todos los costos?"))return;
+  if(!confirm("Limpiar costos duplicados del mes seleccionado?"))return;
+  var mesSel=G("limp-mes-cst")?G("limp-mes-cst").value:mes();
+  var cstMes=oA(DATA.cst).filter(function(c){return c.mes===mesSel;});
   var ups={};
-  oA(DATA.cst).forEach(function(c){
-    if(!c.pagos)return;
-    var pagos=Object.entries(c.pagos);
-    // Agrupar por fecha — conservar solo el primero de cada fecha
-    var vistas={};
-    pagos.forEach(function(entry){
-      var key=entry[0],pg=entry[1];
-      var fecha=pg.fecha||"";
-      if(vistas[fecha]){
-        // Duplicado — borrar
-        ups["cst/"+c._key+"/pagos/"+key]=null;
-      } else {
-        vistas[fecha]=true;
+  // Agrupar por cfid y descripcion, conservar el primero, borrar el resto
+  var vistos={};
+  cstMes.forEach(function(c){
+    var key=c.cfid||(c.desc||"").trim().toLowerCase();
+    if(vistos[key]){
+      // Duplicado — borrar
+      ups["cst/"+c._key]=null;
+    } else {
+      vistos[key]=true;
+      // Tambien limpiar pagos duplicados dentro del costo
+      if(c.pagos){
+        var fechasVistas={};
+        Object.entries(c.pagos).forEach(function(entry){
+          var pk=entry[0],pg=entry[1];
+          var fecha=pg.fecha||"";
+          if(fechasVistas[fecha]){
+            ups["cst/"+c._key+"/pagos/"+pk]=null;
+          } else {
+            fechasVistas[fecha]=true;
+          }
+        });
       }
-    });
+    }
   });
-  if(!Object.keys(ups).length){alert("No se encontraron duplicados.");return;}
+  if(!Object.keys(ups).length){alert("No se encontraron duplicados en "+mesSel+".");return;}
   DB.ref("/").update(ups,function(){
-    alert("Duplicados eliminados: "+Object.keys(ups).length+" pagos borrados.");
+    alert("Listo! Se eliminaron "+Object.keys(ups).length+" registros duplicados.");
     setTimeout(rConfig,300);
   });
 }
