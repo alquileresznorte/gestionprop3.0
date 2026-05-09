@@ -205,7 +205,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo","hist_cst"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -1391,6 +1391,98 @@ function regPago(ckey){
 
 // COSTOS
 var _cstMes=mes(),_cstCat="Todas",_cstEd="Todos",_editC=null;
+// ── HISTORIAL DE COSTOS ────────────────────────────────────────────────────────
+
+function cerrarMesCostos(){
+  if(!confirm("Cerrar el mes "+_cstMes+" de costos? Los costos quedan archivados y se pueden consultar en el historial."))return;
+  var cstMes=oA(DATA.cst).filter(function(c){return c.mes===_cstMes;});
+  if(!cstMes.length){alert("No hay costos para archivar en "+_cstMes);return;}
+
+  // Armar resumen del mes
+  var resumen={
+    mes:_cstMes,
+    fecha_cierre:hoy(),
+    cerrado_por:USER.n||"admin",
+    total_pagado:cstMes.filter(function(c){return c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0),
+    total_pendiente:cstMes.filter(function(c){return !c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0),
+    cantidad:cstMes.length,
+    costos:{}
+  };
+
+  // Guardar cada costo en el historial
+  cstMes.forEach(function(c){
+    resumen.costos[c._key]={
+      desc:c.desc||"",cat:c.cat||"",ed:c.ed||"",
+      monto:Number(c.monto||0),pagado:!!c.pagado,
+      fec_venc:c.fec_venc||"",fecha_pago:c.fecha_pago||"",
+      nro_fact:c.nro_fact||"",cuenta:c.cuenta||"",
+      pagos:c.pagos||{}
+    };
+  });
+
+  DB.ref("hist_cst/"+_cstMes).set(resumen,function(){
+    alert("Mes "+_cstMes+" archivado correctamente. Total pagado: "+fmt(resumen.total_pagado)+(resumen.total_pendiente>0?" | Pendiente: "+fmt(resumen.total_pendiente):""));
+    setTimeout(rCostos,300);
+  });
+}
+
+function verHistorialCostos(){
+  var hist=DATA.hist_cst||{};
+  var meses=Object.keys(hist).sort().reverse();
+  if(!meses.length){
+    openModal("Historial de Costos","<p style='color:#64748B;padding:20px;text-align:center'>No hay meses archivados todavia. Usa el boton Cerrar mes al finalizar cada mes.</p>");
+    return;
+  }
+
+  var o="<p style='color:#64748B;font-size:11px;margin-bottom:12px'>Meses archivados: "+meses.length+". Hace click en un mes para ver el detalle.</p>";
+  meses.forEach(function(m){
+    var h=hist[m];
+    o+="<div style='background:#1E293B;border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer' onclick='verDetalleMesCostos(this.dataset.m)' data-m='"+m+"'>";
+    o+="<div style='display:flex;justify-content:space-between;align-items:center'>";
+    o+="<div><div style='font-weight:700;font-size:13px'>"+m+"</div>";
+    o+="<div style='color:#64748B;font-size:11px'>Cerrado el "+fecDisp(h.fecha_cierre||"")+" por "+esc(h.cerrado_por||"admin")+"</div></div>";
+    o+="<div style='text-align:right'>";
+    o+="<div style='color:#10B981;font-size:12px'>Pagado: "+fmt(h.total_pagado||0)+"</div>";
+    if(h.total_pendiente>0) o+="<div style='color:#EF4444;font-size:11px'>Pendiente: "+fmt(h.total_pendiente)+"</div>";
+    o+="</div></div></div>";
+  });
+  openModal("Historial de Costos",o);
+}
+
+function verDetalleMesCostos(mes){
+  var h=(DATA.hist_cst||{})[mes];if(!h)return;
+  var costos=h.costos?Object.values(h.costos):[];
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+  o+="<div><div style='font-weight:700'>"+mes+"</div><div style='color:#64748B;font-size:11px'>"+costos.length+" costos — Pagado: "+fmt(h.total_pagado||0)+(h.total_pendiente>0?" | Pendiente: "+fmt(h.total_pendiente):"")+"</div></div>";
+  o+="<button class='btn bg bsm' onclick='verHistorialCostos()'>Atras</button></div>";
+
+  // Separar pagados y pendientes
+  var pagados=costos.filter(function(c){return c.pagado;});
+  var pendientes=costos.filter(function(c){return !c.pagado;});
+
+  if(pendientes.length){
+    o+="<div style='color:#EF4444;font-size:11px;font-weight:700;margin-bottom:6px'>SIN PAGAR ("+pendientes.length+")</div>";
+    pendientes.forEach(function(c){
+      o+="<div style='background:#1E293B;border-left:3px solid #EF4444;border-radius:8px;padding:8px 10px;margin-bottom:4px'>";
+      o+="<div style='display:flex;justify-content:space-between'><span style='font-weight:600;font-size:12px'>"+esc(c.desc||"")+"</span><span style='color:#EF4444;font-weight:700'>"+fmt(c.monto||0)+"</span></div>";
+      o+="<div style='color:#64748B;font-size:10px'>"+esc(c.ed||"General")+" · "+esc(c.cat||"")+(c.fec_venc?" · Vencia: "+fecDisp(c.fec_venc):"")+"</div></div>";
+    });
+  }
+
+  if(pagados.length){
+    o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin:10px 0 6px'>PAGADOS ("+pagados.length+")</div>";
+    pagados.forEach(function(c){
+      var pagosArr=c.pagos?Object.values(c.pagos):[];
+      var fechaPago=pagosArr.length?pagosArr.sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");})[0].fecha:c.fecha_pago||"";
+      o+="<div style='background:#1E293B;border-left:3px solid #10B981;border-radius:8px;padding:8px 10px;margin-bottom:4px'>";
+      o+="<div style='display:flex;justify-content:space-between'><span style='font-weight:600;font-size:12px'>"+esc(c.desc||"")+"</span><span style='color:#10B981;font-weight:700'>"+fmt(c.monto||0)+"</span></div>";
+      o+="<div style='color:#64748B;font-size:10px'>"+esc(c.ed||"General")+" · "+esc(c.cat||"")+(fechaPago?" · Pagado: "+fecDisp(fechaPago):"")+(c.nro_fact?" · Fact: "+esc(c.nro_fact):"")+(c.cuenta?" · "+esc(c.cuenta):"")+"</div></div>";
+    });
+  }
+  openModal("Costos "+mes,o);
+}
+
+
 function rCostos(){
   var cfActual=getCF(); // Get CF with overrides applied
   var existingCst=oA(DATA.cst).filter(function(c){return c.mes===_cstMes;});
@@ -1414,7 +1506,15 @@ function rCostos(){
   var sinF=cstA.filter(function(c){return !c.pagado&&!c.nro_fact&&Number(c.monto||0)>0;}).length;
   var cats=[];CF.forEach(function(c){if(!cats.includes(c.c))cats.push(c.c);});
   var esA=USER.r==="admin";
-  var o="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'><div><h2 style='font-size:20px;font-weight:800'>Costos</h2><p style='color:#64748B;font-size:11px'>Pagado: "+fmt(totP)+" - Pendiente: "+fmt(totPend)+(sinF>0?" - "+sinF+" sin nro.":"")+"</p></div></div>";
+  var mesArchivado=(DATA.hist_cst&&DATA.hist_cst[_cstMes])?true:false;
+  var o="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'><div><h2 style='font-size:20px;font-weight:800'>Costos"+(mesArchivado?" <span style='font-size:11px;color:#10B981;font-weight:400'>(archivado)</span>":"")+"</h2><p style='color:#64748B;font-size:11px'>Pagado: "+fmt(totP)+" - Pendiente: "+fmt(totPend)+(sinF>0?" - "+sinF+" sin nro.":"")+"</p></div>";
+  if(USER.r==="admin"){
+    o+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
+    o+="<button class='btn bsm' style='background:#334155;color:#94A3B8' onclick='verHistorialCostos()'>Historial</button>";
+    if(!mesArchivado) o+="<button class='btn bsm' style='background:#10B981;color:#000;font-weight:700' onclick='cerrarMesCostos()'>Cerrar mes</button>";
+    o+="</div>";
+  }
+  o+="</div>";
   o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><input type='month' class='inp' value='"+_cstMes+"' style='max-width:140px' onchange=\"_cstMes=this.value;_editC=null;rCostos()\"/><select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
   o+="<input class='inp' id='cst-busq' type='text' placeholder=\"\uD83D\uDD0D Buscar costo...\" style='width:100%;max-width:340px;margin-bottom:10px' oninput=\"window._cstBusq=this.value;_editC=null;rCostos()\"  value='"+(window._cstBusq||"")+"'/>"; 
   setTimeout(function(){var so=G("cst-ord");if(so)so.onchange=function(){rCostos();};},50);
@@ -1602,6 +1702,59 @@ function getCfgRec(){
 }
 
 
+function selRenMes(m){window._renMesSel=m;verRenovacionesMes();}
+function verRenovacionesMes(){
+  var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo"&&i.egreso;});
+  // Agrupar por mes de vencimiento
+  var porMes={};
+  iqA.forEach(function(i){
+    var mesVenc=i.egreso?i.egreso.slice(0,7):"";
+    if(!mesVenc)return;
+    if(!porMes[mesVenc]) porMes[mesVenc]=[];
+    porMes[mesVenc].push(i);
+  });
+
+  var mesesOrdenados=Object.keys(porMes).sort();
+  var mesSeleccionado=window._renMesSel||mes();
+
+  var o="<div style='margin-bottom:12px'>";
+  o+="<label class='lbl'>Ver contratos que vencen en:</label>";
+  o+="<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:6px'>";
+  mesesOrdenados.forEach(function(m){
+    var activo=m===mesSeleccionado;
+    o+="<button class='btn bsm' style='background:"+(activo?"#06B6D4":"#334155")+";color:"+(activo?"#000":"#94A3B8")+"' onclick='selRenMes(this.dataset.m)' data-m='"+m+">"+m+" ("+porMes[m].length+")</button>";
+  });
+
+  // Tambien agregar selector manual para meses sin vencimientos
+  o+="<input type='month' class='inp' value='"+mesSeleccionado+"' style='max-width:150px' onchange='window._renMesSel=this.value;verRenovacionesMes()'>";
+  o+="</div></div>";
+
+  var lista=porMes[mesSeleccionado]||[];
+  if(!lista.length){
+    o+="<div style='background:#1E293B;border-radius:10px;padding:20px;text-align:center;color:#64748B'>No hay contratos que venzan en "+mesSeleccionado+"</div>";
+  } else {
+    o+="<div style='color:#06B6D4;font-size:12px;font-weight:700;margin-bottom:8px'>"+lista.length+" contrato"+(lista.length!==1?"s":"")+" vencen en "+mesSeleccionado+"</div>";
+    lista.sort(function(a,b){return(a.egreso||"").localeCompare(b.egreso||"");}).forEach(function(i){
+      var diasRestantes=i.egreso?Math.round((new Date(i.egreso)-new Date())/86400000):-1;
+      var color=diasRestantes<=15?"#EF4444":diasRestantes<=30?"#F59E0B":"#06B6D4";
+      var nom=i.nombre.split(",")[0].trim();
+      var waMsg="Hola "+nom+"! Tu contrato del depto "+i.unidad+" vence el "+fecDisp(i.egreso)+". Por favor comunicate con nosotros para gestionar la renovacion. Adm: 1555787641";
+      o+="<div style='background:#1E293B;border-left:3px solid "+color+";border-radius:10px;padding:12px;margin-bottom:8px'>";
+      o+="<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap'>";
+      o+="<div><div style='font-weight:700'>"+esc(i.unidad)+" — "+esc(i.nombre)+"</div>";
+      o+="<div style='color:#64748B;font-size:11px'>Tel: "+esc(i.tel||"--")+" · Alq: "+fmt(i.alquiler)+"</div>";
+      o+="<div style='color:"+color+";font-size:11px;font-weight:700'>Vence: "+fecDisp(i.egreso)+(diasRestantes>=0?" ("+diasRestantes+" dias)":"")+"</div></div>";
+      o+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
+      if(i.tel) o+="<a class='wa' href='https://wa.me/"+i.tel+"?text="+encodeURIComponent(waMsg)+"' target='_blank' style='font-size:10px'>WA</a>";
+      o+="</div></div></div>";
+    });
+  }
+
+  o+="<div style='display:flex;justify-content:flex-end;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cerrar</button></div>";
+  openModal("Renovaciones de contratos",o);
+}
+
+
 function rAlertas(){
   var h=new Date(),dia=h.getDate(),m=mes();
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
@@ -1713,7 +1866,7 @@ function rAlertas(){
   var o="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px'>";
   o+="<div><h2 style='font-size:20px;font-weight:800'>Alertas</h2>";
   o+="<p style='color:#64748B;font-size:11px'>Dia "+dia+" — "+pendientes+" pendientes de "+total+" total</p></div>";
-  o+="<div style='display:flex;gap:6px'><button class='btn bp bsm' onclick='openEv()'>+ Recordatorio</button><button class='btn bg bsm' onclick='limpiarOk()'>Limpiar OK</button></div></div>";
+  o+="<div style='display:flex;gap:6px;flex-wrap:wrap'><button class='btn bp bsm' onclick='openEv()'>+ Recordatorio</button><button class='btn bsm' style='background:#06B6D4;color:#000' onclick='verRenovacionesMes()'>Renovaciones</button><button class='btn bg bsm' onclick='limpiarOk()'>Limpiar OK</button></div></div>";
   
   // Render each group
   var grupos_config=[
