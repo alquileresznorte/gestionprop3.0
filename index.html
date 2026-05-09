@@ -3339,7 +3339,7 @@ function rCtaCte(){
       o+="<td style='color:#94A3B8;font-size:11px'>$"+Number(inv.tc||0).toLocaleString()+"</td>";
       o+="<td style='color:#06B6D4;font-weight:700'>U$S "+usdCompra.toLocaleString()+"</td>";
       o+="<td>"+(vendido?"<span style='color:#64748B;font-size:11px'>Vendido "+fecDisp(inv.fecha_venta||"")+"<br>"+ganancia+"</span>":"<span style='color:#10B981;font-size:11px'>Activo</span>")+"</td>";
-      o+="<td>"+(vendido?"":"<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' onclick='openVenderInversion(""+inv._key+"")'>Vender</button>")+"</td>";
+      o+="<td>"+(vendido?"":"<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' onclick='openVenderInversion(\""+inv._key+"\")'>Vender</button>")+"</td>";
       o+="</tr>";
     });
     o+="</tbody></table>";
