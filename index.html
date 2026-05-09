@@ -205,7 +205,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -401,11 +401,55 @@ function rAcuerdos(){
   var iqA=oA(DATA.iq),udl=uds();
   var act=iqA.filter(function(i){return i.estado==="activo";}).length;
   var lib=udl.filter(function(u){return !iqA.filter(function(i){return i.unidad===u&&i.estado==="activo";}).length;}).length;
-  G("main").innerHTML="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px'><div><h2 style='font-size:20px;font-weight:800'>Acuerdos Vigentes</h2><p style='color:#64748B;font-size:11px'>"+act+" activos - "+lib+" libres</p></div><div style='display:flex;gap:5px'><button class='btn bg bsm' onclick='_vD=!_vD;fAc()'>Deptos</button><button class='btn bp bsm' onclick='openNA()'>+ Nuevo</button><button class='btn bpu bsm' onclick='openAjusteCuat()'>Ajuste Alquileres</button></div></div><div style='display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap'><input class='inp' id='iq-q' placeholder='Buscar nombre, unidad, DNI, ID...' style='flex:1;min-width:160px' oninput='fAc()'/><select class='inp' id='iq-e' style='max-width:100px' onchange='fAc()'><option value=''>Todos</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div><div id='iq-list'></div>";
+  G("main").innerHTML="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px'><div><h2 style='font-size:20px;font-weight:800'>Acuerdos Vigentes</h2><p style='color:#64748B;font-size:11px'>"+act+" activos - "+lib+" libres</p></div><div style='display:flex;gap:5px'><button class='btn bg bsm' onclick='_vD=!_vD;fAc()'>Deptos</button><button class='btn bp bsm' onclick='openNA()'>+ Nuevo</button><button class='btn bsm' style='background:#F59E0B;color:#000' onclick='openReserva()'>+ Reserva</button><button class='btn bpu bsm' onclick='openAjusteCuat()'>Ajuste Alquileres</button></div></div><div style='display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap'><input class='inp' id='iq-q' placeholder='Buscar nombre, unidad, DNI, ID...' style='flex:1;min-width:160px' oninput='fAc()'/><select class='inp' id='iq-e' style='max-width:100px' onchange='fAc()'><option value=''>Todos</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div><div id='iq-list'></div>";
   fAc();
+  // Handler clicks reservas
+  G("main").addEventListener("click",function(e){
+    var b=e.target.closest("[data-editres],[data-convertres],[data-cancelres]");
+    if(!b)return;
+    var key=null;
+    if(b.dataset.editres) key=kget(parseInt(b.dataset.editres));
+    else if(b.dataset.convertres) key=kget(parseInt(b.dataset.convertres));
+    else if(b.dataset.cancelres) key=kget(parseInt(b.dataset.cancelres));
+    if(!key)return;
+    if(b.dataset.editres) openEditReserva(key);
+    else if(b.dataset.convertres) convertirReserva(key);
+    else if(b.dataset.cancelres) liberarReserva(key);
+  },true);
 }
 function fAc(){
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  // Mostrar reservas activas
+  var resActivas=oA(DATA.res||{}).filter(function(r){return r.estado==="reservado";});
+  var resEl=G("iq-reservas");
+  if(!resEl){
+    var resDiv=document.createElement("div");
+    resDiv.id="iq-reservas";
+    var listEl=G("iq-list");
+    if(listEl&&listEl.parentNode) listEl.parentNode.insertBefore(resDiv,listEl);
+    resEl=resDiv;
+  }
+  if(resActivas.length&&resEl){
+    var resHtml="<div style='margin-bottom:12px'><div style='font-size:11px;font-weight:700;color:#F59E0B;margin-bottom:6px'>⏳ DEPTOS RESERVADOS ("+resActivas.length+")</div>";
+    resActivas.forEach(function(r){
+      var ki=kpush(r._key);
+      resHtml+="<div style='background:#1E293B;border:1px solid #F59E0B44;border-left:3px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px'>";
+      resHtml+="<div><div style='font-weight:700;font-size:13px'>"+esc(r.unidad)+" — "+esc(r.nombre)+"</div>";
+      resHtml+="<div style='color:#64748B;font-size:11px'>"+esc(r.tel||"")+" · Seña: "+fmt(r.senia||0)+" ("+esc(r.cta_senia||"Efectivo")+") · "+fecDisp(r.fecha||"")+"</div>";
+      resHtml+="<div style='color:#94A3B8;font-size:10px'>Alq: "+fmt(r.alquiler||0)+" · Dep: "+fmt(r.deposito||0)+" · Gas: "+fmt(r.gastos||0)+"</div></div>";
+      resHtml+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
+      if(USER.r==="admin"){
+        resHtml+="<button class='btn bsm' style='background:#F59E0B;color:#000;font-size:10px' data-editres='"+ki+"'>Editar</button>";
+        resHtml+="<button class='btn bp bsm' style='font-size:10px' data-convertres='"+ki+"'>Convertir a contrato</button>";
+        resHtml+="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-cancelres='"+ki+"'>Liberar depto</button>";
+      }
+      resHtml+="</div></div>";
+    });
+    resHtml+="</div>";
+    resEl.innerHTML=resHtml;
+  } else if(resEl){
+    resEl.innerHTML="";
+  }
   var q=(G("iq-q")||{value:""}).value.toLowerCase();
   var ed=(G("iq-e")||{value:""}).value;
   var el=G("iq-list");if(!el)return;
@@ -689,8 +733,140 @@ function saveRecargo(ckey){
 }
 
 
+// ── RESERVAS ──────────────────────────────────────────────────────────────────
+
+function openReserva(){
+  var udl=uds().filter(function(u){
+    var ocupado=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
+    var reservado=oA(DATA.res||{}).filter(function(r){return r.unidad===u&&r.estado==="reservado";}).length>0;
+    return !ocupado&&!reservado;
+  });
+  if(!udl.length){alert("No hay deptos disponibles");return;}
+  var o="<p style='color:#94A3B8;font-size:11px;margin-bottom:12px'>Registro rapido de reserva. Podes completar el contrato despues.</p>";
+  o+="<div class='g2'>";
+  o+="<div class='fld'><label class='lbl'>Depto *</label><select class='inp' id='rs-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
+  o+=fld("rs-f","Fecha reserva",hoy(),"date");
+  o+=fld("rs-nom","Nombre inquilino *","");
+  o+=fld("rs-tel","Telefono","","tel");
+  o+=fld("rs-alq","Alquiler mensual $","","number");
+  o+=fld("rs-dep","Deposito $","","number");
+  o+=fld("rs-gas","Gastos admin/mant $","","number");
+  o+="</div>";
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin:8px 0'>";
+  o+="<div style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:8px'>Seña recibida</div>";
+  o+="<div class='g2'>"+fld("rs-senia","Monto seña $","","number")+fld("rs-fi","Fecha ingreso previsto",hoy(),"date")+"</div>";
+  o+=sld("rs-cta","Cuenta de pago",CTAS,"Efectivo");
+  o+="</div>";
+  o+=fld("rs-obs","Observaciones (opcional)","");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bsm' style='background:#F59E0B;color:#000' onclick='saveReserva()'>Registrar reserva</button></div>";
+  openModal("+ Nueva Reserva",o);
+}
+
+function saveReserva(){
+  var u=G("rs-u").value;
+  var nom=G("rs-nom").value.trim();
+  var tel=(G("rs-tel")||{value:""}).value;
+  var alq=Number((G("rs-alq")||{value:0}).value||0);
+  var dep=Number((G("rs-dep")||{value:0}).value||0);
+  var gas=Number((G("rs-gas")||{value:0}).value||0);
+  var senia=Number((G("rs-senia")||{value:0}).value||0);
+  var cta=(G("rs-cta")||{value:"Efectivo"}).value;
+  var fecha=G("rs-f").value;
+  var fi=(G("rs-fi")||{value:hoy()}).value;
+  var obs=(G("rs-obs")||{value:""}).value;
+
+  if(!u){alert("Selecciona un depto");return;}
+  if(!nom){alert("El nombre es obligatorio");return;}
+
+  var id_res="RES-"+u+"-"+Date.now().toString().slice(-6);
+
+  // Guardar reserva
+  DB.ref("res").push({
+    id_res:id_res,unidad:u,nombre:nom,tel:tel,
+    alquiler:alq,deposito:dep,gastos:gas,
+    senia:senia,cta_senia:cta,
+    fecha:fecha,fecha_ingreso:fi,
+    obs:obs,estado:"reservado",
+    fecha_reg:hoy()
+  });
+
+  // Si hay seña, registrar en caja
+  if(senia>0){
+    var esSocio=CTAS_SOCIOS.indexOf(cta)>=0;
+    if(esSocio){
+      var socioMap={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
+        "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+      DB.ref("movs").push({fecha:fecha,mes:fecha.slice(0,7),tipo:"aporte",
+        cuenta:socioMap[cta]||"Cuenta Loli",cuenta_caja:cta,monto:senia,
+        nota:"Seña reserva "+u+" - "+nom});
+    } else {
+      DB.ref("aj").push({fecha:fecha,tipo:"ingreso",sub:"Seña reserva",
+        cuenta:cta,concepto:"Seña reserva "+u+" - "+nom,monto:senia});
+    }
+  }
+
+  closeModal();
+  alert("Reserva registrada! ID: "+id_res+". El depto "+u+" queda como RESERVADO.");
+  setTimeout(function(){rAcuerdos();},400);
+}
+
+function openEditReserva(key){
+  var r=(DATA.res||{})[key];if(!r)return;
+  var o="<div class='g2'>";
+  o+=fld("re-nom","Nombre",r.nombre||"");
+  o+=fld("re-tel","Telefono",r.tel||"","tel");
+  o+=fld("re-alq","Alquiler $",r.alquiler||"","number");
+  o+=fld("re-dep","Deposito $",r.deposito||"","number");
+  o+=fld("re-gas","Gastos $",r.gastos||"","number");
+  o+=fld("re-fi","Fecha ingreso",r.fecha_ingreso||hoy(),"date");
+  o+=fld("re-senia","Seña $",r.senia||"","number");
+  o+=fld("re-obs","Observaciones",r.obs||"");
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveEditReserva(this.dataset.rkey)' data-rkey='"+key+"'>Guardar</button></div>";
+  openModal("Editar Reserva — "+esc(r.unidad),o);
+}
+
+function saveEditReserva(key){
+  var ups={
+    nombre:G("re-nom").value.trim(),
+    tel:(G("re-tel")||{value:""}).value,
+    alquiler:Number((G("re-alq")||{value:0}).value||0),
+    deposito:Number((G("re-dep")||{value:0}).value||0),
+    gastos:Number((G("re-gas")||{value:0}).value||0),
+    fecha_ingreso:(G("re-fi")||{value:hoy()}).value,
+    senia:Number((G("re-senia")||{value:0}).value||0),
+    obs:(G("re-obs")||{value:""}).value
+  };
+  if(!ups.nombre){alert("El nombre es obligatorio");return;}
+  DB.ref("res/"+key).update(ups);
+  closeModal();
+  setTimeout(function(){rAcuerdos();},400);
+}
+
+function liberarReserva(key){
+  var r=(DATA.res||{})[key];if(!r)return;
+  if(!confirm("Liberar el depto "+r.unidad+"? La seña queda en caja. Esta accion no se puede deshacer."))return;
+  DB.ref("res/"+key).update({estado:"cancelado",fecha_cancelacion:hoy()});
+  setTimeout(function(){rAcuerdos();},400);
+}
+
+function convertirReserva(key){
+  var r=(DATA.res||{})[key];if(!r)return;
+  // Pre-cargar datos de la reserva en openNA
+  window._resConvert=r;
+  window._resConvertKey=key;
+  openNA();
+}
+
+
 function openNA(){
-  var udl=uds().filter(function(u){return !oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length;});
+  var r=window._resConvert||null;
+  // Incluir depto reservado si viene de conversion
+  var udl=uds().filter(function(u){
+    var activo=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
+    var esResConvert=r&&r.unidad===u;
+    return !activo||esResConvert;
+  });
   var mesActual=mes();
   var mesAnterior=(function(){var d=new Date();d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);})();
 
@@ -738,12 +914,23 @@ function openNA(){
   o+="</div>";
   o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:4px'>Completa los montos para ver el resumen</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNA()'>Crear Acuerdo</button></div>";
-  openModal("Nuevo Acuerdo",o,true);
+  openModal("Nuevo Acuerdo"+(r?" (desde reserva "+r.unidad+")":""),o,true);
   setTimeout(function(){
     ["na-alq","na-dep","na-gs","na-desc-gs","na-pc","na-dep-info","na-gs-info","na-deuda-monto"].forEach(function(id){
       var el=G(id);if(el)el.oninput=actualizarResumenNA;
     });
-  },100);
+    // Pre-llenar con datos de la reserva
+    if(r){
+      if(G("na-u"))G("na-u").value=r.unidad||"";
+      if(G("na-n"))G("na-n").value=r.nombre||"";
+      if(G("na-t"))G("na-t").value=r.tel||"";
+      if(G("na-alq"))G("na-alq").value=r.alquiler||"";
+      if(G("na-dep"))G("na-dep").value=r.deposito||"";
+      if(G("na-gs"))G("na-gs").value=r.gastos||"";
+      if(G("na-ing"))G("na-ing").value=r.fecha_ingreso||hoy();
+      actualizarResumenNA();
+    }
+  },150);
 }
 
 function toggleMonedaNA(){
@@ -899,6 +1086,13 @@ function saveNA(){
     if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
 
+    // Marcar reserva como convertida si corresponde
+    if(window._resConvertKey){
+      DB.ref("res/"+window._resConvertKey).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
+      window._resConvert=null;
+      window._resConvertKey=null;
+    }
+
     closeModal();
     var msg="Acuerdo #"+id+" creado. ";
     if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
@@ -906,6 +1100,7 @@ function saveNA(){
     if(gsNeto>0)msg+="Gastos "+fmt(gsNeto)+(cuotasGs>1?" en "+cuotasGs+" cuotas":"")+(desc>0?" (desc. "+fmt(desc)+")":"")+". ";
     if(pc>0)msg+="Pago a cuenta "+fmt(pc)+" aplicado.";
     alert(msg);
+    setTimeout(rAcuerdos,400);
   }
 }
 
