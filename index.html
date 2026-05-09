@@ -205,7 +205,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -653,12 +653,14 @@ function openRecargos(ckey){
   var c=DATA.cob[ckey];if(!c)return;
   var ki=kpush(ckey);
   var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0),saldo=tot-pg;
-  var rec10=Math.round(c.monto_total*0.10);
+  var cr=getCfgRec();
+  var recTardio=Math.round(c.monto_total*(dia>=20?cr.rec_d20:dia>=10?cr.rec_d10:cr.rec_d5)/100);
+  var recDigital=Math.round(c.monto_total*cr.rec_digital/100);
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>"+c.unidad+" - "+esc(c.inq)+" - Saldo: <b style='color:#EF4444'>"+fmt(saldo)+"</b></p>";
   o+="<div class='card' style='margin-bottom:8px'>";
   o+="<div style='font-weight:700;margin-bottom:8px'>Aplicar recargo por:</div>";
-  o+="<label style='display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'><input type='checkbox' id='rc-tardio'/> <span>Pago fuera de termino (+10%: <b>"+fmt(rec10)+"</b>)</span></label>";
-  o+="<label style='display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'><input type='checkbox' id='rc-digital'/> <span>Pago con medio electronico (+10%: <b>"+fmt(rec10)+"</b>)</span></label>";
+  o+="<label style='display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'><input type='checkbox' id='rc-tardio'/> <span>Pago fuera de termino (+"+(dia>=20?cr.rec_d20:dia>=10?cr.rec_d10:cr.rec_d5)+"%: <b>"+fmt(recTardio)+"</b>)</span></label>";
+  o+="<label style='display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'><input type='checkbox' id='rc-digital'/> <span>Pago con medio electronico (+"+cr.rec_digital+"%: <b>"+fmt(recDigital)+"</b>)</span></label>";
   o+="<div style='display:flex;gap:8px;margin-top:8px'><div style='flex:1'><div class='lbl'>O ingresar monto fijo</div><input class='inp' type='number' id='rc-monto' placeholder='0' style='padding:5px 8px'/></div></div>";
   o+="</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bx bsm' data-rckey='"+ki+"'>Aplicar Recargo</button></div>";
@@ -672,8 +674,9 @@ function saveRecargo(ckey){
   var digital=G("rc-digital").checked;
   var manual=Number(G("rc-monto").value||0);
   var monto=manual>0?manual:0;
-  if(tardio)monto+=Math.round(c.monto_total*0.10);
-  if(digital)monto+=Math.round(c.monto_total*0.10);
+  var cr3=getCfgRec();var diaH=new Date().getDate();
+  if(tardio)monto+=Math.round(c.monto_total*(diaH>=20?cr3.rec_d20:diaH>=10?cr3.rec_d10:cr3.rec_d5)/100);
+  if(digital)monto+=Math.round(c.monto_total*cr3.rec_digital/100);
   if(!monto){alert("Selecciona un recargo o ingresa un monto");return;}
   var ups={};
   var ts=Date.now();
@@ -1337,6 +1340,21 @@ function saveExtraFactura(ckey){
 function revCosto(ckey){if(!confirm("Revertir pago? Se borraran todos los pagos registrados."))return;DB.ref("cst/"+ckey).update({pagado:false,fecha_pago:null});DB.ref("cst/"+ckey+"/pagos").remove();setTimeout(rCostos,400);}
 
 // ALERTAS
+// Helper: obtener config de recargos con defaults
+function getCfgRec(){
+  var d=DATA.cfg_rec||{};
+  return {
+    desc_pronto: Number(d.desc_pronto||5),      // % descuento pronto pago (hasta dia 5)
+    rec_digital: Number(d.rec_digital||10),      // % recargo medio electronico
+    rec_d5:  Number(d.rec_d5||0),               // % recargo dia 5-9
+    rec_d10: Number(d.rec_d10||10),              // % recargo dia 10-19
+    rec_d20: Number(d.rec_d20||15),              // % recargo dia 20+
+    dias_mora: Number(d.dias_mora||10),          // dia inicio mora
+    dias_aviso_costo: Number(d.dias_aviso_costo||3) // dias antes del vencimiento para alertar
+  };
+}
+
+
 function rAlertas(){
   var h=new Date(),dia=h.getDate(),m=mes();
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
@@ -1346,29 +1364,36 @@ function rAlertas(){
   // Load sent status from localStorage
   var sent=JSON.parse(localStorage.getItem("gp_als_sent_"+m)||"{}");
   
-  var grupos={mora:[],pronto:[],ajuste:[],renovacion:[],agenda:[],morosos:[]};
+  var grupos={mora:[],pronto:[],ajuste:[],renovacion:[],agenda:[],morosos:[],servicios:[]};
   
+  var cr=getCfgRec();
   iqA.forEach(function(inq){
     var c=cobA.filter(function(x){return x.unidad===inq.unidad;})[0];
-    var pg=c?pT(c):0,ok=pg>=(inq.alquiler),nom=inq.nombre.split(",")[0].trim();
-    var desc=Math.round(inq.alquiler*0.9);
+    var pg=c?pT(c):0,alq=inq.alquiler,ok=pg>=alq,nom=inq.nombre.split(",")[0].trim();
+    var descPct=cr.desc_pronto;
+    var descMonto=Math.round(alq*(1-descPct/100));
     var key=inq.unidad;
-    
+
     // Pronto pago dias 1-4
     if(dia>=1&&dia<=4&&!ok){
       grupos.pronto.push({key:key+"_pronto",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
-        msg:"Hola "+nom+"! Recordatorio alquiler "+m.replace("-","/")+". Con descuento pronto pago (hasta dia 5): "+fmt(desc)+". Sin descuento: "+fmt(inq.alquiler)+". Adm: 1555787641"});
+        msg:"Hola "+nom+"! Recordatorio alquiler "+m.replace("-","/")+". Con descuento pronto pago ("+descPct+"%, hasta dia 5): "+fmt(descMonto)+". Sin descuento: "+fmt(alq)+". Adm: 1555787641"});
+    }
+    // Pago tardio dia 5-9
+    if(dia>=5&&dia<cr.dias_mora&&!ok){
+      var recPct=cr.rec_d5;
+      var recMonto=recPct>0?Math.round(alq*(1+recPct/100)):alq;
+      var recTxt=recPct>0?" (recargo "+recPct+"%: "+fmt(recMonto)+")":"";
+      grupos.morosos.push({key:key+"_tard",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
+        msg:"Hola "+nom+"! Tu alquiler de "+m.replace("-","/")+": "+fmt(alq)+" vencio el dia 5"+recTxt+". Adm: 1555787641"});
     }
     // Mora dia 10+
-    if(dia>=10&&!ok){
-      var atraso=dia-10;
+    if(dia>=cr.dias_mora&&!ok){
+      var atraso=dia-cr.dias_mora;
+      var recPct2=dia>=20?cr.rec_d20:cr.rec_d10;
+      var recMonto2=Math.round(alq*(1+recPct2/100));
       grupos.mora.push({key:key+"_mora",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
-        msg:"Hola "+nom+". Tu alquiler de "+m.replace("-","/")+" esta en mora ("+atraso+" dia"+(atraso!==1?"s":"")+" de atraso). Se aplican punitorios segun tasa BCRA. Adm: 1555787641"});
-    }
-    // Morosos (dia 5+ sin pagar)
-    if(dia>=5&&dia<10&&!ok){
-      grupos.morosos.push({key:key+"_tard",u:inq.unidad,nom:inq.nombre,tel:inq.tel,
-        msg:"Hola "+nom+"! Tu alquiler de "+m.replace("-","/")+": "+fmt(inq.alquiler)+" vencio el dia 5. Adm: 1555787641"});
+        msg:"Hola "+nom+". Tu alquiler de "+m.replace("-","/")+" esta en mora ("+atraso+" dia"+(atraso!==1?"s":"")+" de atraso). Total con recargo "+recPct2+"%: "+fmt(recMonto2)+". Adm: 1555787641"});
     }
     // Renovacion proximos 30 dias
     if(inq.egreso){
@@ -1391,6 +1416,36 @@ function rAlertas(){
     }
   });
   
+  // Alertas de servicios/costos proximos a vencer
+  var cr2=getCfgRec();
+  var diasAviso=cr2.dias_aviso_costo;
+  var hoyDate=new Date(h.getFullYear(),h.getMonth(),h.getDate());
+  oA(DATA.cst).forEach(function(c){
+    if(c.pagado||!c.fec_venc) return;
+    var venc=new Date(c.fec_venc+"T00:00:00");
+    var diffDias=Math.round((venc-hoyDate)/86400000);
+    if(diffDias>=0&&diffDias<=diasAviso){
+      var label=diffDias===0?"HOY":diffDias===1?"manana":"en "+diffDias+" dias";
+      grupos.servicios.push({
+        key:"svc_"+c._key,
+        u:c.ed||"General",
+        nom:esc(c.desc||""),
+        tel:"",
+        msg:"Servicio a vencer "+label+": "+esc(c.desc||"")+" — "+fmt(c.monto||0)+" (vence "+fecDisp(c.fec_venc)+")"
+      });
+    }
+    // Vencido sin pagar
+    if(diffDias<0){
+      grupos.servicios.push({
+        key:"svc_venc_"+c._key,
+        u:c.ed||"General",
+        nom:esc(c.desc||"")+" ⚠ VENCIDO",
+        tel:"",
+        msg:"Servicio VENCIDO: "+esc(c.desc||"")+" — "+fmt(c.monto||0)+" (vencio "+fecDisp(c.fec_venc)+")"
+      });
+    }
+  });
+
   // Agenda events for today and next 7 days
   var hoy7=new Date(h); hoy7.setDate(hoy7.getDate()+7);
   var hoyStr=hoy();
@@ -1420,7 +1475,8 @@ function rAlertas(){
     {id:"pronto",label:"Pronto pago (dia 1-4)",color:"#10B981"},
     {id:"ajuste",label:"Ajuste cuatrimestral",color:"#8B5CF6"},
     {id:"renovacion",label:"Renovacion de contrato",color:"#06B6D4"},
-    {id:"agenda",label:"Agenda proximos 7 dias",color:"#3B82F6"}
+    {id:"agenda",label:"Agenda proximos 7 dias",color:"#3B82F6"},
+    {id:"servicios",label:"Servicios/costos por vencer",color:"#F59E0B"}
   ];
   
   var hayAlgo=false;
@@ -2219,7 +2275,7 @@ var _cfgTab = "propiedades"; // propiedades | costos | ingresos
 function rConfig(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
 
-  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"],["limpieza","🗑 Limpieza"]];
+  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"],["recargos","% Recargos"],["limpieza","🗑 Limpieza"]];
   var o = "<h2 style='font-size:20px;font-weight:800;margin-bottom:12px'>Configuracion</h2>";
   o += "<div style='display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap'>";
   tabs.forEach(function(t){
@@ -2238,6 +2294,7 @@ function rConfig(){
   else if(_cfgTab==="costos") renderCfgCostos();
   else if(_cfgTab==="ingresos") renderCfgIngresos();
   else if(_cfgTab==="categorias") renderCfgCats();
+  else if(_cfgTab==="recargos") renderCfgRecargos();
   else if(_cfgTab==="limpieza") renderCfgLimpieza();
   else if(_cfgTab==="usuarios") renderCfgUsuarios();
 }
@@ -3246,6 +3303,52 @@ function enviarCajaWA(){
   var msg=lines.join("\n");
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
 }
+
+function renderCfgRecargos(){
+  var el=G("cfg-body");if(!el)return;
+  var cr=getCfgRec();
+  var o="<div class='card'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:4px'>Descuentos y Recargos</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:14px'>Estos valores se usan en alertas, mensajes WA y en el formulario de recargos de cobros.</p>";
+
+  o+="<div class='g2' style='gap:10px'>";
+  o+="<div class='fld'><label class='lbl'>% Descuento pronto pago (hasta dia 5)</label><input class='inp' type='number' id='cr-desc' value='"+cr.desc_pronto+"' min='0' max='50'/></div>";
+  o+="<div class='fld'><label class='lbl'>% Recargo medio electronico</label><input class='inp' type='number' id='cr-dig' value='"+cr.rec_digital+"' min='0' max='50'/></div>";
+  o+="</div>";
+
+  o+="<p style='color:#F59E0B;font-size:11px;font-weight:700;margin:10px 0 6px'>Recargos por mora (sobre el alquiler base)</p>";
+  o+="<div class='g2' style='gap:10px'>";
+  o+="<div class='fld'><label class='lbl'>% Recargo dia 5 al 9</label><input class='inp' type='number' id='cr-d5' value='"+cr.rec_d5+"' min='0' max='100'/></div>";
+  o+="<div class='fld'><label class='lbl'>% Recargo dia 10 al 19</label><input class='inp' type='number' id='cr-d10' value='"+cr.rec_d10+"' min='0' max='100'/></div>";
+  o+="<div class='fld'><label class='lbl'>% Recargo dia 20+</label><input class='inp' type='number' id='cr-d20' value='"+cr.rec_d20+"' min='0' max='100'/></div>";
+  o+="<div class='fld'><label class='lbl'>Dia inicio mora</label><input class='inp' type='number' id='cr-dmora' value='"+cr.dias_mora+"' min='5' max='20'/></div>";
+  o+="</div>";
+
+  o+="<p style='color:#06B6D4;font-size:11px;font-weight:700;margin:10px 0 6px'>Alertas de servicios</p>";
+  o+="<div class='fld' style='max-width:220px'><label class='lbl'>Dias de aviso antes del vencimiento</label><input class='inp' type='number' id='cr-dav' value='"+cr.dias_aviso_costo+"' min='1' max='15'/></div>";
+
+  o+="<div style='margin-top:14px'><button class='btn bok bsm' onclick='saveCfgRecargos()'>Guardar cambios</button></div>";
+  o+="</div>";
+  el.innerHTML=o;
+}
+
+function saveCfgRecargos(){
+  var ups={
+    desc_pronto: Number(G("cr-desc").value||5),
+    rec_digital: Number(G("cr-dig").value||10),
+    rec_d5:      Number(G("cr-d5").value||0),
+    rec_d10:     Number(G("cr-d10").value||10),
+    rec_d20:     Number(G("cr-d20").value||15),
+    dias_mora:   Number(G("cr-dora")||{value:10}).value||10,
+    dias_aviso_costo: Number(G("cr-dav").value||3)
+  };
+  ups.dias_mora=Number((G('cr-dmora')||{value:10}).value||10);
+  DB.ref("cfg_rec").update(ups,function(){
+    alert("Recargos guardados correctamente.");
+    renderCfgRecargos();
+  });
+}
+
 
 function renderCfgLimpieza(){
   var el=G("cfg-body");if(!el)return;
