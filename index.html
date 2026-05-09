@@ -824,15 +824,18 @@ function saveNA(){
       fecha_reg:hoy(),tipo_carga:"vigente"
     });
 
-    // Check if May cobro already exists for this unit (from genCob)
+    // Check if cobro already exists for this unit this month
     var cobExistente=oA(DATA.cob).filter(function(c){return c.unidad===u&&c.mes===mes();});
+    var montoCobro=moneda==="USD"?alqUSD:alq;
     if(cobExistente.length>0){
-      // Update existing cobro with correct id_ac and inq name
-      DB.ref("cob/"+cobExistente[0]._key).update({id_ac:id,inq:n,monto_total:alq});
-    } else if(alq>0){
-      // Create new cobro for current month
-      DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mes(),
-        monto_total:alq,sal_ant:0,estado:"pendiente",pagos:{},concepto:"Alquiler"});
+      var upsCob={id_ac:id,inq:n,monto_total:montoCobro};
+      if(moneda==="USD") upsCob.moneda="USD";
+      DB.ref("cob/"+cobExistente[0]._key).update(upsCob);
+    } else if(montoCobro>0){
+      var nuevoCob={id_ac:id,unidad:u,inq:n,mes:mes(),
+        monto_total:montoCobro,sal_ant:0,estado:"pendiente",pagos:{},concepto:"Alquiler"};
+      if(moneda==="USD") nuevoCob.moneda="USD";
+      DB.ref("cob").push(nuevoCob);
     }
     // Generate debt from previous month if any
     if(deudaMes&&deudaMonto>0){
