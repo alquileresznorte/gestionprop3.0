@@ -1223,7 +1223,13 @@ function rCostos(){
     row+="<div style='color:#64748B;font-size:10px'>"+(c.pv?c.pv+" - ":"")+(c.cta_num?"Cta:"+c.cta_num+" - ":"")+(c.nro_fact?"Fact:"+c.nro_fact+" - ":"")+(c.fec_venc?"Vence:"+c.fec_venc:c.dv?"Vence dia "+c.dv:"")+"</div></div>";
     row+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:4px'><div style='color:"+(Number(c.monto||0)>0?"#F87171":"#64748B")+";font-weight:700;font-size:14px'>"+(Number(c.monto||0)>0?fmt(c.monto):"--")+"</div>";
     if(!c.pagado)row+="<button class='btn bp bsm' data-ec='"+ki+"'>Cargar</button>";
-    if(c.pagado&&esA)row+="<button class='btn bg bsm' data-rev='"+ki+"'>Revertir</button>";
+    if(c.pagado){
+      // Boton ver detalle de pagos
+      if(c.pagos&&Object.keys(c.pagos).length>0){
+        row+="<button class='btn bsm' style='background:#0F172A;border:1px solid #334155;color:#94A3B8;font-size:10px' data-vpagos='"+ki+"'>Ver pagos</button>";
+      }
+      if(esA) row+="<button class='btn bg bsm' data-rev='"+ki+"'>Revertir</button>";
+    }
     // Allow adding another invoice for same cost (gas double bill, multiple combustible, etc)
     row+="<button class='btn bpu bsm' data-extra='"+ki+"' title='Agregar otra factura del mismo concepto'>+ Factura</button>";
     row+="</div></div>";
@@ -1263,6 +1269,7 @@ function rCostos(){
     if(b.dataset.ec){_editC=kget(parseInt(b.dataset.ec));rCostos();}
     else if(b.dataset.sc)saveCosto(kget(parseInt(b.dataset.sc)));
     else if(b.dataset.rev)revCosto(kget(parseInt(b.dataset.rev)));
+    else if(b.dataset.vpagos)verPagosCosto(kget(parseInt(b.dataset.vpagos)));
     else if(b.dataset.extra)addExtraFactura(kget(parseInt(b.dataset.extra)));
   };
 }
@@ -1334,6 +1341,32 @@ function saveExtraFactura(ckey){
   closeModal();
   alert("Factura adicional agregada: "+fmt(m));
   setTimeout(rCostos,400);
+}
+
+
+function verPagosCosto(ckey){
+  var c=DATA.cst[ckey];if(!c)return;
+  var pagos=c.pagos?Object.values(c.pagos).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");}):[];
+  var total=pagos.reduce(function(s,p){return s+Number(p.monto||0);},0);
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'><b>"+esc(c.desc||"")+"</b> — Total: "+fmt(c.monto||0)+"</p>";
+  if(pagos.length){
+    o+="<table class='tbl'><thead><tr><th>Fecha</th><th>Monto</th><th>Cuenta</th></tr></thead><tbody>";
+    pagos.forEach(function(p){
+      o+="<tr><td style='color:#64748B;font-size:11px'>"+fecDisp(p.fecha||"")+"</td>";
+      o+="<td style='color:#F87171;font-weight:700'>"+fmt(p.monto||0)+"</td>";
+      o+="<td style='color:#94A3B8;font-size:11px'>"+esc(p.cuenta||"")+"</td></tr>";
+    });
+    o+="<tr style='border-top:1px solid #334155'><td style='font-weight:700'>Total pagado</td>";
+    o+="<td style='color:"+(total>=Number(c.monto||0)?"#10B981":"#F59E0B")+";font-weight:700'>"+fmt(total)+"</td><td></td></tr>";
+    o+="</tbody></table>";
+    if(total<Number(c.monto||0)){
+      o+="<p style='color:#F59E0B;font-size:11px;margin-top:8px'>Saldo pendiente: "+fmt(Number(c.monto||0)-total)+"</p>";
+    }
+  } else {
+    o+="<p style='color:#64748B'>Sin pagos individuales registrados.</p>";
+  }
+  o+="<div style='display:flex;justify-content:flex-end;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cerrar</button></div>";
+  openModal("Detalle de pagos",o);
 }
 
 
@@ -1694,7 +1727,6 @@ function rCaja(){
   o+="<div style='display:flex;gap:5px;flex-wrap:wrap'>";
   o+="<button class='btn bsm "+(_cajaV==="dia"?"bp":"bg")+"' data-cv='dia'>Diario</button>";
   o+="<button class='btn bsm "+(_cajaV==="mes"?"bp":"bg")+"' data-cv='mes'>Mensual</button>";
-  o+="<button class='btn bsm bpu' onclick='openAj()'>+ Ajuste</button>";
   o+="</div></div>";
 
   if(_cajaV==="dia"){
@@ -1783,8 +1815,7 @@ function rCaja(){
       o+="<span style='color:#10B981;font-size:12px'>✅ Cerrada por "+esc(subcDia.cerradoPor)+"</span>";
     } else {
       o+="<span style='color:#F59E0B;font-size:12px'>Abierta</span>";
-      o+="<button class='btn bp bsm' onclick='openGastoCaja()'>+ Gasto</button>";
-      o+="<button class='btn bpu bsm' onclick='openAj()'>+ Ajuste</button>";
+      o+="<button class='btn bp bsm' onclick='openGastoAjuste()'>+ Gasto / Ajuste</button>";
       o+="<button class='btn bpu bsm' onclick='openMov()'>+ Aporte/Retiro</button>";
       o+="<button class='btn bsm' style='background:#06B6D4;color:#fff' onclick='openAhorro()'>+ Compra USD</button>";
     }
@@ -3173,6 +3204,118 @@ function deletePago(ckey,pagoKey){
   closeModal();
   alert("Pago eliminado.");
   setTimeout(rCob,300);
+}
+
+
+function openGastoAjuste(){
+  var subcHoy=oA(DATA.subc).filter(function(s){return s.fecha===_cajaF;});
+  if(subcHoy.length>0){
+    if(!confirm("La caja de "+_cajaF+" ya fue cerrada. ¿Registrar de todas formas?"))return;
+  }
+  var cats=Object.keys(CATC);
+  var o="<div style='display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid #334155'>";
+  o+="<button class='btn bsm' id='tab-gasto' style='border-radius:8px 8px 0 0;background:#1E40AF;color:#fff;margin-right:4px' onclick='switchGastoTab(this.dataset.t)' data-t='gasto'>Gasto / Costo</button>";
+  o+="<button class='btn bsm' id='tab-ajuste' style='border-radius:8px 8px 0 0;background:#334155;color:#94A3B8' onclick='switchGastoTab(this.dataset.t)' data-t='ajuste'>Ajuste manual</button>";
+  o+="</div>";
+
+  // Tab Gasto
+  o+="<div id='tab-gasto-body'>";
+  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Gasto puntual del dia "+_cajaF+". Si la cuenta es de socio va a Cta Socios.</p>";
+  o+="<div class='g2'>";
+  o+=fld("gc-desc","Descripcion *","");
+  o+=fld("gc-monto","Monto $","","number");
+  o+=fld("gc-fact","Nro. Factura","");
+  o+=sld("gc-cat","Categoria",cats,"Otro");
+  o+=sld("gc-cta","Cuenta",CTAS,"Efectivo");
+  o+="<div class='fld'><label class='lbl'>Edificio</label><select class='inp' id='gc-ed'><option value='General'>General</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div>";
+  o+="</div>";
+  o+="<div id='gc-socio-info' style='display:none;background:#1E293B;border-radius:8px;padding:8px;font-size:11px;color:#06B6D4;margin-top:6px'>⚡ Esta cuenta pertenece a un socio — el gasto se registrara en Cta Socios como aporte.</div>";
+  o+="</div>";
+
+  // Tab Ajuste
+  o+="<div id='tab-ajuste-body' style='display:none'>";
+  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Correcciones, diferencias de caja, devoluciones.</p>";
+  o+="<div class='g2'>"+fld("aj-f","Fecha",_cajaF,"date");
+  o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='aj-t'><option value='egreso'>Egreso (-)</option><option value='ingreso'>Ingreso (+)</option></select></div>";
+  o+="<div class='fld'><label class='lbl'>Categoria</label><select class='inp' id='aj-s'><option>Diferencia de caja</option><option>Compra insumos</option><option>Gastos bancarios</option><option>Impuesto/tasa</option><option>Gasto personal</option><option>Devolucion deposito</option><option>Otro</option></select></div>";
+  o+=sld("aj-c","Cuenta",CTAS)+"</div>";
+  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","number");
+  o+="</div>";
+
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:14px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' id='btn-ga-save' onclick='saveGastoAjuste()'>Registrar</button>";
+  o+="</div>";
+
+  openModal("+ Gasto / Ajuste",o);
+  window._gaTab="gasto";
+
+  setTimeout(function(){
+    // Detectar cuenta de socio
+    var ctaSel=G("gc-cta");
+    if(ctaSel) ctaSel.onchange=function(){
+      var esSocio=CTAS_SOCIOS.indexOf(this.value)>=0;
+      var info=G("gc-socio-info");
+      if(info) info.style.display=esSocio?"block":"none";
+    };
+  },100);
+}
+
+function switchGastoTab(tab){
+  window._gaTab=tab;
+  var gBody=G("tab-gasto-body"),aBody=G("tab-ajuste-body");
+  var gBtn=G("tab-gasto"),aBtn=G("tab-ajuste");
+  if(tab==="gasto"){
+    if(gBody)gBody.style.display="block";
+    if(aBody)aBody.style.display="none";
+    if(gBtn){gBtn.style.background="#1E40AF";gBtn.style.color="#fff";}
+    if(aBtn){aBtn.style.background="#334155";aBtn.style.color="#94A3B8";}
+  } else {
+    if(gBody)gBody.style.display="none";
+    if(aBody)aBody.style.display="block";
+    if(gBtn){gBtn.style.background="#334155";gBtn.style.color="#94A3B8";}
+    if(aBtn){aBtn.style.background="#1E40AF";aBtn.style.color="#fff";}
+  }
+}
+
+function saveGastoAjuste(){
+  if(window._gaTab==="ajuste"){
+    saveAj(); return;
+  }
+  // Gasto
+  var desc=G("gc-desc").value.trim();
+  var monto=Number(G("gc-monto").value||0);
+  var cta=G("gc-cta").value||"Efectivo";
+  if(!desc){alert("La descripcion es obligatoria");return;}
+  if(!monto){alert("El monto es obligatorio");return;}
+
+  var esCuentaSocio=CTAS_SOCIOS.indexOf(cta)>=0;
+  // Mapear cuenta socio a Cuenta Loli/Hugo
+  var socioMap={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
+    "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+
+  if(esCuentaSocio){
+    // Registrar como aporte en movs (Cta Socios)
+    var socio=socioMap[cta]||"Cuenta Loli";
+    DB.ref("movs").push({
+      fecha:_cajaF,mes:_cajaF.slice(0,7),
+      tipo:"aporte",cuenta:socio,cuenta_caja:cta,
+      monto:monto,nota:desc
+    });
+  } else {
+    // Registrar como costo eventual en caja
+    DB.ref("cst").push({
+      cfid:"ev_"+Date.now(),desc:desc,pv:"",
+      ed:G("gc-ed")?G("gc-ed").value||"General":"General",
+      cat:G("gc-cat")?G("gc-cat").value||"Otro":"Otro",
+      mes:_cajaF.slice(0,7),monto:monto,
+      nro_fact:G("gc-fact")?G("gc-fact").value||"":"",
+      fec_venc:_cajaF,pagado:true,
+      cuenta:cta,fecha_pago:_cajaF,tipo:"eventual_caja"
+    });
+  }
+  closeModal();
+  setTimeout(rCaja,400);
 }
 
 
