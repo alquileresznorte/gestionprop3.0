@@ -1653,15 +1653,15 @@ function rCaja(){
         });
       });
     });
-    // Costos - mostrar pagos reales del dia, no el monto total
-    cstM.filter(function(c){return c.fec_venc===_cajaF;}).forEach(function(c){
+    // Costos - mostrar por fecha de PAGO, no de vencimiento
+    oA(DATA.cst).forEach(function(c){
       if(c.pagos&&Object.keys(c.pagos).length>0){
-        // Si tiene pagos registrados, mostrar cada pago del dia
+        // Mostrar cada pago individual del dia
         Object.values(c.pagos).filter(function(pg){return pg.fecha===_cajaF;}).forEach(function(pg){
           movimientosD.push({concepto:esc(c.desc||""),mov:-Number(pg.monto||0),cuenta:pg.cuenta||c.cuenta,tipo:"costo"});
         });
-      } else if(c.pagado){
-        // Pagado sin registro de pagos individuales - usar monto total
+      } else if(c.pagado&&c.fec_venc===_cajaF){
+        // Sin pagos individuales: usar fecha de vencimiento como fecha de pago
         movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta,tipo:"costo"});
       }
     });
