@@ -95,6 +95,13 @@ firebase.initializeApp({
   projectId:"gestion-prop"
 });
 var DB=firebase.database();
+var ACUERDO_TEXTO=null;
+// Cargar acuerdo desde Firebase (editable desde Config)
+DB.ref("cfg_acuerdo").once("value",function(snap){
+  var d=snap.val();
+  if(d&&d.texto) ACUERDO_TEXTO=d.texto;
+});
+function getAcuerdoForm(){return ACUERDO_TEXTO||ACUERDO;}
 
 // ── DATOS PRE-CARGADOS (pasan por URL) ────────────────────────────────────────
 const params = new URLSearchParams(location.search);
@@ -281,7 +288,7 @@ function renderPaso2(){
       <div class="field"><label class="lbl">Teléfono <span class="req">*</span></label><input class="inp" type="tel" id="f-tel1" value="${esc(DATA.tel1)}" placeholder="5491112345678"/><div class="err-msg" id="e-tel1">Campo obligatorio</div></div>
     </div>
     <div class="grid2">
-      <div class="field"><label class="lbl">Email</label><input class="inp" type="email" id="f-email1" value="${esc(DATA.email1)}"/></div>
+
 
     </div>
     <div class="field"><label class="lbl">Trabajo / Actividad</label><input class="inp" id="f-trabajo1" value="${esc(DATA.trabajo1)}" placeholder="Empresa, profesión, actividad"/></div>
@@ -337,7 +344,7 @@ function renderPaso3(){
       <div class="field"><label class="lbl">Teléfono</label><input class="inp" type="tel" id="f-tel2" value="${esc(DATA.tel2)}"/></div>
     </div>
     <div class="grid2">
-      <div class="field"><label class="lbl">Email</label><input class="inp" type="email" id="f-email2" value="${esc(DATA.email2)}"/></div>
+
       <div class="field"><label class="lbl">Lugar de trabajo</label><input class="inp" id="f-trabajo2" value="${esc(DATA.trabajo2)}"/></div>
     </div>
   </div>
@@ -367,7 +374,7 @@ function renderPaso4(){
   c.innerHTML=`
   <div class="card">
     <div class="card-title">📜 Acuerdo de Convivencia y Locación</div>
-    <div class="acuerdo-box">${esc(ACUERDO)}</div>
+    <div class="acuerdo-box">${esc(getAcuerdoForm())}</div>
     <div class="acepta-check ${acepta?"active":""}" id="acepta-row" onclick="toggleAcepta()">
       <div class="check-box ${acepta?"active":""}" id="acepta-box">${acepta?"✓":""}</div>
       <span style="color:${acepta?"#10B981":"#94A3B8"};font-size:13px;font-weight:600">Leí y acepto los términos del acuerdo de convivencia y locación</span>
@@ -407,7 +414,7 @@ function renderPaso5(){
     ["Titular",DATA.nom1],
     ["DNI",DATA.dni1],
     ["Teléfono",DATA.tel1],
-    ["Email",DATA.email1||"—"],
+
     ["Trabajo",DATA.trabajo1||"—"],
     ...(DATA.nom2?[["2do inquilino",DATA.nom2],["DNI 2",DATA.dni2]]:[]),
     ["Contacto emergencia",DATA.ct_emerg?`${DATA.ct_emerg} (${DATA.rel_emerg}) ${DATA.tel_emerg}`:"—"],
