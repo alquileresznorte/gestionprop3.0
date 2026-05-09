@@ -205,7 +205,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -528,6 +528,7 @@ var _gfUnidad='';function genFormLink(unidad){
 }
 
 var ACUERDO="ACUERDO DE CONVIVENCIA Y LOCACION\n\nEs indispensable para la buena convivencia respetar las normas basicas de buenas costumbres.\n\nDado el tamano de los departamentos y las condiciones particulares del alquiler, se estipula que es apto para vivienda de 1 o 2 personas adultas (sin chicos y sin mascotas).\n\nA fin de no molestar a sus vecinos rogamos no hacer reuniones de mas de 3 personas, respetar horarios de descanso, orden, limpieza, etc.\n\nLos espacios comunes son de transito, no de permanencia ni deposito de objetos personales (moto, bicicleta, muebles, etc.)\n\nRESPECTO A LOS SERVICIOS:\nLos servicios estan incluidos para uso racional. Queda terminantemente prohibido el uso de lavarropas, aire acondicionado, caloventor o artefactos de gran consumo. En caso de utilizarlo se cobrara un adicional.\n\nRESPECTO AL PAGO:\nEl alquiler se abona del 1 al 5 con 10% de descuento por pronto pago. Luego del dia 5 se pierde el descuento. Desde el dia 10 se aplican punitorios diarios segun la tasa del BCRA.\n\nEl deposito se devuelve cumplidos los 12 meses contra entrega del departamento en iguales condiciones. El ajuste se realiza en abril, agosto y diciembre con 15 dias de aviso.\n\nAdministracion: Lun-Vie 8-13 y 14-18, Sab 8-12. Tel: 1555787641";
+function getAcuerdo(){return (DATA.cfg_acuerdo&&DATA.cfg_acuerdo.texto)||ACUERDO;}
 
 function openFicha(key){
   var i=DATA.iq[key];if(!i)return;
@@ -567,7 +568,7 @@ function openFicha(key){
 function verAc(key){
   var i=DATA.iq[key];if(!i)return;
   var ki=kpush(key);
-  var o="<div style='background:#0F172A;border-radius:10px;padding:14px;max-height:300px;overflow-y:auto;font-size:11px;color:#CBD5E1;line-height:1.8;white-space:pre-wrap;margin-bottom:12px'>"+esc(ACUERDO)+"</div>";
+  var o="<div style='background:#0F172A;border-radius:10px;padding:14px;max-height:300px;overflow-y:auto;font-size:11px;color:#CBD5E1;line-height:1.8;white-space:pre-wrap;margin-bottom:12px'>"+esc(getAcuerdo())+"</div>";
   o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'><b style='color:#10B981'>Firmado por:</b> "+esc(i.firma||"--")+" el "+esc(i.fecha_firma||"--")+"</div>";
   o+="<div style='display:flex;gap:7px;flex-wrap:wrap'>";
   o+="<button class='btn bg bsm' onclick='navigator.clipboard.writeText(ACUERDO)'>Copiar</button>";
@@ -762,6 +763,7 @@ function openReserva(){
   openModal("+ Nueva Reserva",o);
 }
 
+function copiarResLink(btn){navigator.clipboard.writeText(window._resLink||'');if(btn)btn.textContent='Copiado!';}
 function saveReserva(){
   var u=G("rs-u").value;
   var nom=G("rs-nom").value.trim();
@@ -806,8 +808,25 @@ function saveReserva(){
   }
 
   closeModal();
-  alert("Reserva registrada! ID: "+id_res+". El depto "+u+" queda como RESERVADO.");
-  setTimeout(function(){rAcuerdos();},400);
+
+  // Mostrar link del form para enviar al inquilino
+  var base=location.href.replace(/index\.html.*$/,"").replace(/\?.*$/,"")+"form.html";
+  var link=base+"?id="+id_res+"&u="+encodeURIComponent(u)+"&nom="+encodeURIComponent(nom)+"&tel="+encodeURIComponent(tel)+"&alq="+encodeURIComponent(alq)+"&dep="+encodeURIComponent(dep)+"&gs="+encodeURIComponent(gas);
+  var wa="https://wa.me/"+tel.replace(/\D/g,"")+"?text="+encodeURIComponent("Hola "+nom.split(" ")[0]+"! Para completar el ingreso al depto "+u+" por favor completa este formulario: "+link);
+
+  var oLink="<div style='background:#0F172A;border-radius:10px;padding:16px;margin-top:8px'>";
+  oLink+="<p style='color:#10B981;font-weight:700;margin-bottom:8px'>✓ Reserva registrada — Depto "+u+" RESERVADO</p>";
+  oLink+="<p style='color:#64748B;font-size:12px;margin-bottom:10px'>Compartí este link con "+nom.split(" ")[0]+" para que complete sus datos y firme el acuerdo:</p>";
+  oLink+="<div style='background:#1E293B;border-radius:8px;padding:8px;font-size:10px;color:#06B6D4;word-break:break-all;margin-bottom:10px'>"+link+"</div>";
+  oLink+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
+  window._resLink=link;
+  oLink+="<button class='btn bg bsm' onclick='copiarResLink(this)'>Copiar link</button>";
+  if(tel) oLink+="<a class='btn bsm' style='background:#25D366;color:#fff;text-decoration:none' href='"+wa+"' target='_blank'>📱 Enviar por WhatsApp</a>";
+  oLink+="<button class='btn bp bsm' onclick='closeModal();setTimeout(rAcuerdos,300)'>Cerrar</button>";
+  oLink+="</div></div>";
+  openModal("Reserva creada",oLink);
+
+  setTimeout(function(){rAcuerdos();},300);
 }
 
 function openEditReserva(key){
@@ -2501,7 +2520,7 @@ var _cfgTab = "propiedades"; // propiedades | costos | ingresos
 function rConfig(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
 
-  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"],["recargos","% Recargos"],["limpieza","🗑 Limpieza"]];
+  var tabs = [["propiedades","Propiedades"],["costos","Costos"],["ingresos","Ingresos extras"],["categorias","Categorias"],["usuarios","Usuarios"],["recargos","% Recargos"],["acuerdo","📄 Acuerdo"],["limpieza","🗑 Limpieza"]];
   var o = "<h2 style='font-size:20px;font-weight:800;margin-bottom:12px'>Configuracion</h2>";
   o += "<div style='display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap'>";
   tabs.forEach(function(t){
@@ -2521,6 +2540,7 @@ function rConfig(){
   else if(_cfgTab==="ingresos") renderCfgIngresos();
   else if(_cfgTab==="categorias") renderCfgCats();
   else if(_cfgTab==="recargos") renderCfgRecargos();
+  else if(_cfgTab==="acuerdo") renderCfgAcuerdo();
   else if(_cfgTab==="limpieza") renderCfgLimpieza();
   else if(_cfgTab==="usuarios") renderCfgUsuarios();
 }
@@ -3641,6 +3661,35 @@ function enviarCajaWA(){
   var msg=lines.join("\n");
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
 }
+
+function renderCfgAcuerdo(){
+  var el=G("cfg-body");if(!el)return;
+  var textoActual=getAcuerdo();
+  var o="<div class='card'>";
+  o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:4px'>Texto del Acuerdo de Convivencia y Locacion</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>Este texto aparece en el formulario que completa el inquilino. Podés editarlo cuando cambien las condiciones.</p>";
+  o+="<textarea class='inp' id='cfg-acuerdo-txt' style='min-height:400px;font-size:11px;line-height:1.7;font-family:monospace'>"+esc(textoActual)+"</textarea>";
+  o+="<div style='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap'>";
+  o+="<button class='btn bok bsm' onclick='saveCfgAcuerdo()'>Guardar cambios</button>";
+  o+="<button class='btn bg bsm' onclick='restaurarAcuerdoOriginal()'>Restaurar original</button>";
+  o+="</div></div>";
+  el.innerHTML=o;
+}
+
+function restaurarAcuerdoOriginal(){if(confirm('Restaurar texto original?'))saveCfgAcuerdoTexto(ACUERDO);}
+function saveCfgAcuerdo(){
+  var txt=G("cfg-acuerdo-txt");
+  if(!txt||!txt.value.trim()){alert("El texto no puede estar vacio");return;}
+  saveCfgAcuerdoTexto(txt.value.trim());
+}
+
+function saveCfgAcuerdoTexto(texto){
+  DB.ref("cfg_acuerdo").set({texto:texto,fecha_mod:hoy()},function(){
+    alert("Acuerdo guardado correctamente.");
+    renderCfgAcuerdo();
+  });
+}
+
 
 function renderCfgRecargos(){
   var el=G("cfg-body");if(!el)return;
