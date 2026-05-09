@@ -199,7 +199,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -3312,9 +3312,123 @@ function rCtaCte(){
   }
   o+="</div>";
 
+  // Panel de Inversiones
+  var invTodos=oA(DATA.inv||{}).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
+  var tcRef=Number((DATA.cfg||{}).tc||0);
+  o+="<div class='card' style='margin-bottom:14px;border-left:3px solid #F59E0B'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+  o+="<div><h3 style='font-size:14px;font-weight:700;color:#F59E0B'>Inversiones</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Activos en dolares — compra/venta dolarizada al TC del momento</p></div>";
+  o+="<button class='btn bsm' style='background:#F59E0B;color:#000' onclick='openNuevaInversion()'>+ Nueva</button></div>";
+  if(invTodos.length){
+    var totalInvUSD=invTodos.filter(function(i){return !i.vendido;}).reduce(function(s,i){return s+Number(i.usd||0);},0);
+    o+="<p style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:8px'>Stock activo: U$S "+totalInvUSD.toLocaleString()+"</p>";
+    o+="<table class='tbl'><thead><tr><th>Activo</th><th>Fecha</th><th>Pesos</th><th>TC</th><th>U$S compra</th><th>Estado</th><th></th></tr></thead><tbody>";
+    invTodos.forEach(function(inv){
+      var usdCompra=Number(inv.usd||0);
+      var vendido=inv.vendido;
+      var ganancia="";
+      if(vendido&&inv.usd_venta){
+        var diff=Number(inv.usd_venta)-usdCompra;
+        ganancia=diff>=0?"<span style='color:#10B981'>+U$S "+diff.toFixed(0)+"</span>":"<span style='color:#EF4444'>-U$S "+Math.abs(diff).toFixed(0)+"</span>";
+      }
+      o+="<tr>";
+      o+="<td style='font-weight:600'>"+esc(inv.desc||"")+"</td>";
+      o+="<td style='color:#64748B;font-size:11px'>"+fecDisp(inv.fecha||"")+"</td>";
+      o+="<td style='color:#F59E0B'>"+fmt(inv.pesos||0)+"</td>";
+      o+="<td style='color:#94A3B8;font-size:11px'>$"+Number(inv.tc||0).toLocaleString()+"</td>";
+      o+="<td style='color:#06B6D4;font-weight:700'>U$S "+usdCompra.toLocaleString()+"</td>";
+      o+="<td>"+(vendido?"<span style='color:#64748B;font-size:11px'>Vendido "+fecDisp(inv.fecha_venta||"")+"<br>"+ganancia+"</span>":"<span style='color:#10B981;font-size:11px'>Activo</span>")+"</td>";
+      o+="<td>"+(vendido?"":"<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' onclick='openVenderInversion(""+inv._key+"")'>Vender</button>")+"</td>";
+      o+="</tr>";
+    });
+    o+="</tbody></table>";
+  } else {
+    o+="<p style='color:#64748B;font-size:12px'>Sin inversiones registradas aun</p>";
+  }
+  o+="</div>";
+
   o+=socioTable("Loli",movLoli,totLoli,"#EC4899");
   o+=socioTable("Hugo",movHugo,totHugo,"#3B82F6");
   G("main").innerHTML=o;
+}
+
+function openNuevaInversion(){
+  var o="<p style='color:#64748B;font-size:12px;margin-bottom:12px'>Registra el activo con su valor en pesos y TC del dia. La caja no se afecta — el egreso ya debe estar registrado por separado.</p>";
+  o+="<div class='g2'>";
+  o+=fld("inv-desc","Descripcion (ej: Moto Honda)","","text");
+  o+=fld("inv-f","Fecha de compra",hoy(),"date");
+  o+=fld("inv-pesos","Valor total en pesos $","","number");
+  o+=fld("inv-tc","TC al momento de compra","","number");
+  o+="</div>";
+  o+="<div id='inv-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver el valor en USD</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNuevaInversion()'>Guardar</button></div>";
+  openModal("Nueva Inversion",o);
+  setTimeout(function(){
+    ["inv-pesos","inv-tc"].forEach(function(id){
+      var el=G(id);if(el)el.oninput=function(){
+        var p=Number((G("inv-pesos")||{value:0}).value||0);
+        var tc=Number((G("inv-tc")||{value:0}).value||0);
+        var t=G("inv-preview");
+        if(t&&p>0&&tc>0) t.innerHTML="Valor dolarizado: <b style='color:#F59E0B'>U$S "+Math.round(p/tc).toLocaleString()+"</b> ("+fmt(p)+" / $"+tc.toLocaleString()+")";
+      };
+    });
+  },100);
+}
+
+function saveNuevaInversion(){
+  var desc=G("inv-desc").value.trim();
+  var f=G("inv-f").value;
+  var pesos=Number(G("inv-pesos").value||0);
+  var tc=Number(G("inv-tc").value||0);
+  if(!desc){alert("Ingresa una descripcion");return;}
+  if(!f){alert("Ingresa la fecha");return;}
+  if(!pesos||!tc){alert("Ingresa el valor en pesos y el TC");return;}
+  var usd=Math.round(pesos/tc);
+  DB.ref("inv").push({desc:desc,fecha:f,pesos:pesos,tc:tc,usd:usd,vendido:false});
+  closeModal();
+  setTimeout(rCtaCte,400);
+}
+
+function openVenderInversion(key){
+  var inv=(DATA.inv||{})[key];if(!inv)return;
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Activo: <b>"+esc(inv.desc)+"</b> — Compra: <b style='color:#06B6D4'>U$S "+Number(inv.usd).toLocaleString()+"</b></p>";
+  o+="<div class='g2'>";
+  o+=fld("vnd-f","Fecha de venta",hoy(),"date");
+  o+=fld("vnd-pesos","Precio de venta en pesos $","","number");
+  o+=fld("vnd-tc","TC al momento de venta","","number");
+  o+="</div>";
+  o+="<div id='vnd-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver resultado</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveVentaInversion(""+key+"")'>Registrar venta</button></div>";
+  openModal("Registrar venta — "+esc(inv.desc),o);
+  setTimeout(function(){
+    ["vnd-pesos","vnd-tc"].forEach(function(id){
+      var el=G(id);if(el)el.oninput=function(){
+        var p=Number((G("vnd-pesos")||{value:0}).value||0);
+        var tc=Number((G("vnd-tc")||{value:0}).value||0);
+        var t=G("vnd-preview");
+        if(t&&p>0&&tc>0){
+          var usdVenta=Math.round(p/tc);
+          var diff=usdVenta-Number(inv.usd);
+          var color=diff>=0?"#10B981":"#EF4444";
+          var signo=diff>=0?"+":"";
+          t.innerHTML="Valor venta: <b style='color:#06B6D4'>U$S "+usdVenta.toLocaleString()+"</b> — Resultado: <b style='color:"+color+"'>"+signo+"U$S "+diff.toLocaleString()+"</b>";
+        }
+      };
+    });
+  },100);
+}
+
+function saveVentaInversion(key){
+  var f=G("vnd-f").value;
+  var pesos=Number(G("vnd-pesos").value||0);
+  var tc=Number(G("vnd-tc").value||0);
+  if(!f){alert("Ingresa la fecha");return;}
+  if(!pesos||!tc){alert("Ingresa el precio de venta y el TC");return;}
+  var usdVenta=Math.round(pesos/tc);
+  DB.ref("inv/"+key).update({vendido:true,fecha_venta:f,pesos_venta:pesos,tc_venta:tc,usd_venta:usdVenta});
+  closeModal();
+  setTimeout(rCtaCte,400);
 }
 
 function openStockUSD(){
