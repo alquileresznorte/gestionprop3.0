@@ -1597,10 +1597,15 @@ function rCaja(){
       movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,socioMov:esRetiro?-monto:monto,tipo:"movimiento"});
     });
 
-    // Fix old records
+    // Fix old records (incluyendo cobros viejos con cuentas de socios)
     movimientosD.forEach(function(mv){
       if(mv.cuenta==="Banco") mv.cuenta="Efectivo";
       if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
+      // Cobros registrados en cuentas de socios (MP Loli, MP Hugo, tarjetas) -> columna Socios
+      if(CTAS_SOCIOS.indexOf(mv.cuenta)>=0){
+        mv.socioMov=mv.mov;
+        mv.cuenta="_socios_cobro";
+      }
     });
     // Caja accounts: always show with balance
     var cuentasTabla=CTAS_CAJA.slice();
@@ -3206,9 +3211,56 @@ function rCtaCte(){
     return r;
   }
 
+  // Panel de Ahorro USD
+  var ahoTodos=oA(DATA.aho||{}).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
+  var totalUSDRegistrado=ahoTodos.reduce(function(s,a){return s+Number(a.usd||0);},0);
+  var stockManual=Number((DATA.cfg_aho||{}).stock_usd||0);
+  var stockFecha=(DATA.cfg_aho||{}).stock_fecha||"";
+  o+="<div class='card' style='margin-bottom:14px;border-left:3px solid #06B6D4'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+  o+="<div><h3 style='font-size:14px;font-weight:700;color:#06B6D4'>Fondo de Ahorro USD</h3>";
+  o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Compras acumuladas: <b style='color:#06B6D4'>U$S "+totalUSDRegistrado.toLocaleString()+"</b></p>";
+  if(stockManual>0) o+="<p style='color:#10B981;font-size:12px;margin-top:2px'>Stock actual declarado: <b>U$S "+stockManual.toLocaleString()+"</b>"+(stockFecha?" al "+fecDisp(stockFecha):"")+"</p>";
+  o+="</div>";
+  o+="<button class='btn bp bsm' onclick='openStockUSD()'>✎ Actualizar stock</button></div>";
+  if(ahoTodos.length){
+    o+="<table class='tbl'><thead><tr><th>Fecha</th><th>USD</th><th>TC</th><th>Pesos</th><th>Cuenta</th></tr></thead><tbody>";
+    ahoTodos.forEach(function(a){
+      o+="<tr><td style='color:#64748B;font-size:11px'>"+fecDisp(a.fecha||"")+"</td>";
+      o+="<td style='color:#06B6D4;font-weight:700'>U$S "+Number(a.usd||0).toLocaleString()+"</td>";
+      o+="<td style='color:#94A3B8'>$"+Number(a.tc||0).toLocaleString()+"</td>";
+      o+="<td style='color:#F59E0B'>"+fmt(a.pesos||0)+"</td>";
+      o+="<td style='color:#64748B;font-size:11px'>"+esc(a.cuenta||"")+"</td></tr>";
+    });
+    o+="</tbody></table>";
+  } else {
+    o+="<p style='color:#64748B;font-size:12px'>Sin compras registradas aun</p>";
+  }
+  o+="</div>";
+
   o+=socioTable("Loli",movLoli,totLoli,"#EC4899");
   o+=socioTable("Hugo",movHugo,totHugo,"#3B82F6");
   G("main").innerHTML=o;
+}
+
+function openStockUSD(){
+  var actual=Number((DATA.cfg_aho||{}).stock_usd||0);
+  var o="<p style='color:#64748B;font-size:12px;margin-bottom:12px'>Ingresa el stock real de dolares que tienen hoy. Esto no afecta la caja, es solo para llevar el control del ahorro.</p>";
+  o+="<div class='g2'>";
+  o+=fld("su-usd","Stock actual U$S",actual||"","number");
+  o+=fld("su-f","Fecha",hoy(),"date");
+  o+="</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveStockUSD()'>Guardar</button></div>";
+  openModal("Actualizar stock de dolares",o);
+}
+
+function saveStockUSD(){
+  var usd=Number(G("su-usd").value||0);
+  var f=G("su-f").value;
+  if(!f){alert("Ingresa la fecha");return;}
+  DB.ref("cfg_aho").update({stock_usd:usd,stock_fecha:f});
+  closeModal();
+  setTimeout(rCtaCte,400);
 }
 
 render();
