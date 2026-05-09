@@ -1238,6 +1238,7 @@ function rCostos(){
     row+=sld("ec-pc","Cuenta",CTAS,c.cuenta||"Efectivo");
     row+="</div>";
     row+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#94A3B8;margin-bottom:8px'><input type='checkbox' id='ec-p' "+(c.pagado?"checked":"")+" > Marcar como totalmente pagado</label>";
+    row+=fld("ec-fp","Fecha de pago",c.fecha_pago||hoy(),"date");
     row+="<div style='display:flex;gap:6px'><button class='btn bok bsm' data-sc='"+ki+"'>Guardar</button><button class='btn bg bsm' onclick='_editC=null;rCostos()'>X</button></div>";
     row+="</div>";
   }
@@ -1277,7 +1278,9 @@ function saveCosto(ckey){
   // Si checkbox marcado pero no hay ningun pago, registrar el total como pagado ahora
   if(checkboxPagado&&totalYaPagado===0&&m>0){
     var ts2=Date.now()+1;
-    ups["cst/"+ckey+"/pagos/"+ts2]={fecha:hoy(),monto:m,cuenta:pc};
+    var fechaPagoHoy=G("ec-fp")?(G("ec-fp").value||hoy()):hoy();
+    ups["cst/"+ckey+"/pagos/"+ts2]={fecha:fechaPagoHoy,monto:m,cuenta:pc};
+    ups["cst/"+ckey+"/fecha_pago"]=fechaPagoHoy;
     totalYaPagado=m;
   }
   // Pagado = suma de pagos cubre el monto, O checkbox marcado con al menos algun pago
@@ -1653,16 +1656,21 @@ function rCaja(){
         });
       });
     });
-    // Costos - mostrar por fecha de PAGO, no de vencimiento
+    // Costos - mostrar por fecha de PAGO o fecha de vencimiento si no tiene pagos
     oA(DATA.cst).forEach(function(c){
       if(c.pagos&&Object.keys(c.pagos).length>0){
-        // Mostrar cada pago individual del dia
-        Object.values(c.pagos).filter(function(pg){return pg.fecha===_cajaF;}).forEach(function(pg){
-          movimientosD.push({concepto:esc(c.desc||""),mov:-Number(pg.monto||0),cuenta:pg.cuenta||c.cuenta,tipo:"costo"});
+        // Tiene pagos individuales: mostrar cada pago del dia
+        Object.values(c.pagos).filter(function(pg){
+          return (pg.fecha||"")===_cajaF;
+        }).forEach(function(pg){
+          movimientosD.push({concepto:esc(c.desc||""),mov:-Number(pg.monto||0),cuenta:pg.cuenta||c.cuenta||"Efectivo",tipo:"costo"});
         });
-      } else if(c.pagado&&c.fec_venc===_cajaF){
-        // Sin pagos individuales: usar fecha de vencimiento como fecha de pago
-        movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta,tipo:"costo"});
+      } else {
+        // Sin pagos individuales: comparar fec_venc Y fecha_pago (por si se guardo de otra forma)
+        var fechaPago=c.fecha_pago||c.fec_venc||"";
+        if(c.pagado&&fechaPago===_cajaF){
+          movimientosD.push({concepto:esc(c.desc||""),mov:-Number(c.monto||0),cuenta:c.cuenta||"Efectivo",tipo:"costo"});
+        }
       }
     });
     // Ajustes manuales
