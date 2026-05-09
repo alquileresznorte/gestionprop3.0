@@ -1184,7 +1184,14 @@ function rCostos(){
     return !existingIds.includes(c.id) && !existingDescs.includes((c.d||"").trim().toLowerCase());
   });
   if(nuevos.length){nuevos.forEach(function(c){DB.ref("cst").push({cfid:c.id,desc:c.d,pv:c.pv||"",ed:c.e,cat:c.c,mes:_cstMes,monto:Number(c.monto_cfg||0),nro_fact:"",fec_venc:c.dv?(_cstMes+"-"+String(c.dv).padStart(2,"0")):"",pagado:false,cta_num:c.ct||"",dv:c.dv,cuenta:"Banco"});});setTimeout(rCostos,800);return;}
-  var cstA=oA(DATA.cst).filter(function(c){return c.mes===_cstMes&&(_cstCat==="Todas"||c.cat===_cstCat)&&(_cstEd==="Todos"||c.ed===_cstEd);});
+  var _busq=(window._cstBusq||"").toLowerCase().trim();
+  var cstA=oA(DATA.cst).filter(function(c){
+    if(c.mes!==_cstMes) return false;
+    if(_cstCat!=="Todas"&&c.cat!==_cstCat) return false;
+    if(_cstEd!=="Todos"&&c.ed!==_cstEd) return false;
+    if(_busq&&!(c.desc||"").toLowerCase().includes(_busq)&&!(c.cat||"").toLowerCase().includes(_busq)&&!(c.ed||"").toLowerCase().includes(_busq)) return false;
+    return true;
+  });
   var totP=cstA.filter(function(c){return c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
   var totPend=cstA.filter(function(c){return !c.pagado;}).reduce(function(s,c){return s+Number(c.monto||0);},0);
   var sinF=cstA.filter(function(c){return !c.pagado&&!c.nro_fact&&Number(c.monto||0)>0;}).length;
@@ -1192,6 +1199,7 @@ function rCostos(){
   var esA=USER.r==="admin";
   var o="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'><div><h2 style='font-size:20px;font-weight:800'>Costos</h2><p style='color:#64748B;font-size:11px'>Pagado: "+fmt(totP)+" - Pendiente: "+fmt(totPend)+(sinF>0?" - "+sinF+" sin nro.":"")+"</p></div></div>";
   o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><input type='month' class='inp' value='"+_cstMes+"' style='max-width:140px' onchange=\"_cstMes=this.value;_editC=null;rCostos()\"/><select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
+  o+="<input class='inp' id='cst-busq' type='text' placeholder=\"\uD83D\uDD0D Buscar costo...\" style='width:100%;max-width:340px;margin-bottom:10px' oninput=\"window._cstBusq=this.value;_editC=null;rCostos()\"  value='"+(window._cstBusq||"")+"'/>"; 
   setTimeout(function(){var so=G("cst-ord");if(so)so.onchange=function(){rCostos();};},50);
   var cstOrd=(G("cst-ord")||{value:"cat"}).value;
   cstA.sort(function(a,b){
@@ -1261,6 +1269,8 @@ function saveCosto(ckey){
   var checkboxPagado=G("ec-p").checked;
   var pm=Number((G("ec-pm")||{value:0}).value||0);
   var pc=(G("ec-pc")||{value:"Efectivo"}).value;
+  // Fecha de pago: siempre usar el campo ec-fp
+  var fechaPago=G("ec-fp")?(G("ec-fp").value||hoy()):hoy();
   var c=DATA.cst[ckey];
   var pagosExist=c&&c.pagos?Object.values(c.pagos):[];
   var totalYaPagado=pagosExist.reduce(function(s,x){return s+Number(x.monto||0);},0);
@@ -1269,21 +1279,19 @@ function saveCosto(ckey){
   ups["cst/"+ckey+"/nro_fact"]=f;
   ups["cst/"+ckey+"/fec_venc"]=(G("ec-v")||{value:""}).value;
   ups["cst/"+ckey+"/cuenta"]=pc;
-  // Registrar pago si se ingreso monto
+  ups["cst/"+ckey+"/fecha_pago"]=fechaPago;
+  // Registrar pago parcial si se ingreso monto
   if(pm>0){
     var ts=Date.now();
-    ups["cst/"+ckey+"/pagos/"+ts]={fecha:hoy(),monto:pm,cuenta:pc};
+    ups["cst/"+ckey+"/pagos/"+ts]={fecha:fechaPago,monto:pm,cuenta:pc};
     totalYaPagado+=pm;
   }
-  // Si checkbox marcado pero no hay ningun pago, registrar el total como pagado ahora
+  // Si checkbox marcado sin pagos previos, registrar monto total con fecha correcta
   if(checkboxPagado&&totalYaPagado===0&&m>0){
     var ts2=Date.now()+1;
-    var fechaPagoHoy=G("ec-fp")?(G("ec-fp").value||hoy()):hoy();
-    ups["cst/"+ckey+"/pagos/"+ts2]={fecha:fechaPagoHoy,monto:m,cuenta:pc};
-    ups["cst/"+ckey+"/fecha_pago"]=fechaPagoHoy;
+    ups["cst/"+ckey+"/pagos/"+ts2]={fecha:fechaPago,monto:m,cuenta:pc};
     totalYaPagado=m;
   }
-  // Pagado = suma de pagos cubre el monto, O checkbox marcado con al menos algun pago
   ups["cst/"+ckey+"/pagado"]=totalYaPagado>=m||(checkboxPagado&&totalYaPagado>0);
   DB.ref("/").update(ups);
   _editC=null;setTimeout(rCostos,400);
