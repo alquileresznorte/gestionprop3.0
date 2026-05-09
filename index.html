@@ -170,7 +170,13 @@ function nid(){_nc++;lw("gp_nc",_nc);return String(_nc).padStart(6,"0");}
 function G(id){return document.getElementById(id);}
 function uds(){var r=[];Object.keys(ED).forEach(function(c){for(var i=1;i<=ED[c].u;i++)r.push(c+"-"+i);});return r;}
 function pA(c){return c&&c.pagos?Object.values(c.pagos):[];}
-function pT(c){return pA(c).reduce(function(s,p){return s+p.monto;},0);}
+function pT(c){
+  // Para cobros USD: sumar en USD; para pesos: sumar en pesos
+  if(c&&c.moneda==="USD"){
+    return pA(c).reduce(function(s,p){return s+Number(p.usd||0);},0);
+  }
+  return pA(c).reduce(function(s,p){return s+p.monto;},0);
+}
 
 // HTML builders - ALL use double-quoted attributes, no mixing
 function H(tag,attrs,inner){var a=Object.keys(attrs).map(function(k){return k+'="'+attrs[k]+'"';}).join(" ");return "<"+tag+(a?" "+a:"")+">"+inner+"</"+tag+">";}
