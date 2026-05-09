@@ -699,6 +699,11 @@ function openNA(){
   o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:10px'>MONTOS</div>";
   o+="<div class='g2'>";
   o+=fld("na-alq","Alquiler mensual actual $","","number");
+  o+="<div class='fld'><label class='lbl'>Moneda del alquiler</label><select class='inp' id='na-moneda' onchange='toggleMonedaNA()'><option value='ARS'>Pesos ($)</option><option value='USD'>Dolares (U$S)</option></select></div>";
+  o+="<div id='na-bloque-usd' style='display:none'>";
+  o+=fld("na-alq-usd","Alquiler en U$S","","number");
+  o+="<p style='color:#06B6D4;font-size:11px;margin:2px 0 8px'>El monto en pesos se calcula al momento de cobrar segun el TC del dia.</p>";
+  o+="</div>";
   // Contrato nuevo fields
   o+="<div id='na-bloque-nuevo'>";
   o+=fld("na-dep","Deposito $","","number");
@@ -732,6 +737,14 @@ function openNA(){
   },100);
 }
 
+function toggleMonedaNA(){
+  var esUSD=G("na-moneda")&&G("na-moneda").value==="USD";
+  var bloq=G("na-bloque-usd");
+  var alqField=G("na-alq");
+  if(bloq) bloq.style.display=esUSD?"block":"none";
+  if(alqField) alqField.closest(".fld").style.display=esUSD?"none":"block";
+  actualizarResumenNA();
+}
 function toggleModoNA(){
   var vigente=G("na-vigente")&&G("na-vigente").checked;
   var bNuevo=G("na-bloque-nuevo");
@@ -781,7 +794,10 @@ function saveNA(){
   if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
 
   var id=nid();
-  var alq=Number(G("na-alq").value||0);
+  var moneda=(G("na-moneda")||{value:"ARS"}).value||"ARS";
+  var alqUSD=Number((G("na-alq-usd")||{value:0}).value||0);
+  var alq=moneda==="USD"?0:Number(G("na-alq").value||0);
+  // Para USD guardamos 0 en alquiler (pesos) y alquiler_usd en USD
   var ing=G("na-ing").value;
   var mesInicio=ing?ing.slice(0,7):mes();
 
@@ -801,7 +817,8 @@ function saveNA(){
       id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
       tel:G("na-t").value,email:G("na-e").value,
       ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
-      alquiler:alq,deposito:depInfo,gastos:gsInfo,
+      alquiler:alq,alquiler_usd:moneda==="USD"?alqUSD:0,moneda:moneda,
+      deposito:depInfo,gastos:gsInfo,
       pago_cuenta:0,ingreso:ing,egreso:G("na-egr").value,
       ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",
       fecha_reg:hoy(),tipo_carga:"vigente"
@@ -851,7 +868,8 @@ function saveNA(){
       id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
       tel:G("na-t").value,email:G("na-e").value,
       ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
-      alquiler:alq,deposito:dep,gastos:gs,gastos_neto:gsNeto,
+      alquiler:alq,alquiler_usd:moneda==="USD"?alqUSD:0,moneda:moneda,
+      deposito:dep,gastos:gs,gastos_neto:gsNeto,
       descuento_gs:desc,pago_cuenta:pc,total_ingreso:alq+dep+gsNeto,
       ingreso:ing,egreso:G("na-egr").value,
       ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",fecha_reg:hoy()
@@ -997,7 +1015,8 @@ function rCob(){
     row+="<div style='display:flex;gap:9px;align-items:center;flex:1'>";
     row+="<div style='background:"+ec+"22;color:"+ec+";border-radius:9px;padding:5px 8px;font-weight:800;font-size:11px;min-width:44px;text-align:center'>"+c.unidad+"</div>";
     row+="<div><div style='font-weight:600;font-size:13px'>"+esc(c.inq||"")+"</div>";
-    row+="<div style='color:#64748B;font-size:10px'>"+esc(concepto)+" — "+fmt(c.monto_total)+(c.sal_ant>0?" + Ant.:"+fmt(c.sal_ant):"")+"</div>";
+    var montoLabel=c.moneda==="USD"?"U$S "+Number(c.monto_total).toLocaleString():fmt(c.monto_total);
+    row+="<div style='color:#64748B;font-size:10px'>"+esc(concepto)+" — "+montoLabel+(c.sal_ant>0?" + Ant.:"+fmt(c.sal_ant):"")+"</div>";
     if(ps) row+="<div style='color:#94A3B8;font-size:9px'>"+ps+"</div>";
     row+="</div></div>";
     row+="<div style='display:flex;gap:5px;align-items:center;flex-wrap:wrap'>";
@@ -1041,53 +1060,108 @@ function genCob(){
   ns.forEach(function(i){
     var prev=cobP.filter(function(c){return c.unidad===i.unidad;})[0];
     var sal=0;if(prev){var pg=pT(prev),tot=prev.monto_total+Number(prev.sal_ant||0);if(pg<tot)sal=tot-pg;}
-    var extra=aplicarAdicionales(i.unidad,i.alquiler,_cobMes);
-    var totalMes=i.alquiler+extra;
-    var concepto=extra>0?"Alquiler + adicionales ("+fmt(extra)+" extra)":"";
-    DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:_cobMes,monto_total:totalMes,pagos:{},sal_ant:sal,estado:sal>0?"parcial":"pendiente",concepto_extra:concepto});
+    var esUSD=i.moneda==="USD"&&Number(i.alquiler_usd||0)>0;
+    if(esUSD){
+      // Cobro en dolares: monto_total en USD, moneda="USD"
+      DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:_cobMes,
+        monto_total:Number(i.alquiler_usd),moneda:"USD",pagos:{},sal_ant:sal,
+        estado:sal>0?"parcial":"pendiente",concepto:"Alquiler USD"});
+    } else {
+      var extra=aplicarAdicionales(i.unidad,i.alquiler,_cobMes);
+      var totalMes=i.alquiler+extra;
+      var concepto=extra>0?"Alquiler + adicionales ("+fmt(extra)+" extra)":"";
+      DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:_cobMes,monto_total:totalMes,pagos:{},sal_ant:sal,estado:sal>0?"parcial":"pendiente",concepto_extra:concepto});
+    }
   });
   setTimeout(rCob,600);
 }
 function openPago(ckey){
   var c=DATA.cob[ckey];if(!c)return;
-  // Check if caja is closed for today
   var subcHoy=oA(DATA.subc).filter(function(s){return s.fecha===hoy();});
   if(subcHoy.length>0){
     if(!confirm("La caja de hoy ya fue cerrada. ¿Registrar el pago de todas formas? (quedará en el próximo día hábil)"))return;
   }
+  var esUSD=c.moneda==="USD";
   var pg=pT(c),sal=(c.monto_total+Number(c.sal_ant||0))-pg;
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Saldo pendiente: <b style='color:#EF4444'>"+fmt(sal)+"</b></p>";
+  var salLabel=esUSD?"U$S "+sal.toLocaleString():fmt(sal);
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Saldo pendiente: <b style='color:#EF4444'>"+salLabel+"</b></p>";
   o+="<div class='g2'>"+fld("p-f","Fecha",hoy(),"date")+sld("p-c","Cuenta",CTAS)+"</div>";
-  o+=fld("p-m","Monto $","","number");
+  if(esUSD){
+    o+="<div class='g2'>";
+    o+=fld("p-usd","Monto U$S",sal,"number");
+    o+=fld("p-tc","Tipo de cambio ($/U$S)","","number");
+    o+="</div>";
+    o+="<div id='p-usd-total' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#06B6D4;margin-bottom:8px'>Ingresa U$S y TC para ver total en pesos</div>";
+  } else {
+    o+=fld("p-m","Monto $","","number");
+  }
   o+="<label style='display:flex;align-items:center;gap:7px;color:#94A3B8;font-size:11px;cursor:pointer;margin:8px 0'><input type='checkbox' id='p-d' onchange=\"G('p-d2').style.display=this.checked?'grid':'none'\"> Segundo medio de pago</label>";
   o+="<div id='p-d2' style='display:none' class='g2'>"+sld("p-c2","Cuenta 2",CTAS)+fld("p-m2","Monto 2 $","","number")+"</div>";
   var ki=kpush(ckey);
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rp='"+ki+"'>Registrar</button></div>";
-  openModal("Registrar pago - "+c.unidad,o);
+  openModal("Registrar pago - "+c.unidad+(esUSD?" (USD)":""),o);
+  setTimeout(function(){
+    if(esUSD){
+      ["p-usd","p-tc"].forEach(function(id){
+        var el=G(id);if(el)el.oninput=function(){
+          var u=Number((G("p-usd")||{value:0}).value||0);
+          var tc=Number((G("p-tc")||{value:0}).value||0);
+          var t=G("p-usd-total");
+          if(t&&u>0&&tc>0) t.innerHTML="Total en pesos: <b style='color:#10B981'>"+fmt(u*tc)+"</b> (U$S "+u.toLocaleString()+" x $"+tc.toLocaleString()+")";
+        };
+      });
+    }
+  },100);
   var md=MODS[MODS.length-1];
   md.onclick=function(e){if(e.target.dataset.rp)regPago(kget(parseInt(e.target.dataset.rp)));else if(e.target.classList.contains("ov"))closeModal();};
 }
+
 function regPago(ckey){
-  var m=Number(G("p-m").value);if(!m){alert("Ingresa el monto");return;}
   var c=DATA.cob[ckey],ts=Date.now(),ups={};
+  var esUSD=c.moneda==="USD";
   var fecha=G("p-f").value,cta1=G("p-c").value;
-  ups["cob/"+ckey+"/pagos/"+ts]={fecha:fecha,monto:m,cuenta:cta1,concepto:"Alquiler "+c.unidad};
+  var m,usd_monto=0,tc_usado=0;
+
+  if(esUSD){
+    usd_monto=Number((G("p-usd")||{value:0}).value||0);
+    tc_usado=Number((G("p-tc")||{value:0}).value||0);
+    if(!usd_monto||!tc_usado){alert("Ingresa monto en U$S y tipo de cambio");return;}
+    m=Math.round(usd_monto*tc_usado); // pesos
+  } else {
+    m=Number(G("p-m").value);
+    if(!m){alert("Ingresa el monto");return;}
+  }
+
+  ups["cob/"+ckey+"/pagos/"+ts]={fecha:fecha,monto:m,cuenta:cta1,
+    concepto:"Alquiler "+c.unidad+(esUSD?" (U$S"+usd_monto+" x $"+tc_usado+")":""),
+    usd:esUSD?usd_monto:0,tc:esUSD?tc_usado:0};
+
   if(G("p-d").checked){
     var m2=Number((G("p-m2")||{value:0}).value||0),cta2=(G("p-c2")||{value:""}).value;
-    if(m2){
-      ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:fecha,monto:m2,cuenta:cta2,concepto:"Alquiler "+c.unidad};
-    }
+    if(m2) ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:fecha,monto:m2,cuenta:cta2,concepto:"Alquiler "+c.unidad};
   }
+
   var allP=Object.assign({},c.pagos||{});Object.keys(ups).forEach(function(k){allP[k.split("/").pop()]=ups[k];});
-  var tot=Object.values(allP).reduce(function(s,p){return s+p.monto;},0);
-  ups["cob/"+ckey+"/estado"]=tot>=c.monto_total?"pagado":tot>0?"parcial":"pendiente";
+  // Para USD: comparar en USD; para pesos: comparar en pesos
+  var tot,total;
+  if(esUSD){
+    tot=Object.values(allP).reduce(function(s,p){return s+(p.usd||0);},0);
+    total=c.monto_total; // en USD
+  } else {
+    tot=Object.values(allP).reduce(function(s,p){return s+p.monto;},0);
+    total=c.monto_total;
+  }
+  ups["cob/"+ckey+"/estado"]=tot>=total?"pagado":tot>0?"parcial":"pendiente";
   DB.ref("/").update(ups);
+
   var iq=oA(DATA.iq).filter(function(i){return i.unidad===c.unidad&&i.estado==="activo";})[0];
+  var montoWA=esUSD?"U$S"+usd_monto:fmt(m);
   if(iq&&iq.tel&&confirm("Enviar confirmacion por WhatsApp a "+iq.nombre.split(",")[0]+"?")){
-    window.open("https://wa.me/"+iq.tel+"?text="+encodeURIComponent("Hola "+iq.nombre.split(",")[0].trim()+"! Recibimos tu pago de "+fmt(m)+" para el alquiler de "+c.mes.replace("-","/")+". Gracias! Adm: 1555787641"),"_blank");
+    window.open("https://wa.me/"+iq.tel+"?text="+encodeURIComponent("Hola "+iq.nombre.split(",")[0].trim()+"! Recibimos tu pago de "+montoWA+" para el alquiler de "+c.mes.replace("-","/")+". Gracias! Adm: 1555787641"),"_blank");
   }
   closeModal();setTimeout(rCob,400);
 }
+
 
 // COSTOS
 var _cstMes=mes(),_cstCat="Todas",_cstEd="Todos",_editC=null;
