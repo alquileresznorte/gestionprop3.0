@@ -1754,7 +1754,7 @@ function rCaja(){
       var socioNombre=mv.cuenta==="Cuenta Hugo"?"Hugo":mv.cuenta==="Cuenta Loli"?"Loli":"Socio";
       var concepto=esc((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:""));
       // Impacto en cuenta de caja (Efectivo, Bco Hugo, etc.) + columna Socios en la misma fila
-      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,socioMov:esRetiro?-monto:monto,tipo:"movimiento"});
+      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,socioMov:esRetiro?monto:-monto,tipo:"movimiento"});
     });
 
     // Fix old records (incluyendo cobros viejos con cuentas de socios)
