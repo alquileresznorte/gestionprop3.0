@@ -3399,7 +3399,7 @@ function openVenderInversion(key){
   o+=fld("vnd-tc","TC al momento de venta","","number");
   o+="</div>";
   o+="<div id='vnd-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver resultado</div>";
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveVentaInversion(""+key+"")'>Registrar venta</button></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveVentaInversion(this.dataset.k)' data-k='"+key+"'>Registrar venta</button></div>";
   openModal("Registrar venta — "+esc(inv.desc),o);
   setTimeout(function(){
     ["vnd-pesos","vnd-tc"].forEach(function(id){
