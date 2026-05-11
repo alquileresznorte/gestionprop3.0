@@ -4022,6 +4022,18 @@ function renderCfgLimpieza(){
   o+="<div id='limp-mov-resultados'></div>";
   o+="</div>";
 
+  // Borrar ajuste especifico
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar ajuste especifico de caja</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Busca y borra un ajuste por fecha y/o monto.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px'>";
+  o+="<input type='date' class='inp' id='limp-aj-fecha' style='max-width:160px'/>";
+  o+="<input type='number' class='inp' id='limp-aj-monto' style='max-width:160px' placeholder='Monto (opcional)'/>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff' onclick='buscarAjEspecifico()'>Buscar</button>";
+  o+="</div>";
+  o+="<div id='limp-aj-resultados'></div>";
+  o+="</div>";
+
   // Borrar historial de acuerdos
   o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
   o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar historial de acuerdos</p>";
@@ -4032,6 +4044,51 @@ function renderCfgLimpieza(){
   o+="</div>";
   el.innerHTML=o;
 }
+
+function buscarAjEspecifico(){
+  var fecha=G("limp-aj-fecha")?G("limp-aj-fecha").value:"";
+  var monto=Number(G("limp-aj-monto")?G("limp-aj-monto").value||0:0);
+  var res=G("limp-aj-resultados");if(!res)return;
+
+  var encontrados=oA(DATA.aj||{}).filter(function(a){
+    var ok=true;
+    if(fecha) ok=ok&&a.fecha===fecha;
+    if(monto) ok=ok&&Number(a.monto||0)===monto;
+    return ok;
+  });
+
+  if(!encontrados.length){
+    res.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:6px'>No se encontraron ajustes con esos filtros.</p>";
+    return;
+  }
+
+  var o="<div style='margin-top:8px'><p style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+encontrados.length+" ajuste(s) encontrado(s):</p>";
+  encontrados.forEach(function(a){
+    o+="<div style='background:#0F172A;border-radius:8px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>";
+    o+="<div style='font-size:11px'>";
+    o+="<span style='color:#94A3B8'>"+fecDisp(a.fecha||"")+"</span> · ";
+    o+="<span style='color:#fff'>"+esc(a.concepto||a.sub||"")+"</span> · ";
+    o+="<span style='color:"+(a.tipo==="egreso"?"#F87171":"#10B981")+";font-weight:700'>"+(a.tipo==="egreso"?"-":"+")+fmt(a.monto||0)+"</span> · ";
+    o+="<span style='color:#64748B'>"+esc(a.cuenta||"")+"</span>";
+    o+="</div>";
+    o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-size:10px' data-delaj='"+a._key+"'>Borrar este</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  res.innerHTML=o;
+
+  res.onclick=function(e){
+    var b=e.target.closest("[data-delaj]");
+    if(!b)return;
+    var key=b.dataset.delaj;
+    if(!confirm("Borrar este ajuste?"))return;
+    DB.ref("aj/"+key).remove(function(){
+      alert("Ajuste borrado.");
+      buscarAjEspecifico();
+    });
+  };
+}
+
 
 function buscarMovEspecifico(){
   var fecha=G("limp-mov-fecha")?G("limp-mov-fecha").value:"";
