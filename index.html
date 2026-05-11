@@ -3983,9 +3983,80 @@ function renderCfgLimpieza(){
   o+="<button class='btn bp bsm' onclick='limpiarDuplicadosCostos()'>Limpiar duplicados</button>";
   o+="</div>";
 
+  // Borrar movimientos de un dia
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar movimientos (aportes/retiros) de un dia</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Borra los movimientos de socios (aportes/retiros) de la fecha indicada. No afecta cobros ni costos.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px'>";
+  o+="<input type='date' class='inp' id='limp-fecha-movs' value='"+hoy()+"' style='max-width:160px'/>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-weight:700' onclick='borrarMovsDia()'>Borrar movimientos</button>";
+  o+="</div>";
+  // Listar movimientos del dia seleccionado
+  var movsHoy=oA(DATA.movs||{}).filter(function(mv){return mv.fecha===hoy();});
+  if(movsHoy.length){
+    o+="<div style='font-size:11px;color:#64748B;margin-top:4px'>Movimientos de hoy ("+hoy()+"): "+movsHoy.length+"</div>";
+    movsHoy.forEach(function(mv){
+      o+="<div style='font-size:11px;color:#94A3B8;padding:2px 0'>· "+esc(mv.tipo||"")+" "+esc(mv.cuenta||"")+" "+fmt(mv.monto||0)+(mv.nota?" - "+esc(mv.nota):"")+"</div>";
+    });
+  }
+  o+="</div>";
+
+  // Borrar ajustes de un dia
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar ajustes de caja de un dia</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Borra los ajustes de caja registrados en la fecha indicada.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'>";
+  o+="<input type='date' class='inp' id='limp-fecha-aj' value='"+hoy()+"' style='max-width:160px'/>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-weight:700' onclick='borrarAjDia()'>Borrar ajustes</button>";
+  o+="</div></div>";
+
+  // Borrar historial de acuerdos
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar historial de acuerdos</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Borra el historial de eventos/notas de acuerdos (hist). No afecta los acuerdos vigentes.</p>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-weight:700' onclick='borrarHistAcuerdos()'>Borrar historial</button>";
+  o+="</div>";
+
   o+="</div>";
   el.innerHTML=o;
 }
+
+function borrarMovsDia(){
+  var fecha=G("limp-fecha-movs")?G("limp-fecha-movs").value:hoy();
+  if(!fecha){alert("Selecciona una fecha");return;}
+  var movs=oA(DATA.movs||{}).filter(function(mv){return mv.fecha===fecha;});
+  if(!movs.length){alert("No hay movimientos en "+fecha);return;}
+  if(!confirm("Borrar "+movs.length+" movimiento(s) del "+fecha+"? Esta accion no se puede deshacer."))return;
+  var ups={};
+  movs.forEach(function(mv){ups["movs/"+mv._key]=null;});
+  DB.ref("/").update(ups,function(){
+    alert("Movimientos de "+fecha+" borrados.");
+    setTimeout(rConfig,300);
+  });
+}
+
+function borrarAjDia(){
+  var fecha=G("limp-fecha-aj")?G("limp-fecha-aj").value:hoy();
+  if(!fecha){alert("Selecciona una fecha");return;}
+  var ajs=oA(DATA.aj||{}).filter(function(a){return a.fecha===fecha;});
+  if(!ajs.length){alert("No hay ajustes en "+fecha);return;}
+  if(!confirm("Borrar "+ajs.length+" ajuste(s) de caja del "+fecha+"?"))return;
+  var ups={};
+  ajs.forEach(function(a){ups["aj/"+a._key]=null;});
+  DB.ref("/").update(ups,function(){
+    alert("Ajustes de "+fecha+" borrados.");
+    setTimeout(rConfig,300);
+  });
+}
+
+function borrarHistAcuerdos(){
+  if(!confirm("Borrar TODO el historial de eventos de acuerdos (hist)? Esta accion no se puede deshacer."))return;
+  DB.ref("hist").remove(function(){
+    alert("Historial borrado correctamente.");
+    setTimeout(rConfig,300);
+  });
+}
+
 
 function borrarSoloCostos(){
   var mes=G("limp-mes-cst")?G("limp-mes-cst").value:null;
