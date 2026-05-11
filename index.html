@@ -534,22 +534,63 @@ function openFicha(key){
   var i=DATA.iq[key];if(!i)return;
   var esA=USER.r==="admin";
   var dias=i.egreso?Math.round((new Date(i.egreso)-new Date())/86400000):-1;
-  var rows=[["ID Acuerdo","#"+(i.id_ac||"--")],["Unidad",i.unidad],["Nombre",i.nombre],["DNI",i.dni||"--"],["Telefono",i.tel||"--"],["Alquiler",fmt(i.alquiler)],["Deposito",fmt(i.deposito||0)],["Pago a cuenta",fmt(i.pago_cuenta||0)],["Inicio",i.ingreso||"--"],["Vencimiento",i.egreso||"--"]];
-  var o="<div class='g2' style='margin-bottom:12px'>";
-  rows.forEach(function(r){o+="<div><div class='lbl'>"+r[0]+"</div><div style='font-size:12px'>"+esc(r[1])+"</div></div>";});
+  var ki=kpush(key);
+
+  // Datos principales
+  var o="<div class='g2' style='margin-bottom:10px'>";
+  o+="<div><div class='lbl'>ID Acuerdo</div><div style='font-size:12px'>#"+(i.id_ac||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Unidad</div><div style='font-size:12px'>"+esc(i.unidad)+"</div></div>";
+  o+="<div><div class='lbl'>Titular</div><div style='font-size:12px'>"+esc(i.nombre)+"</div></div>";
+  o+="<div><div class='lbl'>DNI</div><div style='font-size:12px'>"+esc(i.dni||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel||"--")+(i.tel?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div></div>";
+  o+="<div><div class='lbl'>Trabajo</div><div style='font-size:12px'>"+esc(i.trabajo1||i.trabajo||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Alquiler</div><div style='font-size:12px'>"+fmt(i.alquiler)+"</div></div>";
+  o+="<div><div class='lbl'>Deposito</div><div style='font-size:12px'>"+fmt(i.deposito||0)+"</div></div>";
+  o+="<div><div class='lbl'>Inicio</div><div style='font-size:12px'>"+fecDisp(i.ingreso||"")+"</div></div>";
+  o+="<div><div class='lbl'>Vencimiento</div><div style='font-size:12px'>"+fecDisp(i.egreso||"")+"</div></div>";
   o+="</div>";
+
+  // 2do inquilino
+  if(i.nom2){
+    o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
+    o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>2do Inquilino</div>";
+    o+="<div class='g2'>";
+    o+="<div><div class='lbl'>Nombre</div><div style='font-size:12px'>"+esc(i.nom2)+"</div></div>";
+    o+="<div><div class='lbl'>DNI</div><div style='font-size:12px'>"+esc(i.dni2||"--")+"</div></div>";
+    o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel2||"--")+(i.tel2?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel2+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div></div>";
+    o+="<div><div class='lbl'>Trabajo</div><div style='font-size:12px'>"+esc(i.trabajo2||"--")+"</div></div>";
+    o+="</div></div>";
+  }
+
+  // Contacto de emergencia
+  if(i.ct_emerg||i.tel_emerg){
+    o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
+    o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:6px'>Contacto de emergencia</div>";
+    o+="<div class='g2'>";
+    o+="<div><div class='lbl'>Nombre</div><div style='font-size:12px'>"+esc(i.ct_emerg||"--")+"</div></div>";
+    o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel_emerg||"--")+(i.tel_emerg?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel_emerg+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div></div>";
+    if(i.rel_emerg)o+="<div><div class='lbl'>Relacion</div><div style='font-size:12px'>"+esc(i.rel_emerg)+"</div></div>";
+    o+="</div></div>";
+  }
+
   if(dias>=0&&dias<=15)o+="<div class='wbx'>Vencimiento en "+dias+" dias - "+fecDisp(i.egreso)+"</div>";
-  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'><div class='lbl'>Obs. al ingreso</div><div style='font-size:12px;margin-top:3px'>"+esc(i.obs_ingreso||"Sin observaciones")+"</div></div>";
+  if(i.obs_ingreso)o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'><div class='lbl'>Obs. al ingreso</div><div style='font-size:12px;margin-top:3px'>"+esc(i.obs_ingreso)+"</div></div>";
+
+  // Botones
   o+="<div style='display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #334155'>";
   if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank'>WhatsApp</a>";
-  var ki=kpush(key);
   o+="<button class='btn bpu bsm' data-ac='"+ki+"'>Ver Acuerdo</button>";
-  o+="<button class='btn bg bsm' data-hev='"+ki+"'>📋 Historial</button>";
-  if(esA){o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";}
-  if(esA){o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";}
-  if(esA){o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";}
-  if(esA){o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";}
-  if(esA&&(i.deposito||0)>0){o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";}
+  o+="<button class='btn bg bsm' data-hev='"+ki+"'>Historial</button>";
+  // Enviar form: disponible para todos
+  window._fichaFormData={tel:i.tel||"",nom:(i.nombre||"").split(",")[0].trim(),key:key};
+  o+="<button class='btn bsm' style='background:#06B6D4;color:#000' onclick='enviarFormFicha()'>Enviar form</button>";
+  if(esA){
+    o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
+    o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
+    o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";
+    o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
+    if((i.deposito||0)>0)o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";
+  }
   o+="</div>";
   openModal("Ficha - "+esc(i.nombre),o,true);
   var md=MODS[MODS.length-1];
@@ -565,6 +606,22 @@ function openFicha(key){
     else if(e.target.classList.contains("ov"))closeModal();
   };
 }
+function enviarFormFicha(){
+  var d=window._fichaFormData||{};
+  var i=DATA.iq[d.key];if(!i)return;
+  var base=location.origin+location.pathname.replace(/index\.html$/,"")+"form.html";
+  var link=base+"?id="+encodeURIComponent(i.id_ac||i._key||"")+"&u="+encodeURIComponent(i.unidad||"");
+  var nom=(i.nombre||"").split(",")[0].trim();
+  var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+" Adm: 1555787641";
+  if(d.tel){
+    window.open("https://wa.me/"+d.tel.replace(/[^0-9]/g,"")+"?text="+encodeURIComponent(msg),"_blank");
+  } else {
+    navigator.clipboard.writeText(link);
+    alert("Link copiado (sin telefono registrado)");
+  }
+}
+
+
 function verAc(key){
   var i=DATA.iq[key];if(!i)return;
   var ki=kpush(key);
@@ -1703,14 +1760,15 @@ function revCosto(ckey){if(!confirm("Revertir pago? Se borraran todos los pagos 
 // Helper: obtener config de recargos con defaults
 function getCfgRec(){
   var d=DATA.cfg_rec||{};
+  // Usar !== undefined para permitir valor 0
   return {
-    desc_pronto: Number(d.desc_pronto||5),      // % descuento pronto pago (hasta dia 5)
-    rec_digital: Number(d.rec_digital||10),      // % recargo medio electronico
-    rec_d5:  Number(d.rec_d5||0),               // % recargo dia 5-9
-    rec_d10: Number(d.rec_d10||10),              // % recargo dia 10-19
-    rec_d20: Number(d.rec_d20||15),              // % recargo dia 20+
-    dias_mora: Number(d.dias_mora||10),          // dia inicio mora
-    dias_aviso_costo: Number(d.dias_aviso_costo||3) // dias antes del vencimiento para alertar
+    desc_pronto: d.desc_pronto!==undefined?Number(d.desc_pronto):5,
+    rec_digital: d.rec_digital!==undefined?Number(d.rec_digital):10,
+    rec_d5:      d.rec_d5!==undefined?Number(d.rec_d5):0,
+    rec_d10:     d.rec_d10!==undefined?Number(d.rec_d10):10,
+    rec_d20:     d.rec_d20!==undefined?Number(d.rec_d20):15,
+    dias_mora:   d.dias_mora!==undefined?Number(d.dias_mora):10,
+    dias_aviso_costo: d.dias_aviso_costo!==undefined?Number(d.dias_aviso_costo):3
   };
 }
 
@@ -3887,7 +3945,7 @@ function renderCfgRecargos(){
 
 function saveCfgRecargos(){
   var ups={
-    desc_pronto: Number(G("cr-desc").value||5),
+    desc_pronto: Number(G("cr-desc").value||0),
     rec_digital: Number(G("cr-dig").value||10),
     rec_d5:      Number(G("cr-d5").value||0),
     rec_d10:     Number(G("cr-d10").value||10),
