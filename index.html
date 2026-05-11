@@ -4010,6 +4010,18 @@ function renderCfgLimpieza(){
   o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-weight:700' onclick='borrarAjDia()'>Borrar ajustes</button>";
   o+="</div></div>";
 
+  // Borrar movimiento especifico
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar movimiento especifico (aporte/retiro)</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Busca y borra un movimiento por fecha y monto exacto.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px'>";
+  o+="<input type='date' class='inp' id='limp-mov-fecha' style='max-width:160px' placeholder='Fecha'/>";
+  o+="<input type='number' class='inp' id='limp-mov-monto' style='max-width:160px' placeholder='Monto exacto'/>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff' onclick='buscarMovEspecifico()'>Buscar</button>";
+  o+="</div>";
+  o+="<div id='limp-mov-resultados'></div>";
+  o+="</div>";
+
   // Borrar historial de acuerdos
   o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
   o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar historial de acuerdos</p>";
@@ -4020,6 +4032,52 @@ function renderCfgLimpieza(){
   o+="</div>";
   el.innerHTML=o;
 }
+
+function buscarMovEspecifico(){
+  var fecha=G("limp-mov-fecha")?G("limp-mov-fecha").value:"";
+  var monto=Number(G("limp-mov-monto")?G("limp-mov-monto").value||0:0);
+  var res=G("limp-mov-resultados");if(!res)return;
+
+  var encontrados=oA(DATA.movs||{}).filter(function(mv){
+    var ok=true;
+    if(fecha) ok=ok&&mv.fecha===fecha;
+    if(monto) ok=ok&&Number(mv.monto||0)===monto;
+    return ok;
+  });
+
+  if(!encontrados.length){
+    res.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:6px'>No se encontraron movimientos con esos filtros.</p>";
+    return;
+  }
+
+  var o="<div style='margin-top:8px'><p style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+encontrados.length+" movimiento(s) encontrado(s):</p>";
+  encontrados.forEach(function(mv){
+    o+="<div style='background:#0F172A;border-radius:8px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>";
+    o+="<div style='font-size:11px'>";
+    o+="<span style='color:#94A3B8'>"+fecDisp(mv.fecha||"")+"</span> · ";
+    o+="<span style='color:#fff'>"+esc(mv.tipo||"")+" — "+esc(mv.nota||mv.cuenta||"")+"</span> · ";
+    o+="<span style='color:#F59E0B;font-weight:700'>"+fmt(mv.monto||0)+"</span> · ";
+    o+="<span style='color:#64748B'>"+esc(mv.cuenta||"")+"</span>";
+    o+="</div>";
+    o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-size:10px' data-delmov='"+mv._key+"'>Borrar este</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  res.innerHTML=o;
+
+  // Handler para borrar
+  res.onclick=function(e){
+    var b=e.target.closest("[data-delmov]");
+    if(!b)return;
+    var key=b.dataset.delmov;
+    if(!confirm("Borrar este movimiento?"))return;
+    DB.ref("movs/"+key).remove(function(){
+      alert("Movimiento borrado.");
+      buscarMovEspecifico();
+    });
+  };
+}
+
 
 function borrarMovsDia(){
   var fecha=G("limp-fecha-movs")?G("limp-fecha-movs").value:hoy();
