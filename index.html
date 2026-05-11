@@ -4038,6 +4038,24 @@ function renderCfgLimpieza(){
   o+="<div id='limp-aj-resultados'></div>";
   o+="</div>";
 
+  // Borrar alertas/eventos de agenda
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar alertas / agenda</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Borra todos los recordatorios y eventos de la agenda (ev). No afecta acuerdos ni costos.</p>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-weight:700' onclick='borrarAlertas()'>Borrar todas las alertas</button>";
+  o+="</div>";
+
+  // Borrar compras de USD desde una fecha
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar compras de USD desde una fecha</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Borra los registros de ahorro en dolares a partir de la fecha indicada.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px'>";
+  o+="<input type='date' class='inp' id='limp-aho-fecha' value='"+hoy()+"' style='max-width:160px'/>";
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff' onclick='borrarAhoDesde()'>Buscar y borrar</button>";
+  o+="</div>";
+  o+="<div id='limp-aho-res'></div>";
+  o+="</div>";
+
   // Borrar historial de acuerdos
   o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
   o+="<p style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar historial de acuerdos</p>";
@@ -4167,6 +4185,51 @@ function borrarAjDia(){
     setTimeout(rConfig,300);
   });
 }
+
+function borrarAlertas(){
+  if(!confirm("Borrar TODOS los recordatorios y eventos de agenda? Esta accion no se puede deshacer."))return;
+  DB.ref("ev").remove(function(){
+    alert("Alertas/agenda borradas correctamente.");
+    setTimeout(rConfig,300);
+  });
+}
+
+function borrarAhoDesde(){
+  var fecha=G("limp-aho-fecha")?G("limp-aho-fecha").value:"";
+  var res=G("limp-aho-res");
+  if(!fecha){alert("Selecciona una fecha");return;}
+  
+  var ahos=oA(DATA.aho||{}).filter(function(a){return (a.fecha||"")>=fecha;});
+  if(!ahos.length){
+    if(res) res.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:6px'>No hay compras de USD desde "+fecDisp(fecha)+".</p>";
+    return;
+  }
+
+  var o="<div style='margin-top:8px'><p style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+ahos.length+" compra(s) de USD desde "+fecDisp(fecha)+":</p>";
+  ahos.forEach(function(a){
+    o+="<div style='background:#0F172A;border-radius:8px;padding:6px 8px;margin-bottom:4px;font-size:11px;color:#94A3B8'>";
+    o+=fecDisp(a.fecha||"")+" · U$S "+Number(a.usd||0).toLocaleString()+" · TC $"+Number(a.tc||0).toLocaleString()+" · "+fmt(a.pesos||0);
+    o+="</div>";
+  });
+  window._ahoFechaLimp=fecha;
+  o+="<button class='btn bsm' style='background:#EF4444;color:#fff;margin-top:8px' onclick='confirmarBorrarAho(window._ahoFechaLimp)'>Borrar estas "+ahos.length+" compras</button>";
+  o+="</div>";
+  if(res) res.innerHTML=o;
+}
+
+function confirmarBorrarAho(fecha){
+  if(!confirm("Borrar todas las compras de USD desde "+fecDisp(fecha)+"?"))return;
+  var ahos=oA(DATA.aho||{}).filter(function(a){return (a.fecha||"")>=fecha;});
+  var ups={};
+  ahos.forEach(function(a){ups["aho/"+a._key]=null;});
+  DB.ref("/").update(ups,function(){
+    alert("Compras de USD borradas. Podes volver a cargarlas desde Cta Socios.");
+    var res=G("limp-aho-res");
+    if(res) res.innerHTML="<p style='color:#10B981;font-size:11px'>Borrado correctamente.</p>";
+    setTimeout(rConfig,300);
+  });
+}
+
 
 function borrarHistAcuerdos(){
   if(!confirm("Borrar TODO el historial de eventos de acuerdos (hist)? Esta accion no se puede deshacer."))return;
@@ -4469,3 +4532,4 @@ render();
 </script>
 </body>
 </html>
+
