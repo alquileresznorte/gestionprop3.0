@@ -2632,13 +2632,17 @@ function saveAj(){
   closeModal();setTimeout(rCaja,300);
 }
 function openMov(){
+  // Solo cuentas de caja reales (sin MP Hugo/Loli que son cuentas de socios)
+  var ctasCaja=CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;});
   var o="<div class='g2'>"+fld("mv-f","Fecha",hoy(),"date");
-  o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro</option><option value='aporte'>Aporte</option></select></div>";
+  o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro (saca de caja)</option><option value='aporte'>Aporte (pone en caja)</option></select></div>";
   o+="<div class='fld'><label class='lbl'>Socio</label><select class='inp' id='mv-c'><option value='Cuenta Loli'>Loli</option><option value='Cuenta Hugo'>Hugo</option></select></div>";
-  o+=sld("mv-caja","Cuenta de caja",CTAS,"Efectivo");
-  o+=fld("mv-m","Monto $","","number")+"</div>"+fld("mv-n","Concepto (ej: medicamentos, viaje, gasoil)");
+  o+=sld("mv-caja","Cuenta de donde sale/entra el dinero",ctasCaja,"Efectivo");
+  o+=fld("mv-m","Monto $","","number")+"</div>";
+  o+=fld("mv-n","Concepto (ej: medicamentos, viaje, compra estufa)");
+  o+="<p style='color:#64748B;font-size:10px;margin-top:4px'>Retiro = el socio se lleva plata de caja. Aporte = el socio pone plata en caja o paga algo de su bolsillo.</p>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
-  openModal("Retiro / Aporte",o);
+  openModal("Retiro / Aporte de Socio",o);
 }
 function saveMov(){
   var m=Number(G("mv-m").value);if(!m){alert("Ingresa el monto");return;}
