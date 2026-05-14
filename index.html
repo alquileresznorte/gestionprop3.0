@@ -1004,6 +1004,10 @@ function openNA(){
       if(G("na-dep"))G("na-dep").value=r.deposito||"";
       if(G("na-gs"))G("na-gs").value=r.gastos||"";
       if(G("na-ing"))G("na-ing").value=r.fecha_ingreso||hoy();
+      // Pre-cargar seña como pago a cuenta
+      if(r.senia&&r.senia>0&&G("na-pc")){
+        G("na-pc").value=r.senia;
+      }
       actualizarResumenNA();
     }
   },150);
