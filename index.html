@@ -2135,9 +2135,9 @@ function saldoAcumulado(cta, hastaFecha, hastaM){
   // Subtract withdrawals, add deposits (movs)
   oA(DATA.movs).forEach(function(mv){
     if(mv.fecha<=hastaFecha){
-      // Para cuentas de caja: el impacto es en cuenta_caja (o en mv.cuenta si no hay cuenta_caja y no es "Cuenta Hugo/Loli")
-      var ctaCajaDelMov=mv.cuenta_caja||(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta);
-      if(ctaCajaDelMov===cta){
+      // Solo usar cuenta_caja explícita - NO asumir Efectivo si no está definida
+      var ctaCajaDelMov=mv.cuenta_caja||"";
+      if(ctaCajaDelMov&&ctaCajaDelMov===cta){
         if(mv.tipo==="retiro") egr+=Number(mv.monto||0);
         else ing+=Number(mv.monto||0);
       }
@@ -2223,7 +2223,8 @@ function rCaja(){
     });
     // Aportes y retiros de socios
     movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
-      var ctaCaja=mv.cuenta_caja||(["Cuenta Loli","Cuenta Hugo"].indexOf(mv.cuenta)>=0?"Efectivo":mv.cuenta);
+      // Solo usar cuenta_caja explícita - no asumir Efectivo
+      var ctaCaja=mv.cuenta_caja||"Efectivo_sin_cuenta";
       var monto=Number(mv.monto||0);
       var esRetiro=mv.tipo==="retiro";
       var socioNombre=mv.cuenta==="Cuenta Hugo"?"Hugo":mv.cuenta==="Cuenta Loli"?"Loli":"Socio";
