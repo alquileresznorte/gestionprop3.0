@@ -2121,13 +2121,14 @@ function saldoAcumulado(cta, hastaFecha, hastaM){
   });
   oA(DATA.cst).forEach(function(c){
     if(c.pagos&&Object.keys(c.pagos).length>0){
-      // Pagos individuales: usar fecha real de cada pago (no fec_venc)
+      // Pagos individuales: usar fecha real de cada pago
       Object.values(c.pagos).forEach(function(pg){
         if(pg.cuenta===cta&&pg.fecha&&pg.fecha<=hastaFecha) egr+=Number(pg.monto||0);
       });
     } else if(c.pagado&&c.cuenta===cta){
-      // Sin pagos individuales: usar fecha_pago si existe, sino fec_venc
-      var fp=c.fecha_pago||c.fec_venc||"";
+      // Sin pagos individuales: SOLO usar fecha_pago (no fec_venc como fallback)
+      // Si no tiene fecha_pago, no se puede saber cuándo se pagó - no incluir
+      var fp=c.fecha_pago||"";
       if(fp&&fp<=hastaFecha) egr+=Number(c.monto||0);
     }
   });
