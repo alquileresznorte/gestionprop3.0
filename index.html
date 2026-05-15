@@ -971,6 +971,7 @@ function openNA(){
   o+=fld("na-gs","Gastos de gestion $","","number");
   o+=fld("na-desc-gs","Descuento en gastos $","0","number");
   o+=fld("na-pc","Reserva / Pago a cuenta $","0","number");
+  o+=sld("na-pc-cta","Cuenta del pago",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
   o+=sld("na-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
   o+=sld("na-cuotas-gs","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
   o+="</div>";
@@ -1158,13 +1159,28 @@ function saveNA(){
     function aplicarPC(monto){
       if(pcRestante<=0)return{monto:monto,pagos:{},estado:"pendiente"};
       var aplicado=Math.min(pcRestante,monto);pcRestante-=aplicado;
-      var pagos={};pagos[Date.now()+Math.random()]={fecha:hoy(),monto:aplicado,cuenta:"Efectivo",concepto:"Pago a cuenta"};
+      var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
+      var pagos={};pagos[Date.now()+Math.random()]={fecha:hoy(),monto:aplicado,cuenta:pcCta,concepto:"Pago a cuenta"};
       return{monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
     }
 
     if(alq>0){var ca=aplicarPC(alq);DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,concepto:"Alquiler"});}
     if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
+
+    // Registrar pago a cuenta en caja como ingreso
+    if(pc>0){
+      var pcCta2=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
+      DB.ref("aj").push({
+        fecha:ing||hoy(),
+        tipo:"ingreso",
+        sub:"Pago a cuenta ingreso",
+        cuenta:pcCta2,
+        concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,
+        monto:pc,
+        auto:true
+      });
+    }
 
     // Marcar reserva como convertida si corresponde
     if(window._resConvertKey){
