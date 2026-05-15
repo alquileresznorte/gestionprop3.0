@@ -576,36 +576,6 @@ function openFicha(key){
   if(dias>=0&&dias<=15)o+="<div class='wbx'>Vencimiento en "+dias+" dias - "+fecDisp(i.egreso)+"</div>";
   if(i.obs_ingreso)o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'><div class='lbl'>Obs. al ingreso</div><div style='font-size:12px;margin-top:3px'>"+esc(i.obs_ingreso)+"</div></div>";
 
-  // Resumen de cobros (admin y empleado)
-  if(true){
-    var cobsInq=oA(DATA.cob).filter(function(c){return c.id_ac===i.id_ac||c.unidad===i.unidad;});
-    cobsInq.sort(function(a,b){return(a.mes||"").localeCompare(b.mes||"");});
-    if(cobsInq.length){
-      o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
-      o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:8px'>Cobros registrados</div>";
-      cobsInq.forEach(function(c){
-        var pagado=pT(c);
-        var total=Number(c.monto_total||0)+Number(c.sal_ant||0);
-        var saldo=total-pagado;
-        var color=c.estado==="pagado"?"#10B981":c.estado==="parcial"?"#F59E0B":"#EF4444";
-        o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1E293B;font-size:11px'>";
-        o+="<div><span style='color:#94A3B8'>"+esc(c.mes||"")+"</span> <span style='color:#CBD5E1'>"+esc(c.concepto||"Alquiler")+"</span></div>";
-        o+="<div style='text-align:right'>";
-        o+="<span style='color:"+color+";font-weight:700'>"+fmt(pagado)+"</span>";
-        o+=" / <span style='color:#64748B'>"+fmt(total)+"</span>";
-        if(saldo>0) o+=" <span style='color:#EF4444;font-size:10px'>(debe "+fmt(saldo)+")</span>";
-        o+="</div></div>";
-      });
-      var totalPagado=cobsInq.reduce(function(s,c){return s+pT(c);},0);
-      var totalCobrar=cobsInq.reduce(function(s,c){return s+Number(c.monto_total||0)+Number(c.sal_ant||0);},0);
-      o+="<div style='display:flex;justify-content:space-between;padding-top:6px;font-size:11px;font-weight:700'>";
-      o+="<span style='color:#94A3B8'>Total</span>";
-      o+="<span style='color:#10B981'>"+fmt(totalPagado)+"</span> / <span style='color:#64748B'>"+fmt(totalCobrar)+"</span>";
-      o+="</div>";
-      o+="</div>";
-    }
-  }
-
   // Botones
   o+="<div style='display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #334155'>";
   if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank'>WhatsApp</a>";
@@ -1001,7 +971,6 @@ function openNA(){
   o+=fld("na-gs","Gastos de gestion $","","number");
   o+=fld("na-desc-gs","Descuento en gastos $","0","number");
   o+=fld("na-pc","Reserva / Pago a cuenta $","0","number");
-  o+=sld("na-pc-cta","Cuenta del pago",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
   o+=sld("na-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
   o+=sld("na-cuotas-gs","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
   o+="</div>";
@@ -1189,28 +1158,13 @@ function saveNA(){
     function aplicarPC(monto){
       if(pcRestante<=0)return{monto:monto,pagos:{},estado:"pendiente"};
       var aplicado=Math.min(pcRestante,monto);pcRestante-=aplicado;
-      var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
-      var pagos={};pagos[Date.now()+Math.random()]={fecha:hoy(),monto:aplicado,cuenta:pcCta,concepto:"Pago a cuenta"};
+      var pagos={};pagos[Date.now()+Math.random()]={fecha:hoy(),monto:aplicado,cuenta:"Efectivo",concepto:"Pago a cuenta"};
       return{monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
     }
 
     if(alq>0){var ca=aplicarPC(alq);DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,concepto:"Alquiler"});}
     if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
-
-    // Registrar pago a cuenta en caja como ingreso
-    if(pc>0){
-      var pcCta2=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
-      DB.ref("aj").push({
-        fecha:ing||hoy(),
-        tipo:"ingreso",
-        sub:"Pago a cuenta ingreso",
-        cuenta:pcCta2,
-        concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,
-        monto:pc,
-        auto:true
-      });
-    }
 
     // Marcar reserva como convertida si corresponde
     if(window._resConvertKey){
@@ -2770,6 +2724,51 @@ function rStats(){
       o+="<td style='color:"+(d>=0&&d<=30?"#F59E0B":"#64748B")+";font-size:10px'>"+(i.egreso||"--")+"</td></tr>";
     });
     o+="</tbody></table></div>";
+  }
+
+  // Costos variables del mes (eventuales de caja)
+  var cstVar=cstM.filter(function(c){return c.tipo==="eventual_caja";});
+  if(cstVar.length){
+    o+="<div class='card' style='margin-bottom:10px;overflow-x:auto;border-left:3px solid #F59E0B'>";
+    o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Costos variables del mes — "+m+"</h3>";
+    o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Gastos eventuales registrados desde caja. No forman parte de los costos fijos.</p>";
+
+    // Agrupar por categoria
+    var varPorCat={};
+    cstVar.forEach(function(c){
+      var cat=c.cat||"Otro";
+      if(!varPorCat[cat]) varPorCat[cat]={total:0,items:[]};
+      varPorCat[cat].total+=Number(c.monto||0);
+      varPorCat[cat].items.push(c);
+    });
+    var totalVar=cstVar.reduce(function(s,c){return s+Number(c.monto||0);},0);
+
+    o+="<table class='tbl'><thead><tr><th>Categoria</th><th>Descripcion</th><th>Edificio</th><th>Fecha</th><th>Monto</th></tr></thead><tbody>";
+    cstVar.sort(function(a,b){return(a.cat||"").localeCompare(b.cat||"");}).forEach(function(c){
+      var cc=CATC[c.cat]||"#64748B";
+      o+="<tr>";
+      o+="<td>"+bdg(c.cat||"Otro",cc)+"</td>";
+      o+="<td style='font-size:12px'>"+esc(c.desc||"")+"</td>";
+      o+="<td style='color:#64748B;font-size:11px'>"+esc(c.ed||"General")+"</td>";
+      o+="<td style='color:#64748B;font-size:11px'>"+fecDisp(c.fecha_pago||c.fec_venc||"")+"</td>";
+      o+="<td style='color:#EF4444;font-weight:700'>"+fmt(c.monto||0)+"</td>";
+      o+="</tr>";
+    });
+    o+="<tr style='border-top:2px solid #334155;font-weight:700'><td colspan='4'>Total costos variables</td><td style='color:#EF4444'>"+fmt(totalVar)+"</td></tr>";
+    o+="</tbody></table>";
+
+    // Resumen por categoria
+    o+="<div style='margin-top:10px;display:flex;flex-wrap:wrap;gap:8px'>";
+    Object.keys(varPorCat).forEach(function(cat){
+      var cc=CATC[cat]||"#64748B";
+      o+="<div style='background:"+cc+"22;border:1px solid "+cc+"44;border-radius:8px;padding:6px 10px'>";
+      o+="<div style='color:"+cc+";font-size:10px;font-weight:700'>"+cat+"</div>";
+      o+="<div style='color:#F1F5F9;font-size:12px;font-weight:700'>"+fmt(varPorCat[cat].total)+"</div>";
+      o+="<div style='color:#64748B;font-size:10px'>"+varPorCat[cat].items.length+" item"+(varPorCat[cat].items.length!==1?"s":"")+"</div>";
+      o+="</div>";
+    });
+    o+="</div>";
+    o+="</div>";
   }
 
   if(cieA.length){
