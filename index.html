@@ -2234,7 +2234,8 @@ function rCaja(){
     });
     // Ajustes manuales
     ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
-      movimientosD.push({concepto:esc(a.concepto||""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste"});
+      var clasifLabel={"error":"[ERROR]","gs_corriente":"[Gs.corriente]","gs_extraordinario":"[Gs.ext.]","inversion":"[Inversion]","ingreso_venta":"[Venta]"}[a.clasificacion||a.sub]||"";
+      movimientosD.push({concepto:esc(a.concepto||"")+(clasifLabel?" "+clasifLabel:""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste",ajKey:a._key,ajClasif:a.clasificacion||a.sub||""});
     });
     // Aportes y retiros de socios
     movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
@@ -2317,6 +2318,12 @@ function rCaja(){
         var val=cta==="_socios"?(mv.socioMov!==undefined?mv.socioMov:0):(mv.cuenta===cta?mv.mov:0);
         o+="<td style='padding:6px 10px;text-align:right;color:"+(val>0?"#10B981":val<0?"#EF4444":"#334155")+"'>"+(val!==0?(val>0?"+"+fmt(val):fmt(val)):"")+"</td>";
       });
+      // Botón borrar error (solo admin)
+      if(esA&&mv.tipo==="ajuste"&&mv.ajClasif==="error"&&mv.ajKey){
+        o+="<td style='padding:4px 6px'><button class='btn bx bsm' style='font-size:9px;padding:2px 6px' data-delaj='"+mv.ajKey+"'>Borrar</button></td>";
+      } else {
+        o+="<td></td>";
+      }
       o+="</tr>";
     });
 
@@ -2509,7 +2516,14 @@ function rCaja(){
   }
 
   G("main").innerHTML=o;
-    G("main").onclick=function(e){var b=e.target.closest("[data-subcid]");if(b)toggleSubcDet(b.dataset.subcid);};
+    G("main").onclick=function(e){
+    var b=e.target.closest("[data-subcid]");if(b)toggleSubcDet(b.dataset.subcid);
+    var da=e.target.closest("[data-delaj]");
+    if(da){
+      if(!confirm("Borrar este ajuste de error?"))return;
+      DB.ref("aj/"+da.dataset.delaj).remove(function(){setTimeout(rCaja,300);});
+    }
+  };
   // Wire view toggle buttons
   G("main").addEventListener("click",function(e){
     var cv=e.target.closest("[data-cv]");
@@ -2649,7 +2663,8 @@ function openAj(){
 function saveAj(){
   var m=Number(G("aj-m").value),c=G("aj-con").value;
   if(!m||!c){alert("Monto y descripcion obligatorios");return;}
-  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:G("aj-s").value,cuenta:G("aj-c").value,concepto:c,monto:m});
+  var clasif=(G("aj-s")||{value:"otro"}).value;
+  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:c,monto:m});
   closeModal();setTimeout(rCaja,300);
 }
 function openMov(){
@@ -3743,12 +3758,20 @@ function openGastoAjuste(){
 
   // Tab Ajuste
   o+="<div id='tab-ajuste-body' style='display:none'>";
-  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Correcciones, diferencias de caja, devoluciones.</p>";
+  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Correcciones y movimientos varios de caja.</p>";
   o+="<div class='g2'>"+fld("aj-f","Fecha",_cajaF,"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='aj-t'><option value='egreso'>Egreso (-)</option><option value='ingreso'>Ingreso (+)</option></select></div>";
-  o+="<div class='fld'><label class='lbl'>Categoria</label><select class='inp' id='aj-s'><option>Diferencia de caja</option><option>Compra insumos</option><option>Gastos bancarios</option><option>Impuesto/tasa</option><option>Gasto personal</option><option>Devolucion deposito</option><option>Otro</option></select></div>";
+  o+="<div class='fld'><label class='lbl'>Clasificacion</label><select class='inp' id='aj-s' onchange='switchAjClasif(this.value)'>";
+  o+="<option value='error'>Error de carga (solo admin puede borrar)</option>";
+  o+="<option value='gs_corriente'>Gasto corriente (yerba, clavo, etc.)</option>";
+  o+="<option value='gs_extraordinario'>Gasto extraordinario</option>";
+  o+="<option value='inversion'>Inversion</option>";
+  o+="<option value='ingreso_venta'>Ingreso por venta</option>";
+  o+="<option value='otro'>Otro</option>";
+  o+="</select></div>";
   o+=sld("aj-c","Cuenta",CTAS)+"</div>";
   o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","number");
+  o+="<div id='aj-error-info' style='background:#EF444411;border:1px solid #EF444433;border-radius:8px;padding:8px;font-size:11px;color:#EF4444;margin-top:6px'>⚠ Los errores solo los puede borrar el Admin desde Config → Limpieza.</div>";
   o+="</div>";
 
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:14px'>";
@@ -3770,6 +3793,11 @@ function openGastoAjuste(){
   },100);
 }
 
+function switchAjClasif(val){
+  var info=G("aj-error-info");
+  if(info) info.style.display=val==="error"?"block":"none";
+}
+
 function switchGastoTab(tab){
   window._gaTab=tab;
   var gBody=G("tab-gasto-body"),aBody=G("tab-ajuste-body");
@@ -3789,6 +3817,7 @@ function switchGastoTab(tab){
 
 function saveGastoAjuste(){
   if(window._gaTab==="ajuste"){
+    // Tomar clasificacion del select antes de llamar saveAj
     saveAj(); return;
   }
   // Gasto
@@ -4598,3 +4627,4 @@ render();
 </script>
 </body>
 </html>
+
