@@ -1155,16 +1155,31 @@ function saveNA(){
     });
 
     var pcRestante=pc;
+    var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
+    var pcFecha=ing||hoy();
     function aplicarPC(monto){
       if(pcRestante<=0)return{monto:monto,pagos:{},estado:"pendiente"};
       var aplicado=Math.min(pcRestante,monto);pcRestante-=aplicado;
-      var pagos={};pagos[Date.now()+Math.random()]={fecha:hoy(),monto:aplicado,cuenta:"Efectivo",concepto:"Pago a cuenta"};
+      var pagos={};pagos[Date.now()+Math.random()]={fecha:pcFecha,monto:aplicado,cuenta:pcCta,concepto:"Pago a cuenta"};
       return{monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
     }
 
     if(alq>0){var ca=aplicarPC(alq);DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,concepto:"Alquiler"});}
     if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
+
+    // Registrar pago a cuenta como ingreso en caja
+    if(pc>0){
+      DB.ref("aj").push({
+        fecha:pcFecha,
+        tipo:"ingreso",
+        sub:"Pago a cuenta ingreso",
+        cuenta:pcCta,
+        concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,
+        monto:pc,
+        auto:true
+      });
+    }
 
     // Marcar reserva como convertida si corresponde
     if(window._resConvertKey){
