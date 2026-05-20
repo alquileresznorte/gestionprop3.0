@@ -438,9 +438,10 @@ function fAc(){
       resHtml+="<div style='color:#64748B;font-size:11px'>"+esc(r.tel||"")+" · Seña: "+fmt(r.senia||0)+" ("+esc(r.cta_senia||"Efectivo")+") · "+fecDisp(r.fecha||"")+"</div>";
       resHtml+="<div style='color:#94A3B8;font-size:10px'>Alq: "+fmt(r.alquiler||0)+" · Dep: "+fmt(r.deposito||0)+" · Gas: "+fmt(r.gastos||0)+"</div></div>";
       resHtml+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
+      // Convertir: todos pueden. Editar y liberar: solo admin
+      resHtml+="<button class='btn bp bsm' style='font-size:10px' data-convertres='"+ki+"'>Convertir a contrato</button>";
       if(USER.r==="admin"){
         resHtml+="<button class='btn bsm' style='background:#F59E0B;color:#000;font-size:10px' data-editres='"+ki+"'>Editar</button>";
-        resHtml+="<button class='btn bp bsm' style='font-size:10px' data-convertres='"+ki+"'>Convertir a contrato</button>";
         resHtml+="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-cancelres='"+ki+"'>Liberar depto</button>";
       }
       resHtml+="</div></div>";
@@ -971,6 +972,15 @@ function openNA(){
   o+=fld("na-gs","Gastos de gestion $","","number");
   o+=fld("na-desc-gs","Descuento en gastos $","0","number");
   o+=fld("na-pc","Reserva / Pago a cuenta $","0","number");
+  o+=sld("na-pc-cta","Cuenta del pago a cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
+  o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin-bottom:8px'>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Pago al tomar posesion (opcional)</div>";
+  o+="<div class='g2'>";
+  o+=fld("na-pos-monto","Monto $","","number");
+  o+=sld("na-pos-cta","Cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
+  o+="</div>";
+  o+="<p style='color:#64748B;font-size:10px;margin-top:2px'>Se registra como ingreso en caja el dia de inicio del contrato.</p>";
+  o+="</div>";
   o+=sld("na-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
   o+=sld("na-cuotas-gs","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
   o+="</div>";
@@ -1065,6 +1075,14 @@ function actualizarResumenNA(){
 function saveNA(){
   var u=G("na-u").value,n=G("na-n").value,d=G("na-d").value;
   if(!u||!n||!d){alert("Unidad, nombre y DNI son obligatorios");return;}
+  // Verificar que no haya contrato activo para esa unidad
+  var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
+  if(deptoActivo){
+    alert("El depto "+u+" ya tiene un contrato activo. Solo puede haber uno por departamento.");return;
+  }
+  // Deshabilitar botón para evitar doble click
+  var btnCrear=document.querySelector("button[onclick='saveNA()']");
+  if(btnCrear){btnCrear.disabled=true;btnCrear.textContent="Creando...";}
   var vigente=G("na-vigente")&&G("na-vigente").checked;
   var hist=oA(DATA.hist).filter(function(h){return h.dni===d;});
   if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
@@ -1171,13 +1189,19 @@ function saveNA(){
     // Registrar pago a cuenta como ingreso en caja
     if(pc>0){
       DB.ref("aj").push({
-        fecha:pcFecha,
-        tipo:"ingreso",
-        sub:"Pago a cuenta ingreso",
-        cuenta:pcCta,
-        concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,
-        monto:pc,
-        auto:true
+        fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
+        cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,
+        monto:pc,auto:true
+      });
+    }
+    // Registrar pago al tomar posesion
+    var posMonto=Number((G("na-pos-monto")||{value:0}).value||0);
+    var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
+    if(posMonto>0){
+      DB.ref("aj").push({
+        fecha:ing||hoy(),tipo:"ingreso",sub:"Pago posesion",
+        cuenta:posCta,concepto:"Pago al tomar posesion #"+id+" - "+n+" - "+u,
+        monto:posMonto,auto:true
       });
     }
 
@@ -1189,7 +1213,7 @@ function saveNA(){
     }
 
     closeModal();
-    var msg="Acuerdo #"+id+" creado. ";
+    var msg="Acuerdo #"+id+" creado correctamente. ";
     if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
     if(dep>0)msg+="Deposito "+fmt(dep)+(cuotasDep>1?" en "+cuotasDep+" cuotas":"")+". ";
     if(gsNeto>0)msg+="Gastos "+fmt(gsNeto)+(cuotasGs>1?" en "+cuotasGs+" cuotas":"")+(desc>0?" (desc. "+fmt(desc)+")":"")+". ";
