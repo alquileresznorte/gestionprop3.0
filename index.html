@@ -1311,7 +1311,10 @@ function saveNA(){
   var resKeyLocal=window._resConvertKey||null;
   var vigente=G("na-vigente")&&G("na-vigente").checked;
   var hist=oA(DATA.hist).filter(function(h){return h.dni===d;});
-  if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
+  if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?")){
+    if(btnCrear){btnCrear.disabled=false;btnCrear.textContent="Crear Acuerdo";btnCrear.style.opacity="1";}
+    return;
+  }
 
   var id=nid();
   var moneda=(G("na-moneda")||{value:"ARS"}).value||"ARS";
@@ -1321,10 +1324,10 @@ function saveNA(){
   var ing=G("na-ing").value;
   var mesInicio=ing?ing.slice(0,7):mes();
 
-  function getMesN(start,n){
-    var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+n;
+  var getMesN=function(start,nn){
+    var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+nn;
     while(mo>12){mo-=12;yr++;}return yr+"-"+String(mo).padStart(2,"0");
-  }
+  };
 
   if(vigente){
     // CONTRATO VIGENTE - save with historical data, generate current month cobro
