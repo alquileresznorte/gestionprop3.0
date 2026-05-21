@@ -1140,11 +1140,13 @@ function liberarReserva(key){
   setTimeout(function(){rAcuerdos();},400);
 }
 
-function convertirReserva(key){
-  var r=(DATA.res||{})[key];if(!r)return;
-  // Pre-cargar datos de la reserva en openNA
+function convertirReserva(resKey){
+  var r=(DATA.res||{})[resKey];if(!r)return;
+  // Verificar que el depto no tenga ya un contrato activo
+  var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===r.unidad&&i.estado==="activo";}).length>0;
+  if(deptoActivo){alert("El depto "+r.unidad+" ya tiene un contrato activo.");return;}
   window._resConvert=r;
-  window._resConvertKey=key;
+  window._resConvertKey=resKey;
   openNA();
 }
 
@@ -1296,7 +1298,6 @@ function saveNA(){
   if(!u||!n||!d){alert("Unidad, nombre y DNI son obligatorios");return;}
   // Verificar que no haya contrato activo para esa unidad
   var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
-  console.log("saveNA: unidad="+u+" deptoActivo="+deptoActivo+" resKeyLocal="+window._resConvertKey);
   if(deptoActivo){
     alert("El depto "+u+" ya tiene un contrato activo. Solo puede haber uno por departamento.");return;
   }
@@ -1439,28 +1440,23 @@ function saveNA(){
       }
     }
 
-    // Marcar reserva como convertida si corresponde
-    if(resKeyLocal){
-      var rkl=resKeyLocal;
-      DB.ref("res/"+rkl).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()},function(err){
-        if(err){console.error("Error al marcar reserva convertida:",err);}
-        else{console.log("Reserva "+rkl+" marcada como convertida OK");}
-      });
+    // Marcar reserva como convertida
+    var finalizarContrato=function(){
+      closeModal();
+      var msg="Acuerdo #"+id+" creado. ";
+      if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
+      if(pc>0)msg+="Pago a cuenta "+fmt(pc)+". ";
+      if(posMonto>0)msg+="Pago posesion "+fmt(posMonto)+".";
+      alert(msg);
       window._resConvert=null;
       window._resConvertKey=null;
-      resKeyLocal=null;
+      setTimeout(rAcuerdos,400);
+    };
+    if(resKeyLocal){
+      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()},finalizarContrato);
     } else {
-      console.log("resKeyLocal vacio - no habia reserva o se perdio la key");
+      finalizarContrato();
     }
-
-    closeModal();
-    var msg="Acuerdo #"+id+" creado correctamente. ";
-    if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
-    if(dep>0)msg+="Deposito "+fmt(dep)+(cuotasDep>1?" en "+cuotasDep+" cuotas":"")+". ";
-    if(gsNeto>0)msg+="Gastos "+fmt(gsNeto)+(cuotasGs>1?" en "+cuotasGs+" cuotas":"")+(desc>0?" (desc. "+fmt(desc)+")":"")+". ";
-    if(pc>0)msg+="Pago a cuenta "+fmt(pc)+" aplicado.";
-    alert(msg);
-    setTimeout(rAcuerdos,400);
   }
 }
 
