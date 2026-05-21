@@ -1105,8 +1105,11 @@ function openEditReserva(key){
   o+=fld("re-gas","Gastos $",r.gastos||"","number");
   o+=fld("re-fi","Fecha ingreso",r.fecha_ingreso||hoy(),"date");
   o+=fld("re-senia","Seña $",r.senia||"","number");
-  o+=fld("re-obs","Observaciones",r.obs||"");
   o+="</div>";
+  o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin:8px 0'>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Pago al tomar posesion</div>";
+  o+="<div class='g2'>"+fld("re-pos-monto","Monto $",r.pago_posesion||"","number")+sld("re-pos-cta","Cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo")+"</div></div>";
+  o+=fld("re-obs","Observaciones",r.obs||"");
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveEditReserva(this.dataset.rkey)' data-rkey='"+key+"'>Guardar</button></div>";
   openModal("Editar Reserva — "+esc(r.unidad),o);
 }
@@ -1120,6 +1123,8 @@ function saveEditReserva(key){
     gastos:Number((G("re-gas")||{value:0}).value||0),
     fecha_ingreso:(G("re-fi")||{value:hoy()}).value,
     senia:Number((G("re-senia")||{value:0}).value||0),
+    pago_posesion:Number((G("re-pos-monto")||{value:0}).value||0),
+    cta_posesion:(G("re-pos-cta")||{value:"Efectivo"}).value||"Efectivo",
     obs:(G("re-obs")||{value:""}).value
   };
   if(!ups.nombre){alert("El nombre es obligatorio");return;}
@@ -1226,6 +1231,12 @@ function openNA(){
       if(r.senia&&r.senia>0&&G("na-pc")){
         G("na-pc").value=r.senia;
       }
+      if(r.pago_posesion&&r.pago_posesion>0&&G("na-pos-monto")){
+        G("na-pos-monto").value=r.pago_posesion;
+      }
+      if(r.cta_posesion&&G("na-pos-cta")){
+        G("na-pos-cta").value=r.cta_posesion;
+      }
       actualizarResumenNA();
     }
   },150);
@@ -1290,7 +1301,10 @@ function saveNA(){
   }
   // Deshabilitar botón para evitar doble click
   var btnCrear=document.querySelector("button[onclick='saveNA()']");
-  if(btnCrear){btnCrear.disabled=true;btnCrear.textContent="Creando...";}
+  if(btnCrear){
+    if(btnCrear.disabled){alert("Ya se esta creando el contrato, por favor espera.");return;}
+    btnCrear.disabled=true;btnCrear.textContent="Creando...";btnCrear.style.opacity="0.5";
+  }
   var vigente=G("na-vigente")&&G("na-vigente").checked;
   var hist=oA(DATA.hist).filter(function(h){return h.dni===d;});
   if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
