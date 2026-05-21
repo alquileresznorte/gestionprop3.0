@@ -167,7 +167,14 @@ function fecDisp(s){
 }
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 var _nc=ls("gp_nc",2000);
-function nid(){_nc++;lw("gp_nc",_nc);return String(_nc).padStart(6,"0");}
+function nid(){
+  _nc++;lw("gp_nc",_nc);
+  // Sincronizar con Firebase para evitar duplicados entre dispositivos
+  DB.ref("cfg_nc").transaction(function(cur){return (cur||2000)+1;},function(err,committed,snap){
+    if(committed&&snap){_nc=snap.val();lw("gp_nc",_nc);}
+  });
+  return String(_nc).padStart(6,"0");
+}
 function G(id){return document.getElementById(id);}
 function uds(){var r=[];Object.keys(ED).forEach(function(c){for(var i=1;i<=ED[c].u;i++)r.push(c+"-"+i);});return r;}
 function pA(c){return c&&c.pagos?Object.values(c.pagos):[];}
@@ -276,6 +283,8 @@ function stopDB(){DKEYS.forEach(function(k){DB.ref(k).off();});}
 
 function render(){
   if(!USER){rLogin();return;}
+  // Si hay un modal abierto, no reconstruir el DOM - solo actualizar datos internos
+  if(MODS.length>0) return;
   rShell();
   var fn={panel:rPanel,alertas:rAlertas,acuerdos:rAcuerdos,historial:rHistorial,cobranzas:rCob,costos:rCostos,caja:rCaja,ctacte:rCtaCte,stats:rStats,config:rConfig};
   if(fn[SEC])fn[SEC]();
@@ -436,8 +445,8 @@ function fAc(){
       var ki=kpush(r._key);
       resHtml+="<div style='background:#1E293B;border:1px solid #F59E0B44;border-left:3px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px'>";
       resHtml+="<div><div style='font-weight:700;font-size:13px'>"+esc(r.unidad)+" — "+esc(r.nombre)+"</div>";
-      resHtml+="<div style='color:#64748B;font-size:11px'>"+esc(r.tel||"")+" · Seña: "+fmt(r.senia||0)+" ("+esc(r.cta_senia||"Efectivo")+") · "+fecDisp(r.fecha||"")+"</div>";
-      resHtml+="<div style='color:#94A3B8;font-size:10px'>Alq: "+fmt(r.alquiler||0)+" · Dep: "+fmt(r.deposito||0)+" · Gas: "+fmt(r.gastos||0)+"</div></div>";
+      resHtml+="<div style='color:#64748B;font-size:11px'>"+esc(r.tel||"")+(r.dni?" · DNI: "+esc(r.dni):"")+" · Seña: "+fmt(r.senia||0)+" ("+esc(r.cta_senia||"Efectivo")+") · "+fecDisp(r.fecha||"")+"</div>";
+      resHtml+="<div style='color:#94A3B8;font-size:10px'>Alq: "+fmt(r.alquiler||0)+" · Dep: "+fmt(r.deposito||0)+" · Gas: "+fmt(r.gastos||0)+(r.fecha_ingreso?" · Ingreso: "+fecDisp(r.fecha_ingreso):"")+(r.fecha_egreso?" · Fin: "+fecDisp(r.fecha_egreso):"")+"</div></div>";
       resHtml+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
       // Convertir: todos pueden. Editar y liberar: solo admin
       resHtml+="<button class='btn bp bsm' style='font-size:10px' data-convertres='"+ki+"'>Convertir a contrato</button>";
@@ -1014,14 +1023,19 @@ function openReserva(){
   o+="<div class='fld'><label class='lbl'>Depto *</label><select class='inp' id='rs-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
   o+=fld("rs-f","Fecha reserva",hoy(),"date");
   o+=fld("rs-nom","Nombre inquilino *","");
+  o+=fld("rs-dni","DNI","");
   o+=fld("rs-tel","Telefono","","tel");
-  o+=fld("rs-alq","Alquiler mensual $","","number");
+  o+=fld("rs-alq","Valor mensual acordado $","","number");
   o+=fld("rs-dep","Deposito $","","number");
   o+=fld("rs-gas","Gastos admin/mant $","","number");
   o+="</div>";
+  o+="<div class='g2'>";
+  o+=fld("rs-fi","Fecha inicio contrato",hoy(),"date");
+  o+=fld("rs-fegr","Fecha fin contrato","","date");
+  o+="</div>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin:8px 0'>";
   o+="<div style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:8px'>Seña recibida</div>";
-  o+="<div class='g2'>"+fld("rs-senia","Monto seña $","","number")+fld("rs-fi","Fecha ingreso previsto",hoy(),"date")+"</div>";
+  o+="<div class='g2'>"+fld("rs-senia","Monto seña $","","number")+sld("rs-cta","Cuenta de pago",CTAS,"Efectivo")+"</div>";
   o+=sld("rs-cta","Cuenta de pago",CTAS,"Efectivo");
   o+="</div>";
   o+=fld("rs-obs","Observaciones (opcional)","");
@@ -1049,11 +1063,13 @@ function saveReserva(){
   var id_res="RES-"+u+"-"+Date.now().toString().slice(-6);
 
   // Guardar reserva
+  var dni=(G("rs-dni")||{value:""}).value.trim();
+  var fegr=(G("rs-fegr")||{value:""}).value;
   DB.ref("res").push({
-    id_res:id_res,unidad:u,nombre:nom,tel:tel,
+    id_res:id_res,unidad:u,nombre:nom,dni:dni,tel:tel,
     alquiler:alq,deposito:dep,gastos:gas,
     senia:senia,cta_senia:cta,
-    fecha:fecha,fecha_ingreso:fi,
+    fecha:fecha,fecha_ingreso:fi,fecha_egreso:fegr,
     obs:obs,estado:"reservado",
     fecha_reg:hoy()
   });
@@ -1099,11 +1115,13 @@ function openEditReserva(key){
   var r=(DATA.res||{})[key];if(!r)return;
   var o="<div class='g2'>";
   o+=fld("re-nom","Nombre",r.nombre||"");
+  o+=fld("re-dni","DNI",r.dni||"");
   o+=fld("re-tel","Telefono",r.tel||"","tel");
   o+=fld("re-alq","Alquiler $",r.alquiler||"","number");
   o+=fld("re-dep","Deposito $",r.deposito||"","number");
   o+=fld("re-gas","Gastos $",r.gastos||"","number");
-  o+=fld("re-fi","Fecha ingreso",r.fecha_ingreso||hoy(),"date");
+  o+=fld("re-fi","Fecha inicio contrato",r.fecha_ingreso||hoy(),"date");
+  o+=fld("re-fegr","Fecha fin contrato",r.fecha_egreso||"","date");
   o+=fld("re-senia","Seña $",r.senia||"","number");
   o+="</div>";
   o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin:8px 0'>";
@@ -1117,11 +1135,13 @@ function openEditReserva(key){
 function saveEditReserva(key){
   var ups={
     nombre:G("re-nom").value.trim(),
+    dni:(G("re-dni")||{value:""}).value.trim(),
     tel:(G("re-tel")||{value:""}).value,
     alquiler:Number((G("re-alq")||{value:0}).value||0),
     deposito:Number((G("re-dep")||{value:0}).value||0),
     gastos:Number((G("re-gas")||{value:0}).value||0),
     fecha_ingreso:(G("re-fi")||{value:hoy()}).value,
+    fecha_egreso:(G("re-fegr")||{value:""}).value,
     senia:Number((G("re-senia")||{value:0}).value||0),
     pago_posesion:Number((G("re-pos-monto")||{value:0}).value||0),
     cta_posesion:(G("re-pos-cta")||{value:"Efectivo"}).value||"Efectivo",
@@ -1169,13 +1189,13 @@ function openNA(){
   o+="</div></div>";
   o+="<div class='g2'>";
   o+="<div class='fld' style='grid-column:1/-1'><label class='lbl'>Unidad *</label><select class='inp' id='na-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
-  o+=fld("na-n","Nombre y apellido *")+fld("na-d","DNI *")+fld("na-t","Telefono")+fld("na-e","Email","","email");
+  o+=fld("na-n","Nombre y apellido *")+fld("na-d","DNI *")+fld("na-t","Telefono");
   o+=fld("na-ce","Contacto emergencia")+fld("na-te","Tel. emergencia");
   o+="<div class='fld' style='grid-column:1/-1'>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px solid #3B82F633'>";
   o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:10px'>MONTOS</div>";
   o+="<div class='g2'>";
-  o+=fld("na-alq","Alquiler mensual actual $","","number");
+  o+=fld("na-alq","Valor mensual acordado $","","number");
   o+="<div class='fld'><label class='lbl'>Moneda del alquiler</label><select class='inp' id='na-moneda' onchange='toggleMonedaNA()'><option value='ARS'>Pesos ($)</option><option value='USD'>Dolares (U$S)</option></select></div>";
   o+="<div id='na-bloque-usd' style='display:none'>";
   o+=fld("na-alq-usd","Alquiler en U$S","","number");
@@ -1210,7 +1230,7 @@ function openNA(){
   o+=fld("na-deuda-monto","Monto adeudado $","0","number");
   o+="</div></div>";
   o+="</div></div></div>";
-  o+=fld("na-ing","Inicio del contrato (fecha real de ingreso)","","date")+fld("na-egr","Fin del contrato","","date");
+  o+=fld("na-ing","Inicio del acuerdo (fecha de ingreso)","","date")+fld("na-egr","Fin del acuerdo","","date");
   o+="<div class='fld' style='grid-column:1/-1'>"+tad("na-obs","Observaciones al ingreso")+"</div>";
   o+="</div>";
   o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:4px'>Completa los montos para ver el resumen</div>";
@@ -1229,6 +1249,8 @@ function openNA(){
       if(G("na-dep"))G("na-dep").value=r.deposito||"";
       if(G("na-gs"))G("na-gs").value=r.gastos||"";
       if(G("na-ing"))G("na-ing").value=r.fecha_ingreso||hoy();
+      if(G("na-egr"))G("na-egr").value=r.fecha_egreso||"";
+      if(G("na-d")&&r.dni)G("na-d").value=r.dni;
       // Pre-cargar seña como pago a cuenta
       if(r.senia&&r.senia>0&&G("na-pc")){
         G("na-pc").value=r.senia;
@@ -1270,7 +1292,7 @@ function actualizarResumenNA(){
     var gs=Number((G("na-gs-info")||{value:0}).value||0);
     var deuda=Number((G("na-deuda-monto")||{value:0}).value||0);
     el.innerHTML="<b style='color:#F1F5F9'>Contrato vigente</b>"
-      +"<br>Alquiler mensual: "+fmt(alq)
+      +"<br>Valor mensual acordado: "+fmt(alq)
       +(dep>0?"<br>Deposito (informativo): "+fmt(dep):"")
       +(gs>0?"<br>Gastos (informativo): "+fmt(gs):"")
       +(deuda>0?"<br><span style='color:#F59E0B'>Deuda pendiente: "+fmt(deuda)+"</span>":"")
@@ -2489,10 +2511,12 @@ function rCaja(){
         }
       }
     });
-    // Ajustes manuales
-    ajM.filter(function(a){return a.fecha===_cajaF&&!a.auto;}).forEach(function(a){
-      var clasifLabel={"error":"[ERROR]","gs_corriente":"[Gs.corriente]","gs_extraordinario":"[Gs.ext.]","inversion":"[Inversion]","ingreso_venta":"[Venta]"}[a.clasificacion||a.sub]||"";
-      movimientosD.push({concepto:esc(a.concepto||"")+(clasifLabel?" "+clasifLabel:""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste",ajKey:a._key,ajClasif:a.clasificacion||a.sub||""});
+    // Ajustes manuales (incluyendo pagos de posesion y pago a cuenta que son auto:true)
+    ajM.filter(function(a){return a.fecha===_cajaF;}).forEach(function(a){
+      // Los ajustes auto de diferencia de cierre no se muestran
+      if(a.auto&&a.sub==="Diferencia de caja") return;
+      var clasifLabel={"error":"[ERROR]","gs_corriente":"[Gs.corriente]","gs_extraordinario":"[Gs.ext.]","inversion":"[Inversion]","ingreso_venta":"[Venta]","Pago posesion":"[Posesion]","Pago a cuenta ingreso":"[Pago cuenta]"}[a.clasificacion||a.sub]||"";
+      movimientosD.push({concepto:esc(a.concepto||"")+(clasifLabel?" "+clasifLabel:""),mov:a.tipo==="ingreso"?Number(a.monto||0):-Number(a.monto||0),cuenta:a.cuenta,tipo:"ajuste",ajKey:a.auto?null:a._key,ajClasif:a.clasificacion||a.sub||""});
     });
     // Aportes y retiros de socios
     movsM.filter(function(mv){return mv.fecha===_cajaF;}).forEach(function(mv){
@@ -4239,7 +4263,9 @@ function enviarCajaWA(){
   lines.push("Resultado del dia: "+fmt(totIng-totEgr));
 
   var msg=lines.join("\n");
-  window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+  if(!lines.length||lines.length===1){alert("No hay movimientos en este dia.");return;}
+  var url="https://wa.me/?text="+encodeURIComponent(msg);
+  var a=document.createElement("a");a.href=url;a.target="_blank";a.click();
 }
 
 function renderCfgAcuerdo(){
