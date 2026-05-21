@@ -1296,6 +1296,7 @@ function saveNA(){
   if(!u||!n||!d){alert("Unidad, nombre y DNI son obligatorios");return;}
   // Verificar que no haya contrato activo para esa unidad
   var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
+  console.log("saveNA: unidad="+u+" deptoActivo="+deptoActivo+" resKeyLocal="+window._resConvertKey);
   if(deptoActivo){
     alert("El depto "+u+" ya tiene un contrato activo. Solo puede haber uno por departamento.");return;
   }
@@ -1440,10 +1441,16 @@ function saveNA(){
 
     // Marcar reserva como convertida si corresponde
     if(resKeyLocal){
-      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
+      var rkl=resKeyLocal;
+      DB.ref("res/"+rkl).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()},function(err){
+        if(err){console.error("Error al marcar reserva convertida:",err);}
+        else{console.log("Reserva "+rkl+" marcada como convertida OK");}
+      });
       window._resConvert=null;
       window._resConvertKey=null;
       resKeyLocal=null;
+    } else {
+      console.log("resKeyLocal vacio - no habia reserva o se perdio la key");
     }
 
     closeModal();
