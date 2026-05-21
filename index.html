@@ -7,6 +7,7 @@
 <meta http-equiv="Expires" content="0"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>GestionProp v2.7</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
@@ -531,6 +532,208 @@ var _gfUnidad='';function genFormLink(unidad){
 var ACUERDO="ACUERDO DE CONVIVENCIA Y LOCACION\n\nEs indispensable para la buena convivencia respetar las normas basicas de buenas costumbres.\n\nDado el tamano de los departamentos y las condiciones particulares del alquiler, se estipula que es apto para vivienda de 1 o 2 personas adultas (sin chicos y sin mascotas).\n\nA fin de no molestar a sus vecinos rogamos no hacer reuniones de mas de 3 personas, respetar horarios de descanso, orden, limpieza, etc.\n\nLos espacios comunes son de transito, no de permanencia ni deposito de objetos personales (moto, bicicleta, muebles, etc.)\n\nRESPECTO A LOS SERVICIOS:\nLos servicios estan incluidos para uso racional. Queda terminantemente prohibido el uso de lavarropas, aire acondicionado, caloventor o artefactos de gran consumo. En caso de utilizarlo se cobrara un adicional.\n\nRESPECTO AL PAGO:\nEl alquiler se abona del 1 al 5 con 10% de descuento por pronto pago. Luego del dia 5 se pierde el descuento. Desde el dia 10 se aplican punitorios diarios segun la tasa del BCRA.\n\nEl deposito se devuelve cumplidos los 12 meses contra entrega del departamento en iguales condiciones. El ajuste se realiza en abril, agosto y diciembre con 15 dias de aviso.\n\nAdministracion: Lun-Vie 8-13 y 14-18, Sab 8-12. Tel: 1555787641";
 function getAcuerdo(){return (DATA.cfg_acuerdo&&DATA.cfg_acuerdo.texto)||ACUERDO;}
 
+// ── GOOGLE DRIVE INTEGRATION ──────────────────────────────────────────────────
+var DRIVE_CLIENT_ID = "581104673030-lmalfgruief3qgltd235j00huv00dp7t.apps.googleusercontent.com";
+var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+var _driveToken = null;
+var _driveTokenExpiry = 0;
+
+function driveGetToken(callback){
+  var now = Date.now();
+  if(_driveToken && now < _driveTokenExpiry){callback(_driveToken);return;}
+  // Request new token
+  google.accounts.oauth2.initTokenClient({
+    client_id: DRIVE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: function(response){
+      if(response.error){alert("Error de autenticacion con Google: "+response.error);return;}
+      _driveToken = response.access_token;
+      _driveTokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
+      callback(_driveToken);
+    }
+  }).requestAccessToken();
+}
+
+function driveFindOrCreateFolder(token, name, parentId, callback){
+  var query = "name='"+name+"' and mimeType='application/vnd.google-apps.folder' and trashed=false"+(parentId?" and '"+parentId+"' in parents":"");
+  fetch("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent(query)+"&fields=files(id,name)", {
+    headers:{Authorization:"Bearer "+token}
+  }).then(function(r){return r.json();}).then(function(data){
+    if(data.files && data.files.length > 0){
+      callback(null, data.files[0].id);
+    } else {
+      // Create folder
+      var meta = {name:name, mimeType:"application/vnd.google-apps.folder"};
+      if(parentId) meta.parents = [parentId];
+      fetch("https://www.googleapis.com/drive/v3/files", {
+        method:"POST",
+        headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify(meta)
+      }).then(function(r){return r.json();}).then(function(d){
+        callback(null, d.id);
+      }).catch(function(e){callback(e);});
+    }
+  }).catch(function(e){callback(e);});
+}
+
+function driveGetFolderPath(token, inq, callback){
+  // Estructura: GestionProp / Edificio / Depto / ID_contrato
+  var cod = (inq.unidad||"").split("-")[0];
+  var depto = inq.unidad||"";
+  var idac = inq.id_ac||"sin-id";
+  driveFindOrCreateFolder(token, "GestionProp", null, function(e1, rootId){
+    if(e1){callback(e1);return;}
+    driveFindOrCreateFolder(token, cod, rootId, function(e2, edId){
+      if(e2){callback(e2);return;}
+      driveFindOrCreateFolder(token, depto, edId, function(e3, depId){
+        if(e3){callback(e3);return;}
+        driveFindOrCreateFolder(token, idac, depId, function(e4, contId){
+          if(e4){callback(e4);return;}
+          callback(null, contId);
+        });
+      });
+    });
+  });
+}
+
+function driveListFiles(token, folderId, callback){
+  fetch("https://www.googleapis.com/drive/v3/files?q='"+folderId+"' in parents and trashed=false&fields=files(id,name,mimeType,thumbnailLink,webViewLink,createdTime)&orderBy=createdTime", {
+    headers:{Authorization:"Bearer "+token}
+  }).then(function(r){return r.json();}).then(function(data){
+    callback(null, data.files||[]);
+  }).catch(function(e){callback(e);});
+}
+
+function driveUploadFile(token, folderId, file, callback){
+  var metadata = {name:file.name, parents:[folderId]};
+  var formData = new FormData();
+  formData.append("metadata", new Blob([JSON.stringify(metadata)], {type:"application/json"}));
+  formData.append("file", file);
+  fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,thumbnailLink", {
+    method:"POST",
+    headers:{Authorization:"Bearer "+token},
+    body:formData
+  }).then(function(r){return r.json();}).then(function(d){
+    callback(null, d);
+  }).catch(function(e){callback(e);});
+}
+
+function driveDeleteFile(token, fileId, callback){
+  fetch("https://www.googleapis.com/drive/v3/files/"+fileId, {
+    method:"DELETE",
+    headers:{Authorization:"Bearer "+token}
+  }).then(function(){callback(null);}).catch(function(e){callback(e);});
+}
+
+function openDriveFotos(iqKey){
+  var i = DATA.iq[iqKey]; if(!i) return;
+  openModal("Fotos — "+esc(i.unidad)+" "+esc(i.nombre.split(",")[0]), "<div id='drive-modal-body'><div style='text-align:center;padding:20px'><div class='spin'></div><p style='color:#64748B;font-size:12px;margin-top:8px'>Conectando con Google Drive...</p></div></div>", true);
+
+  driveGetToken(function(token){
+    driveGetFolderPath(token, i, function(err, folderId){
+      if(err){
+        G("drive-modal-body").innerHTML = "<p style='color:#EF4444'>Error al acceder a Drive: "+err.message+"</p>";
+        return;
+      }
+      window._driveFolderId = folderId;
+      window._driveToken = token;
+      renderDriveModal(token, folderId, i);
+    });
+  });
+}
+
+function renderDriveModal(token, folderId, inq){
+  driveListFiles(token, folderId, function(err, files){
+    var el = G("drive-modal-body"); if(!el) return;
+    var cod = (inq.unidad||"").split("-")[0];
+
+    var o = "<p style='color:#64748B;font-size:11px;margin-bottom:12px'>Carpeta: GestionProp / "+cod+" / "+inq.unidad+" / "+(inq.id_ac||"")+"</p>";
+
+    // Botón subir
+    o += "<div style='margin-bottom:12px'>";
+    o += "<label style='background:#3B82F6;color:#fff;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;display:inline-block'>";
+    o += "📎 Subir archivo";
+    o += "<input type='file' id='drive-file-input' accept='image/*,.pdf' style='display:none' multiple onchange='driveSubirArchivos()'>";
+    o += "</label>";
+    o += "<span id='drive-upload-status' style='color:#64748B;font-size:11px;margin-left:10px'></span>";
+    o += "</div>";
+
+    // Lista de archivos
+    if(!files.length){
+      o += "<p style='color:#64748B;font-size:12px;text-align:center;padding:20px'>Sin archivos. Subí el DNI, recibo de sueldo y acuerdo firmado.</p>";
+    } else {
+      o += "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:12px'>";
+      files.forEach(function(f){
+        var esImg = f.mimeType && f.mimeType.startsWith("image/");
+        var fki = kpush(f.id);
+        o += "<div style='background:#0F172A;border-radius:8px;overflow:hidden;border:1px solid #334155'>";
+        if(esImg && f.thumbnailLink){
+          var imgEl="<img src='"+f.thumbnailLink+"' style='width:100%;height:100px;object-fit:cover;display:block'/>"; o += imgEl;
+        } else {
+          o += "<div style='height:100px;display:flex;align-items:center;justify-content:center;font-size:28px'>"+(f.mimeType==="application/pdf"?"📄":"📎")+"</div>";
+        }
+        o += "<div style='padding:6px'>";
+        o += "<div style='font-size:10px;color:#CBD5E1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+esc(f.name)+"</div>";
+        o += "<div style='display:flex;gap:4px;margin-top:4px'>";
+        o += "<a href='"+f.webViewLink+"' target='_blank' class='btn bsm' style='font-size:9px;background:#334155;color:#94A3B8;flex:1;text-align:center;text-decoration:none'>Ver</a>";
+        o += "<button class='btn bsm bx' style='font-size:9px' data-deldrive='"+fki+"'>✕</button>";
+        o += "</div></div></div>";
+      });
+      o += "</div>";
+    }
+
+    o += "<div style='display:flex;justify-content:flex-end'><button class='btn bg bsm' onclick='closeModal()'>Cerrar</button></div>";
+    el.innerHTML = o;
+
+    // Handler borrar
+    el.onclick = function(e){
+      var b = e.target.closest("[data-deldrive]");
+      if(b){
+        var fileId = kget(parseInt(b.dataset.deldrive));
+        if(!confirm("Borrar este archivo?")) return;
+        driveDeleteFile(window._driveToken, fileId, function(err){
+          if(err){alert("Error al borrar");return;}
+          renderDriveModal(window._driveToken, window._driveFolderId, inq);
+        });
+      }
+    };
+  });
+}
+
+function driveSubirArchivos(){
+  var input = G("drive-file-input"); if(!input) return;
+  var files = Array.from(input.files); if(!files.length) return;
+  var status = G("drive-upload-status");
+  if(status) status.textContent = "Subiendo "+files.length+" archivo(s)...";
+  var token = window._driveToken;
+  var folderId = window._driveFolderId;
+  var subidos = 0;
+  files.forEach(function(file){
+    driveUploadFile(token, folderId, file, function(err, result){
+      if(err){
+        if(status) status.textContent = "Error al subir "+file.name;
+        return;
+      }
+      subidos++;
+      if(subidos === files.length){
+        if(status) status.textContent = subidos+" archivo(s) subido(s)";
+        // Recargar la lista
+        var inqData = oA(DATA.iq).filter(function(i){return i.id_ac === (result.name||"") || true;})[0];
+        // Refresh modal
+        setTimeout(function(){
+          driveListFiles(token, folderId, function(e2, newFiles){
+            // Find current inq from modal title
+            var allIq = oA(DATA.iq);
+            var modalInq = allIq.filter(function(i){return window._driveFolderId;})[0]||{};
+            renderDriveModal(token, folderId, window._driveInq||{});
+          });
+        }, 500);
+      }
+    });
+  });
+}
+
+
 function openFicha(key){
   var i=DATA.iq[key];if(!i)return;
   var esA=USER.r==="admin";
@@ -585,6 +788,10 @@ function openFicha(key){
   // Enviar form: disponible para todos
   window._fichaFormData={tel:i.tel||"",nom:(i.nombre||"").split(",")[0].trim(),key:key};
   o+="<button class='btn bsm' style='background:#06B6D4;color:#000' onclick='enviarFormFicha()'>Enviar form</button>";
+  // Fotos en Drive
+  window._driveInq=i;
+  var dki=kpush(key);
+  o+="<button class='btn bsm' style='background:#4285F4;color:#fff' data-drivefoto='"+dki+"'>📷 Fotos Drive</button>";
   if(esA){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
@@ -597,7 +804,8 @@ function openFicha(key){
   var md=MODS[MODS.length-1];
   md.onclick=function(e){
     var t=e.target;
-    if(t.dataset.ac)verAc(kget(parseInt(t.dataset.ac)));
+    if(t.dataset.drivefoto)openDriveFotos(kget(parseInt(t.dataset.drivefoto)));
+    else if(t.dataset.ac)verAc(kget(parseInt(t.dataset.ac)));
     else if(t.dataset.obs)editObs(kget(parseInt(t.dataset.obs)));
     else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
     else if(t.dataset.renovar)openRenovar(kget(parseInt(t.dataset.renovar)));
