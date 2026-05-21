@@ -1108,7 +1108,7 @@ function openEditReserva(key){
   o+="</div>";
   o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin:8px 0'>";
   o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Pago al tomar posesion</div>";
-  o+="<div class='g2'>"+fld("re-pos-monto","Monto $",r.pago_posesion||"","number")+sld("re-pos-cta","Cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo")+"</div></div>";
+  o+="<div class='g2'>"+fld("re-pos-monto","Monto $",r.pago_posesion||"","number")+sld("re-pos-cta","Cuenta",CTAS,"Efectivo")+"</div></div>";
   o+=fld("re-obs","Observaciones",r.obs||"");
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveEditReserva(this.dataset.rkey)' data-rkey='"+key+"'>Guardar</button></div>";
   openModal("Editar Reserva — "+esc(r.unidad),o);
@@ -1190,7 +1190,7 @@ function openNA(){
   o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Pago al tomar posesion (opcional)</div>";
   o+="<div class='g2'>";
   o+=fld("na-pos-monto","Monto $","","number");
-  o+=sld("na-pos-cta","Cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
+  o+=sld("na-pos-cta","Cuenta",CTAS,"Efectivo");
   o+="</div>";
   o+="<p style='color:#64748B;font-size:10px;margin-top:2px'>Se registra como ingreso en caja el dia de inicio del contrato.</p>";
   o+="</div>";
