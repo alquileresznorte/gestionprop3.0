@@ -1384,9 +1384,15 @@ function saveNA(){
     var desc=Number(G("na-desc-gs").value||0);
     var gsNeto=Math.max(0,gs-desc);
     var pc=Number(G("na-pc").value||0);
+    var posMonto=Number((G("na-pos-monto")||{value:0}).value||0);
+    var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
+    var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
+    var pcFecha=ing||hoy();
     var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
     var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
+    var pcRestante=pc;
 
+    // Guardar inquilino
     DB.ref("iq").push({
       id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
       tel:G("na-t").value,email:G("na-e").value,
@@ -1398,65 +1404,52 @@ function saveNA(){
       ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",fecha_reg:hoy()
     });
 
-    var pcRestante=pc;
-    var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
-    var pcFecha=ing||hoy();
-    function aplicarPC(monto){
+    // Aplicar pago a cuenta a las cobranzas
+    var _pcAplicar=function(monto){
       if(pcRestante<=0)return{monto:monto,pagos:{},estado:"pendiente"};
       var aplicado=Math.min(pcRestante,monto);pcRestante-=aplicado;
       var pagos={};pagos[Date.now()+Math.random()]={fecha:pcFecha,monto:aplicado,cuenta:pcCta,concepto:"Pago a cuenta"};
       return{monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
-    }
+    };
 
-    if(alq>0){var ca=aplicarPC(alq);DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,concepto:"Alquiler"});}
-    if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?aplicarPC(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
-    if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?aplicarPC(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
+    if(alq>0){var ca=_pcAplicar(alq);DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:mesInicio,monto_total:ca.monto,sal_ant:0,estado:ca.estado,pagos:ca.pagos,concepto:"Alquiler"});}
+    if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?_pcAplicar(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
+    if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?_pcAplicar(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
 
-    // Registrar pago a cuenta como ingreso en caja
+    // Registrar pago a cuenta en caja
     if(pc>0){
-      DB.ref("aj").push({
-        fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
-        cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,
-        monto:pc,auto:true
-      });
+      DB.ref("aj").push({fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
+        cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,monto:pc,auto:true});
     }
-    // Registrar pago al tomar posesion
-    var posMonto=Number((G("na-pos-monto")||{value:0}).value||0);
-    var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
+
+    // Registrar pago al tomar posesion en caja
     if(posMonto>0){
-      var esSocioPos=CTAS_SOCIOS.indexOf(posCta)>=0;
-      if(esSocioPos){
-        // Va a cta socios como aporte (el socio recibio plata)
-        var socioMapPos={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
-          "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+      var _socioMapP={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
+        "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+      if(CTAS_SOCIOS.indexOf(posCta)>=0){
         DB.ref("movs").push({fecha:ing||hoy(),mes:(ing||hoy()).slice(0,7),tipo:"aporte",
-          cuenta:socioMapPos[posCta]||"Cuenta Loli",cuenta_caja:posCta,monto:posMonto,
+          cuenta:_socioMapP[posCta]||"Cuenta Loli",cuenta_caja:posCta,monto:posMonto,
           nota:"Pago posesion #"+id+" - "+n+" - "+u});
       } else {
-        // Va a caja como ingreso normal
         DB.ref("aj").push({fecha:ing||hoy(),tipo:"ingreso",sub:"Pago posesion",
           cuenta:posCta,concepto:"Pago al tomar posesion #"+id+" - "+n+" - "+u,
           monto:posMonto,auto:true});
       }
     }
 
-    // Marcar reserva como convertida
-    var finalizarContrato=function(){
-      closeModal();
-      var msg="Acuerdo #"+id+" creado. ";
-      if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
-      if(pc>0)msg+="Pago a cuenta "+fmt(pc)+". ";
-      if(posMonto>0)msg+="Pago posesion "+fmt(posMonto)+".";
-      alert(msg);
-      window._resConvert=null;
-      window._resConvertKey=null;
-      setTimeout(rAcuerdos,400);
-    };
+    // Cerrar modal, mostrar mensaje, marcar reserva convertida
+    closeModal();
+    var msg="Acuerdo #"+id+" creado. ";
+    if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
+    if(pc>0)msg+="Pago a cuenta: "+fmt(pc)+". ";
+    if(posMonto>0)msg+="Pago posesion: "+fmt(posMonto)+".";
+    alert(msg);
     if(resKeyLocal){
-      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()},finalizarContrato);
-    } else {
-      finalizarContrato();
+      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
     }
+    window._resConvert=null;
+    window._resConvertKey=null;
+    setTimeout(rAcuerdos,400);
   }
 }
 
