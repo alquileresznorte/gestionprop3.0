@@ -1305,6 +1305,8 @@ function saveNA(){
     if(btnCrear.disabled){alert("Ya se esta creando el contrato, por favor espera.");return;}
     btnCrear.disabled=true;btnCrear.textContent="Creando...";btnCrear.style.opacity="0.5";
   }
+  // Guardar key de reserva localmente ANTES de cualquier operacion async
+  var resKeyLocal=window._resConvertKey||null;
   var vigente=G("na-vigente")&&G("na-vigente").checked;
   var hist=oA(DATA.hist).filter(function(h){return h.dni===d;});
   if(hist.length>0&&!confirm("Este DNI tiene historial previo. Motivo: "+(hist[0].motivo_egreso||"--")+". Continuas?"))return;
@@ -1420,18 +1422,28 @@ function saveNA(){
     var posMonto=Number((G("na-pos-monto")||{value:0}).value||0);
     var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
     if(posMonto>0){
-      DB.ref("aj").push({
-        fecha:ing||hoy(),tipo:"ingreso",sub:"Pago posesion",
-        cuenta:posCta,concepto:"Pago al tomar posesion #"+id+" - "+n+" - "+u,
-        monto:posMonto,auto:true
-      });
+      var esSocioPos=CTAS_SOCIOS.indexOf(posCta)>=0;
+      if(esSocioPos){
+        // Va a cta socios como aporte (el socio recibio plata)
+        var socioMapPos={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
+          "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+        DB.ref("movs").push({fecha:ing||hoy(),mes:(ing||hoy()).slice(0,7),tipo:"aporte",
+          cuenta:socioMapPos[posCta]||"Cuenta Loli",cuenta_caja:posCta,monto:posMonto,
+          nota:"Pago posesion #"+id+" - "+n+" - "+u});
+      } else {
+        // Va a caja como ingreso normal
+        DB.ref("aj").push({fecha:ing||hoy(),tipo:"ingreso",sub:"Pago posesion",
+          cuenta:posCta,concepto:"Pago al tomar posesion #"+id+" - "+n+" - "+u,
+          monto:posMonto,auto:true});
+      }
     }
 
     // Marcar reserva como convertida si corresponde
-    if(window._resConvertKey){
-      DB.ref("res/"+window._resConvertKey).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
+    if(resKeyLocal){
+      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
       window._resConvert=null;
       window._resConvertKey=null;
+      resKeyLocal=null;
     }
 
     closeModal();
