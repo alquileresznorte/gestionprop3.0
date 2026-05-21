@@ -1294,8 +1294,8 @@ function actualizarResumenNA(){
 
 
 function saveNA(){
-  var u=G("na-u").value,n=G("na-n").value,d=G("na-d").value;
-  if(!u||!n||!d){alert("Unidad, nombre y DNI son obligatorios");return;}
+  var u=G("na-u").value,n=G("na-n").value,d=G("na-d").value||"PENDIENTE";
+  if(!u||!n){alert("Unidad y nombre son obligatorios");return;}
   // Verificar que no haya contrato activo para esa unidad
   var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
   if(deptoActivo){
