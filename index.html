@@ -827,7 +827,7 @@ function openFicha(key){
 function enviarFormFicha(){
   var d=window._fichaFormData||{};
   var i=DATA.iq[d.key];if(!i)return;
-  var base=location.origin+location.pathname.replace(/index\.html$/,"")+"form.html";
+  var base=location.href.replace(/index\.html.*$/,"").replace(/\?.*$/,"")+"form.html";
   var link=base+"?id="+encodeURIComponent(i.id_ac||i._key||"")+"&u="+encodeURIComponent(i.unidad||"");
   var nom=(i.nombre||"").split(",")[0].trim();
   var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+" Adm: 1555787641";
@@ -1260,6 +1260,9 @@ function openNA(){
       if(G("na-t"))G("na-t").value=r.tel||"";
       if(G("na-ce"))G("na-ce").value=r.ct_emerg||"";
       if(G("na-te"))G("na-te").value=r.tel_emerg||"";
+      // Guardar firma para incluirla en el contrato
+      window._resConvertFirma=r.firma||"";
+      window._resConvertFechaFirma=r.fecha_firma||"";
       // Pre-cargar seña como pago a cuenta
       if(r.senia&&r.senia>0&&G("na-pc")){
         G("na-pc").value=r.senia;
@@ -1447,7 +1450,17 @@ function saveNA(){
       deposito:dep,gastos:gs,gastos_neto:gsNeto,
       descuento_gs:desc,pago_cuenta:pc,total_ingreso:alq+dep+gsNeto,
       ingreso:ing,egreso:_egr,
-      ultimo_aj:ing,obs_ingreso:_obs,obs_egreso:"",fecha_reg:hoy()
+      ultimo_aj:ing,obs_ingreso:_obs,obs_egreso:"",fecha_reg:hoy(),
+      firma:window._resConvertFirma||"",
+      fecha_firma:window._resConvertFechaFirma||"",
+      trabajo1:resDataLocal?resDataLocal.trabajo1||"":"",
+      tel_trabajo1:resDataLocal?resDataLocal.tel_trabajo1||"":"",
+      dir_trabajo1:resDataLocal?resDataLocal.dir_trabajo1||"":"",
+      nom2:resDataLocal?resDataLocal.nom2||"":"",
+      dni2:resDataLocal?resDataLocal.dni2||"":"",
+      tel2:resDataLocal?resDataLocal.tel2||"":"",
+      trabajo2:resDataLocal?resDataLocal.trabajo2||"":"",
+      rel_emerg:resDataLocal?resDataLocal.rel_emerg||"":""
     });
 
     // Aplicar pago a cuenta a las cobranzas
