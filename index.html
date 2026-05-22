@@ -1489,10 +1489,13 @@ function saveNA(){
     if(pc>0)msg+="Pago a cuenta: "+fmt(pc)+". ";
     if(posMonto>0)msg+="Pago posesion: "+fmt(posMonto)+".";
     alert(msg);
+    // Marcar reserva como convertida
     if(resKeyLocal){
-      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
+      DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()},function(err){
+        if(err) alert("Error al marcar reserva: "+err.message);
+      });
     }
-    setTimeout(rAcuerdos,400);
+    setTimeout(rAcuerdos,600);
   }
 }
 
