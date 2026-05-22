@@ -1454,7 +1454,7 @@ function saveNA(){
     var _pcAplicar=function(monto){
       if(pcRestante<=0)return{monto:monto,pagos:{},estado:"pendiente"};
       var aplicado=Math.min(pcRestante,monto);pcRestante-=aplicado;
-      var pagos={};pagos[Date.now()+Math.random()]={fecha:pcFecha,monto:aplicado,cuenta:pcCta,concepto:"Pago a cuenta"};
+      var pagos={};pagos["p"+Date.now()+Math.floor(Math.random()*1000)]={fecha:pcFecha,monto:aplicado,cuenta:pcCta,concepto:"Pago a cuenta"};
       return{monto:monto,pagos:pagos,estado:aplicado>=monto?"pagado":"parcial"};
     };
 
@@ -4928,4 +4928,3 @@ render();
 </script>
 </body>
 </html>
-
