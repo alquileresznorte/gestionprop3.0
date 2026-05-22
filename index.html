@@ -1369,7 +1369,7 @@ function saveNA(){
 
     DB.ref("iq").push({
       id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
-      tel:G("na-t").value,email:G("na-e").value,
+      tel:G("na-t").value,email:"",
       ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
       alquiler:alq,alquiler_usd:moneda==="USD"?alqUSD:0,moneda:moneda,
       deposito:depInfo,gastos:gsInfo,
@@ -1426,16 +1426,28 @@ function saveNA(){
     var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
     var pcRestante=pc;
 
+    // Leer TODOS los valores del DOM antes de cerrar el modal
+    var _tel=G("na-t")?G("na-t").value:"";
+    var _ce=G("na-ce")?G("na-ce").value:"";
+    var _te=G("na-te")?G("na-te").value:"";
+    var _egr=G("na-egr")?G("na-egr").value:"";
+    var _obs=G("na-obs")?G("na-obs").value:"";
+
+    // Cerrar modal antes de Firebase para evitar que el listener lo destruya
+    closeModal();
+    window._resConvert=null;
+    window._resConvertKey=null;
+
     // Guardar inquilino
     DB.ref("iq").push({
       id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
-      tel:G("na-t").value,email:G("na-e").value,
-      ct_emerg:G("na-ce").value,tel_emerg:G("na-te").value,
+      tel:_tel,email:"",
+      ct_emerg:_ce,tel_emerg:_te,
       alquiler:alq,alquiler_usd:moneda==="USD"?alqUSD:0,moneda:moneda,
       deposito:dep,gastos:gs,gastos_neto:gsNeto,
       descuento_gs:desc,pago_cuenta:pc,total_ingreso:alq+dep+gsNeto,
-      ingreso:ing,egreso:G("na-egr").value,
-      ultimo_aj:ing,obs_ingreso:G("na-obs").value,obs_egreso:"",fecha_reg:hoy()
+      ingreso:ing,egreso:_egr,
+      ultimo_aj:ing,obs_ingreso:_obs,obs_egreso:"",fecha_reg:hoy()
     });
 
     // Aplicar pago a cuenta a las cobranzas
@@ -1471,8 +1483,7 @@ function saveNA(){
       }
     }
 
-    // Cerrar modal, mostrar mensaje, marcar reserva convertida
-    closeModal();
+    // Mostrar mensaje y actualizar pantalla
     var msg="Acuerdo #"+id+" creado. ";
     if(alq>0)msg+="Alquiler "+fmt(alq)+". ";
     if(pc>0)msg+="Pago a cuenta: "+fmt(pc)+". ";
@@ -1481,8 +1492,6 @@ function saveNA(){
     if(resKeyLocal){
       DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()});
     }
-    window._resConvert=null;
-    window._resConvertKey=null;
     setTimeout(rAcuerdos,400);
   }
 }
@@ -4919,3 +4928,4 @@ render();
 </script>
 </body>
 </html>
+
