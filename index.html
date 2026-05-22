@@ -4370,6 +4370,19 @@ function renderCfgLimpieza(){
   o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:4px;color:#EF4444'>⚠ Zona de limpieza de datos</h3>";
   o+="<p style='color:#64748B;font-size:11px;margin-bottom:14px'>Estas acciones son irreversibles. Los datos borrados no se pueden recuperar.</p>";
 
+  // Asignar IDs a contratos sin ID
+  var sinId=oA(DATA.iq).filter(function(i){return i.estado==="activo"&&!i.id_ac;});
+  if(sinId.length){
+    o+="<div style='background:#1E293B;border:1px solid #10B981;border-radius:10px;padding:12px;margin-bottom:10px'>";
+    o+="<p style='color:#10B981;font-size:12px;font-weight:700;margin-bottom:4px'>Contratos sin ID ("+sinId.length+")</p>";
+    o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Estos contratos fueron cargados antes del sistema de IDs. Asignales un ID ahora — no modifica ningún dato.</p>";
+    sinId.forEach(function(i){
+      o+="<div style='font-size:11px;color:#94A3B8;padding:3px 0'>· "+esc(i.unidad)+" — "+esc(i.nombre)+"</div>";
+    });
+    o+="<button class='btn bok bsm' style='margin-top:8px' onclick='asignarIdsContratos()'>Asignar IDs ahora</button>";
+    o+="</div>";
+  }
+
   // Borrar solo costos
   o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
   o+="<p style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar solo COSTOS del mes</p>";
@@ -4464,6 +4477,21 @@ function renderCfgLimpieza(){
 
   o+="</div>";
   el.innerHTML=o;
+}
+
+function asignarIdsContratos(){
+  var sinId=oA(DATA.iq).filter(function(i){return i.estado==="activo"&&!i.id_ac;});
+  if(!sinId.length){alert("Todos los contratos ya tienen ID.");return;}
+  if(!confirm("Asignar ID a "+sinId.length+" contrato(s)? No se modifica ningún otro dato."))return;
+  var ups={};
+  sinId.forEach(function(i){
+    var nuevoId=nid();
+    ups["iq/"+i._key+"/id_ac"]=nuevoId;
+  });
+  DB.ref("/").update(ups,function(){
+    alert("IDs asignados correctamente.");
+    setTimeout(rConfig,300);
+  });
 }
 
 function buscarAjEspecifico(){
