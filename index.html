@@ -1163,8 +1163,14 @@ function liberarReserva(key){
 function convertirReserva(resKey){
   var r=(DATA.res||{})[resKey];if(!r)return;
   // Verificar que el depto no tenga ya un contrato activo
-  var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===r.unidad&&i.estado==="activo";}).length>0;
-  if(deptoActivo){alert("El depto "+r.unidad+" ya tiene un contrato activo.");return;}
+  var contratosActivos=oA(DATA.iq).filter(function(i){return i.unidad===r.unidad&&i.estado==="activo";});
+  // Si hay contratos activos pero sin id_ac (creados por el form del inquilino), los borramos
+  var soloFormData=contratosActivos.every(function(i){return !i.id_ac;});
+  if(contratosActivos.length>0&&!soloFormData){
+    alert("El depto "+r.unidad+" ya tiene un contrato activo con ID.");return;
+  }
+  // Borrar contratos sin ID creados por el form
+  contratosActivos.forEach(function(i){if(!i.id_ac)DB.ref("iq/"+i._key).remove();});
   window._resConvert=r;
   window._resConvertKey=resKey;
   openNA();
@@ -1250,7 +1256,10 @@ function openNA(){
       if(G("na-gs"))G("na-gs").value=r.gastos||"";
       if(G("na-ing"))G("na-ing").value=r.fecha_ingreso||hoy();
       if(G("na-egr"))G("na-egr").value=r.fecha_egreso||"";
-      if(G("na-d")&&r.dni)G("na-d").value=r.dni;
+      if(G("na-d"))G("na-d").value=r.dni||"";
+      if(G("na-t"))G("na-t").value=r.tel||"";
+      if(G("na-ce"))G("na-ce").value=r.ct_emerg||"";
+      if(G("na-te"))G("na-te").value=r.tel_emerg||"";
       // Pre-cargar seña como pago a cuenta
       if(r.senia&&r.senia>0&&G("na-pc")){
         G("na-pc").value=r.senia;
