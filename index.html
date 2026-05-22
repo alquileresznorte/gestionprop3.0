@@ -634,8 +634,8 @@ function driveDeleteFile(token, fileId, callback){
   }).then(function(){callback(null);}).catch(function(e){callback(e);});
 }
 
-function openDriveFotos(iqKey, iqData){
-  var i = iqData || (iqKey ? DATA.iq[iqKey] : null); if(!i) return;
+function openDriveFotos(iqKey){
+  var i = DATA.iq[iqKey]; if(!i) return;
   openModal("Fotos — "+esc(i.unidad)+" "+esc(i.nombre.split(",")[0]), "<div id='drive-modal-body'><div style='text-align:center;padding:20px'><div class='spin'></div><p style='color:#64748B;font-size:12px;margin-top:8px'>Conectando con Google Drive...</p></div></div>", true);
 
   driveGetToken(function(token){
@@ -827,7 +827,7 @@ function openFicha(key){
 function enviarFormFicha(){
   var d=window._fichaFormData||{};
   var i=DATA.iq[d.key];if(!i)return;
-  var base=location.href.replace(/index\.html.*$/,"").replace(/\?.*$/,"")+"form.html";
+  var base=location.origin+location.pathname.replace(/index\.html$/,"")+"form.html";
   var link=base+"?id="+encodeURIComponent(i.id_ac||i._key||"")+"&u="+encodeURIComponent(i.unidad||"");
   var nom=(i.nombre||"").split(",")[0].trim();
   var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+" Adm: 1555787641";
@@ -1260,9 +1260,6 @@ function openNA(){
       if(G("na-t"))G("na-t").value=r.tel||"";
       if(G("na-ce"))G("na-ce").value=r.ct_emerg||"";
       if(G("na-te"))G("na-te").value=r.tel_emerg||"";
-      // Guardar firma para incluirla en el contrato
-      window._resConvertFirma=r.firma||"";
-      window._resConvertFechaFirma=r.fecha_firma||"";
       // Pre-cargar seña como pago a cuenta
       if(r.senia&&r.senia>0&&G("na-pc")){
         G("na-pc").value=r.senia;
@@ -1450,17 +1447,7 @@ function saveNA(){
       deposito:dep,gastos:gs,gastos_neto:gsNeto,
       descuento_gs:desc,pago_cuenta:pc,total_ingreso:alq+dep+gsNeto,
       ingreso:ing,egreso:_egr,
-      ultimo_aj:ing,obs_ingreso:_obs,obs_egreso:"",fecha_reg:hoy(),
-      firma:window._resConvertFirma||"",
-      fecha_firma:window._resConvertFechaFirma||"",
-      trabajo1:resDataLocal?resDataLocal.trabajo1||"":"",
-      tel_trabajo1:resDataLocal?resDataLocal.tel_trabajo1||"":"",
-      dir_trabajo1:resDataLocal?resDataLocal.dir_trabajo1||"":"",
-      nom2:resDataLocal?resDataLocal.nom2||"":"",
-      dni2:resDataLocal?resDataLocal.dni2||"":"",
-      tel2:resDataLocal?resDataLocal.tel2||"":"",
-      trabajo2:resDataLocal?resDataLocal.trabajo2||"":"",
-      rel_emerg:resDataLocal?resDataLocal.rel_emerg||"":""
+      ultimo_aj:ing,obs_ingreso:_obs,obs_egreso:"",fecha_reg:hoy()
     });
 
     // Aplicar pago a cuenta a las cobranzas
@@ -1555,60 +1542,18 @@ function fH(){
 
 function openFichaHist(key){
   var i=DATA.hist[key]; if(!i) return;
-
-  // Datos principales
-  var o="<div class='g2' style='margin-bottom:10px'>";
-  o+="<div><div class='lbl'>ID Acuerdo</div><div style='font-size:12px'>#"+(i.id_ac||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Unidad</div><div style='font-size:12px'>"+esc(i.unidad||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Titular</div><div style='font-size:12px'>"+esc(i.nombre)+"</div></div>";
-  o+="<div><div class='lbl'>DNI</div><div style='font-size:12px'>"+esc(i.dni||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel||"--")+(i.tel?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div></div>";
-  o+="<div><div class='lbl'>Trabajo</div><div style='font-size:12px'>"+esc(i.trabajo1||i.trabajo||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Valor mensual</div><div style='font-size:12px'>"+fmt(i.alquiler||0)+"</div></div>";
-  o+="<div><div class='lbl'>Deposito</div><div style='font-size:12px'>"+fmt(i.deposito||0)+"</div></div>";
-  o+="<div><div class='lbl'>Gastos</div><div style='font-size:12px'>"+fmt(i.gastos||0)+"</div></div>";
-  o+="<div><div class='lbl'>Inicio</div><div style='font-size:12px'>"+fecDisp(i.ingreso||"")+"</div></div>";
-  o+="<div><div class='lbl'>Fin acuerdo</div><div style='font-size:12px'>"+fecDisp(i.egreso||"")+"</div></div>";
-  o+="<div><div class='lbl'>Egreso real</div><div style='font-size:12px'>"+fecDisp(i.fecha_egreso_real||"")+"</div></div>";
-  o+="<div><div class='lbl'>Cierre</div><div style='font-size:12px'>"+fecDisp(i.fecha_cierre||"")+"</div></div>";
-  o+="<div><div class='lbl'>Motivo</div><div style='font-size:12px'>"+esc(i.motivo_egreso||"--")+"</div></div>";
+  var o="<div class='g2' style='margin-bottom:12px'>";
+  var rows=[
+    ["ID Acuerdo","#"+(i.id_ac||"--")],["Unidad",i.unidad||"--"],
+    ["Nombre",i.nombre],["DNI",i.dni||"--"],["Telefono",i.tel||"--"],
+    ["Alquiler",fmt(i.alquiler||0)],["Deposito",fmt(i.deposito||0)],
+    ["Ingreso",i.ingreso||"--"],["Egreso real",i.fecha_egreso_real||i.egreso||"--"],
+    ["Cierre",i.fecha_cierre||"--"],["Motivo",i.motivo_egreso||"--"]
+  ];
+  rows.forEach(function(r){o+="<div><div class='lbl'>"+r[0]+"</div><div style='font-size:12px'>"+esc(r[1])+"</div></div>";});
   o+="</div>";
-
-  // 2do inquilino
-  if(i.nom2){
-    o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
-    o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>2do Inquilino</div>";
-    o+="<div class='g2'>";
-    o+="<div><div class='lbl'>Nombre</div><div style='font-size:12px'>"+esc(i.nom2)+"</div></div>";
-    o+="<div><div class='lbl'>DNI</div><div style='font-size:12px'>"+esc(i.dni2||"--")+"</div></div>";
-    o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel2||"--")+"</div></div>";
-    o+="<div><div class='lbl'>Trabajo</div><div style='font-size:12px'>"+esc(i.trabajo2||"--")+"</div></div>";
-    o+="</div></div>";
-  }
-
-  // Contacto emergencia
-  if(i.ct_emerg||i.tel_emerg){
-    o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
-    o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:6px'>Contacto de emergencia</div>";
-    o+="<div class='g2'>";
-    o+="<div><div class='lbl'>Nombre</div><div style='font-size:12px'>"+esc(i.ct_emerg||"--")+"</div></div>";
-    o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel_emerg||"--")+"</div></div>";
-    if(i.rel_emerg)o+="<div><div class='lbl'>Relacion</div><div style='font-size:12px'>"+esc(i.rel_emerg)+"</div></div>";
-    o+="</div></div>";
-  }
-
-  // Acuerdo firmado
-  if(i.firma){
-    o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px'>";
-    o+="<b style='color:#10B981'>Firmado por:</b> "+esc(i.firma||"--")+" el "+esc(i.fecha_firma||"--");
-    o+="</div>";
-  }
-
-  // Obs egreso/ingreso
   if(i.obs_egreso) o+="<div style='background:#EF444411;border-left:3px solid #EF4444;border-radius:0 8px 8px 0;padding:10px;margin-bottom:8px;font-size:12px'><b style='color:#EF4444'>Obs. egreso:</b> "+esc(i.obs_egreso)+"</div>";
   if(i.obs_ingreso) o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px'><b class='lbl'>Obs. ingreso:</b> "+esc(i.obs_ingreso)+"</div>";
-
-  // Historial eventos
   if(i.historial_eventos){
     o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
     o+="<div class='lbl' style='margin-bottom:6px'>Historial de eventos</div>";
@@ -1617,15 +1562,6 @@ function openFichaHist(key){
     });
     o+="</div>";
   }
-
-  // Botones
-  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #334155'>";
-  if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank'>WhatsApp</a>";
-  // Fotos Drive (usando datos del historial)
-  window._driveInq=i;
-  o+="<button class='btn bsm' style='background:#4285F4;color:#fff' onclick='openDriveFotos(null,"+JSON.stringify({unidad:i.unidad,id_ac:i.id_ac,nombre:i.nombre})+")'> Fotos Drive</button>";
-  o+="</div>";
-
   openModal("Historial - "+esc(i.nombre),o,true);
 }
 
