@@ -4475,8 +4475,63 @@ function renderCfgLimpieza(){
   o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-weight:700' onclick='borrarHistAcuerdos()'>Borrar historial</button>";
   o+="</div>";
 
+  // Borrar cobros específicos
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#3B82F6;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar cobro específico por unidad y mes</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Buscá los cobros de una unidad en un mes y borrá los que sean de prueba.</p>";
+  o+="<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px'>";
+  o+="<div class='fld' style='margin:0;flex:1'><label class='lbl'>Unidad (ej: R2-16)</label><input class='inp' id='limp-cob-u' placeholder='R2-16' style='max-width:120px'/></div>";
+  o+="<div class='fld' style='margin:0;flex:1'><label class='lbl'>Mes</label><input type='month' class='inp' id='limp-cob-mes' value='"+mes()+"' style='max-width:150px'/></div>";
+  o+="<div style='display:flex;align-items:flex-end'><button class='btn bp bsm' onclick='buscarCobrosLimp()'>Buscar</button></div>";
+  o+="</div>";
+  o+="<div id='limp-cob-res'></div>";
+  o+="</div>";
+
   o+="</div>";
   el.innerHTML=o;
+  // Wire buscar cobros
+  var lcu=G("limp-cob-u");
+  if(lcu) lcu.addEventListener("keydown",function(e){if(e.key==="Enter")buscarCobrosLimp();});
+}
+
+function buscarCobrosLimp(){
+  var u=(G("limp-cob-u")||{value:""}).value.trim();
+  var m=(G("limp-cob-mes")||{value:""}).value.trim();
+  var res=G("limp-cob-res"); if(!res) return;
+  if(!u&&!m){res.innerHTML="<p style='color:#EF4444;font-size:11px'>Ingresá una unidad o un mes</p>";return;}
+  var cobros=oA(DATA.cob).filter(function(c){
+    var okU=!u||c.unidad===u;
+    var okM=!m||c.mes===m;
+    return okU&&okM;
+  });
+  if(!cobros.length){res.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:6px'>No hay cobros para esos filtros.</p>";return;}
+  var o="<div style='margin-top:8px'><p style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+cobros.length+" cobro(s) encontrado(s):</p>";
+  cobros.sort(function(a,b){return(a.mes||"").localeCompare(b.mes||"");}).forEach(function(c){
+    var pagado=pT(c);
+    o+="<div style='background:#0F172A;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>";
+    o+="<div style='font-size:11px'>";
+    o+="<span style='color:#3B82F6;font-weight:700'>"+esc(c.unidad||"")+"</span> · ";
+    o+="<span style='color:#94A3B8'>"+esc(c.mes||"")+"</span> · ";
+    o+="<span style='color:#F1F5F9'>"+esc(c.concepto||"Alquiler")+"</span> · ";
+    o+="<span style='color:#EF4444;font-weight:700'>"+fmt(c.monto_total||0)+"</span>";
+    if(pagado>0) o+=" · <span style='color:#10B981'>Pagado: "+fmt(pagado)+"</span>";
+    o+="</div>";
+    o+="<button class='btn bsm bx' style='font-size:10px' data-delcob='"+c._key+"'>Borrar</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  res.innerHTML=o;
+  res.onclick=function(e){
+    var b=e.target.closest("[data-delcob]");
+    if(!b) return;
+    var key=b.dataset.delcob;
+    var c=DATA.cob[key];
+    if(!confirm("Borrar cobro de "+esc((c||{}).unidad||"")+" — "+(c||{}).mes+" — "+fmt((c||{}).monto_total||0)+"?")) return;
+    DB.ref("cob/"+key).remove(function(){
+      alert("Cobro borrado.");
+      buscarCobrosLimp();
+    });
+  };
 }
 
 function asignarIdsContratos(){
