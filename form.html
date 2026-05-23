@@ -127,9 +127,9 @@ const DATA = {
   alquiler: PRE.alquiler, deposito: PRE.deposito, gastos: PRE.gastos,
   ingreso: PRE.ingreso, egreso: PRE.egreso, posesion: PRE.posesion,
   // Inquilino 1
-  nom1:"", dni1:"", tel1:"", email1:"", trabajo1:"", tel_trabajo1:"", dir_trabajo1:"", dom1:"",
+  nom1:"", dni1:"", tel1:"", email1:"", trabajo1:"", dom1:"",
   // Inquilino 2
-  nom2:"", dni2:"", tel2:"", email2:"", trabajo2:"", tel_trabajo2:"", dir_trabajo2:"",
+  nom2:"", dni2:"", tel2:"", email2:"", trabajo2:"",
   // Emergencia
   ct_emerg:"", tel_emerg:"", rel_emerg:"",
   // Fotos
@@ -191,8 +191,8 @@ function saveField(k){
   if(el)DATA[k]=el.value;
 }
 function saveAllFields(){
-  ["nom1","dni1","tel1","email1","trabajo1","tel_trabajo1","dir_trabajo1",
-   "nom2","dni2","tel2","email2","trabajo2","tel_trabajo2","dir_trabajo2",
+  ["nom1","dni1","tel1","email1","trabajo1",
+   "nom2","dni2","tel2","email2","trabajo2",
    "ct_emerg","tel_emerg","rel_emerg","firma","obs_ingreso"].forEach(saveField);
 }
 function nc(){
@@ -291,11 +291,7 @@ function renderPaso2(){
 
 
     </div>
-    <div class="grid2">
-      <div class="field"><label class="lbl">Lugar de trabajo</label><input class="inp" id="f-trabajo1" value="${esc(DATA.trabajo1)}" placeholder="Empresa, profesión, actividad"/></div>
-      <div class="field"><label class="lbl">Tel. trabajo</label><input class="inp" type="tel" id="f-tel_trabajo1" value="${esc(DATA.tel_trabajo1||'')}"/></div>
-    </div>
-    <div class="field"><label class="lbl">Dirección trabajo</label><input class="inp" id="f-dir_trabajo1" value="${esc(DATA.dir_trabajo1||'')}"/></div>
+    <div class="field"><label class="lbl">Trabajo / Actividad</label><input class="inp" id="f-trabajo1" value="${esc(DATA.trabajo1)}" placeholder="Empresa, profesión, actividad"/></div>
   </div>
 
   <div class="card">
@@ -350,9 +346,7 @@ function renderPaso3(){
     <div class="grid2">
 
       <div class="field"><label class="lbl">Lugar de trabajo</label><input class="inp" id="f-trabajo2" value="${esc(DATA.trabajo2)}"/></div>
-      <div class="field"><label class="lbl">Tel. trabajo</label><input class="inp" type="tel" id="f-tel_trabajo2" value="${esc(DATA.tel_trabajo2||'')}"/></div>
     </div>
-    <div class="field"><label class="lbl">Dirección trabajo</label><input class="inp" id="f-dir_trabajo2" value="${esc(DATA.dir_trabajo2||'')}"/></div>
   </div>
   <div id="docs2-area" style="display:${DATA.nom2?'block':'none'}">
   <div class="card">
@@ -379,7 +373,7 @@ function renderPaso4(){
   const c=document.getElementById("step-content");
   c.innerHTML=`
   <div class="card">
-    <div class="card-title">📜 Acuerdo de Convivencia</div>
+    <div class="card-title">📜 Acuerdo de Convivencia y Locación</div>
     <div class="acuerdo-box">${esc(getAcuerdoForm())}</div>
     <div class="acepta-check ${acepta?"active":""}" id="acepta-row" onclick="toggleAcepta()">
       <div class="check-box ${acepta?"active":""}" id="acepta-box">${acepta?"✓":""}</div>
@@ -427,7 +421,7 @@ function renderPaso5(){
     ["Inicio contrato",DATA.ingreso||PRE.ingreso],
     ["Fin contrato",DATA.egreso||PRE.egreso],
     ...(DATA.posesion||PRE.posesion?[["Fecha posesión",DATA.posesion||PRE.posesion]]:[]),
-    ["Valor mensual acordado",fmt(DATA.alquiler||PRE.alquiler)],
+    ["Alquiler mensual",fmt(DATA.alquiler||PRE.alquiler)],
     ["Depósito",fmt(DATA.deposito||PRE.deposito)],
     ["Gastos gestión",fmt(DATA.gastos||PRE.gastos)],
     ["TOTAL AL INGRESO",fmt(total||Number(PRE.alquiler||0)+Number(PRE.deposito||0)+Number(PRE.gastos||0))],
@@ -440,6 +434,7 @@ function renderPaso5(){
     <div class="card-title">✅ Revisá tus datos antes de confirmar</div>
     ${rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #334155;font-size:12px"><span style="color:#94A3B8">${k}</span><span style="color:#F1F5F9;font-weight:600;text-align:right;max-width:60%">${esc(v)}</span></div>`).join("")}
   </div>
+  <div class="warn">⚠️ Una vez enviado, solo la administración podrá modificar los datos.</div>
   <div class="btn-nav">
     <button class="btn btn-g" onclick="paso=4;render()">← Atrás</button>
     <button class="btn btn-ok" onclick="guardar()">✓ Confirmar y Enviar</button>
@@ -473,41 +468,10 @@ function guardar(){
     firma:DATA.firma,fecha_firma:hoy(),
     fecha_registro:new Date().toISOString(),
   };
-  // Guardar datos del form en Firebase - NO crea contrato, actualiza datos de reserva
-  registro.trabajo1=DATA.trabajo1;
-  registro.tel_trabajo1=DATA.tel_trabajo1||"";
-  registro.dir_trabajo1=DATA.dir_trabajo1||"";
-  registro.tel_trabajo2=DATA.tel_trabajo2||"";
-  registro.dir_trabajo2=DATA.dir_trabajo2||"";
+  // Guardar en Firebase (compartido con todos los dispositivos)
   try{
-    // Buscar la reserva por unidad y actualizar con los datos del inquilino
-    var idParam=params.get("id")||"";
-    if(idParam){
-      // Si viene con ID de reserva, actualizar esa reserva con los datos del form
-      DB.ref("res").orderByChild("id_res").equalTo(idParam).once("value",function(snap){
-        if(snap.exists()){
-          var key=Object.keys(snap.val())[0];
-          DB.ref("res/"+key).update({
-            nombre:registro.nombre, dni:registro.dni, tel:registro.tel,
-            trabajo1:registro.trabajo1, tel_trabajo1:registro.tel_trabajo1,
-            dir_trabajo1:registro.dir_trabajo1,
-            nom2:registro.nom2, dni2:registro.dni2, tel2:registro.tel2,
-            trabajo2:registro.trabajo2, tel_trabajo2:registro.tel_trabajo2,
-            dir_trabajo2:registro.dir_trabajo2,
-            ct_emerg:registro.ct_emerg, tel_emerg:registro.tel_emerg,
-            rel_emerg:registro.rel_emerg,
-            firma:registro.firma, fecha_firma:registro.fecha_firma,
-            form_completado:true
-          });
-        } else {
-          // No hay reserva, guardar como form_data para que admin lo procese
-          DB.ref("form_data").push(registro);
-        }
-      });
-    } else {
-      DB.ref("form_data").push(registro);
-    }
-    console.log("Datos del form guardados en Firebase OK");
+    DB.ref("iq").push(registro);
+    console.log("Guardado en Firebase OK");
   }catch(e){
     console.error("Error Firebase:",e);
   }
@@ -529,7 +493,7 @@ function renderExito(){
   </div>
   <div class="card" style="text-align:center">
     <p style="color:#64748B;font-size:12px;margin-bottom:12px">¿Querés recibir una copia del acuerdo?</p>
-    <a href="https://wa.me/?text=${encodeURIComponent("✅ Mi acuerdo fue registrado.\n\nAcuerdo N°: "+DATA._contrato+"\nUnidad: "+(DATA.unidad||PRE.unidad)+"\nInicio: "+(DATA.ingreso||PRE.ingreso)+"\nValor mensual acordado: "+fmt(DATA.alquiler||PRE.alquiler)+"\n\nAdministración: 1555787641")}" target="_blank" style="background:#25D366;color:#fff;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;text-decoration:none;display:inline-block">💬 Compartir resumen por WhatsApp</a>
+    <a href="https://wa.me/?text=${encodeURIComponent("✅ Mi contrato de alquiler fue registrado.\n\nContrato N°: "+DATA._contrato+"\nUnidad: "+(DATA.unidad||PRE.unidad)+"\nInicio: "+(DATA.ingreso||PRE.ingreso)+"\nAlquiler mensual: "+fmt(DATA.alquiler||PRE.alquiler)+"\n\nAdministración: 1555787641")}" target="_blank" style="background:#25D366;color:#fff;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;text-decoration:none;display:inline-block">💬 Compartir resumen por WhatsApp</a>
   </div>`;
 }
 
