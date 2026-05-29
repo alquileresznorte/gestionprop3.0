@@ -1620,8 +1620,7 @@ function rCob(){
 
   var html="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'>";
   html+="<div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#64748B;font-size:11px'>"+cobA.length+" de "+allCob.length+" registros</p></div>";
-  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' id='cob-mes-inp'/><button class='btn bg bsm' onclick='genCob()'>Generar</button>
-      +(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
+  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' id='cob-mes-inp'/><button class='btn bg bsm' onclick='genCob()'>Generar</button>"+(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
 
   html+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>";
   html+="<select class='inp' style='max-width:110px' id='cob-ed'><option value=''>Todos</option>"+edOpts+"</select>";
