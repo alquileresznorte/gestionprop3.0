@@ -924,6 +924,9 @@ function cerrarAc(key){
   DB.ref("iq/"+key).remove();
   // Clean up eventos from cfg
   eventos.forEach(function(ev){DB.ref("cfg/"+ev._key).remove();});
+  // Desactivar adicionales de la unidad al cerrar contrato
+  var adicionales=oA(DATA.cfg).filter(function(x){return x.tipo==="adicional_iq"&&x.unidad===i.unidad&&x.activo!==false;});
+  adicionales.forEach(function(a){DB.ref("cfg/"+a._key).update({activo:false,hasta:hoy(),baja_por_cierre:true});});
   closeModal();closeModal();
   alert("Acuerdo cerrado. "+i.unidad+" quedo libre. Historial de "+eventos.length+" eventos guardado.");
   go("acuerdos");
@@ -1617,7 +1620,8 @@ function rCob(){
 
   var html="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'>";
   html+="<div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#64748B;font-size:11px'>"+cobA.length+" de "+allCob.length+" registros</p></div>";
-  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' id='cob-mes-inp'/><button class='btn bg bsm' onclick='genCob()'>Generar</button></div></div>";
+  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' id='cob-mes-inp'/><button class='btn bg bsm' onclick='genCob()'>Generar</button>
+      +(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
 
   html+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>";
   html+="<select class='inp' style='max-width:110px' id='cob-ed'><option value=''>Todos</option>"+edOpts+"</select>";
@@ -1682,10 +1686,49 @@ function rCob(){
 }
 
 
+function limpiarDuplicadosCob(){
+  // Para cada unidad+mes, si hay mas de un cobro con concepto "Alquiler" (o sin concepto especial),
+  // conservar el que tiene pagos y/o el creado por saveNA (tiene sal_ant=0 y concepto="Alquiler")
+  // Eliminar los generados de mas (sin pagos)
+  var cobsArr=oA(DATA.cob);
+  var grupos={};
+  cobsArr.forEach(function(c){
+    // Agrupar cobros de alquiler por unidad+mes (los de deposito/gastos tienen concepto distinto)
+    var esAlq=!c.concepto||c.concepto==="Alquiler"||c.concepto==="Alquiler USD"||(c.concepto_extra!==undefined&&!c.concepto);
+    if(!esAlq)return;
+    var k=c.unidad+"|"+c.mes;
+    if(!grupos[k])grupos[k]=[];
+    grupos[k].push(c);
+  });
+  var aBorrar=[];
+  Object.values(grupos).forEach(function(grp){
+    if(grp.length<=1)return;
+    // Ordenar: los que tienen pagos primero, luego por monto_total desc
+    grp.sort(function(a,b){
+      var pa=pT(a),pb=pT(b);
+      if(pa!==pb)return pb-pa; // más pagado primero
+      return (b.monto_total||0)-(a.monto_total||0);
+    });
+    // Conservar el primero, marcar el resto para borrar (solo si no tienen pagos)
+    for(var i=1;i<grp.length;i++){
+      if(pT(grp[i])===0){
+        aBorrar.push(grp[i]._key);
+      }
+    }
+  });
+  if(!aBorrar.length){alert("No se encontraron duplicados de alquiler sin pagos.");return;}
+  if(!confirm("Se encontraron "+aBorrar.length+" cobro(s) duplicado(s) sin pagos. ¿Eliminarlos?"))return;
+  aBorrar.forEach(function(k){DB.ref("cob/"+k).remove();});
+  setTimeout(rCob,700);
+  alert("Listo. Se eliminaron "+aBorrar.length+" cobro(s) duplicado(s).");
+}
 function genCob(){
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+  // Unidades que ya tienen cualquier cobro este mes (evita duplicados con saveNA)
   var ya=oA(DATA.cob).filter(function(c){return c.mes===_cobMes;}).map(function(c){return c.unidad;});
-  var ns=iqA.filter(function(i){return !ya.includes(i.unidad);});
+  // También excluir unidades donde el acuerdo activo ya tiene un cobro este mes (por id_ac)
+  var yaIdAc=oA(DATA.cob).filter(function(c){return c.mes===_cobMes;}).map(function(c){return c.id_ac;});
+  var ns=iqA.filter(function(i){return !ya.includes(i.unidad)&&!yaIdAc.includes(i.id_ac);});
   if(!ns.length){alert("Todas las unidades activas ya tienen cobranza este mes");return;}
   var yr=parseInt(_cobMes.split("-")[0]),mo=parseInt(_cobMes.split("-")[1]);
   var mPrev=mo===1?(yr-1)+"-12":yr+"-"+String(mo-1).padStart(2,"0");
@@ -2498,6 +2541,13 @@ function rCaja(){
   var esA=USER.r==="admin",m=_cajaMes;
   // ALL cobranzas and costs for this month
   var cobM=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  // Para la vista DIARIA: también incluir cobros de otros meses con pagos en este mes
+  // (ej: inquilino que paga por adelantado el mes siguiente)
+  var cobOtrosMeses=oA(DATA.cob).filter(function(c){
+    if(c.mes===m) return false; // ya incluido
+    var pagosDelMes=pA(c).filter(function(p){return (p.fecha||"").startsWith(m);});
+    return pagosDelMes.length>0;
+  });
   var cstM=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
   var ajM=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m);});
   var movsM=oA(DATA.movs).filter(function(mv){return mv.fecha&&mv.fecha.startsWith(m);});
@@ -2506,7 +2556,11 @@ function rCaja(){
   var tcVal=Number(localStorage.getItem("gp_tc_"+m)||0);
 
   // Monthly totals (ingresos = cobrado, egresos = costos pagados + aj egresos)
-  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)
+  // Ingresos: pagos del mes actual (de cobros de este mes + adelantos de otros meses)
+  var _pagosMesExtra=cobOtrosMeses.reduce(function(s,c){
+    return s+pA(c).filter(function(p){return (p.fecha||"").startsWith(m);}).reduce(function(ss,p){return ss+Number(p.monto||0);},0);
+  },0);
+  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)+_pagosMesExtra
         +ajM.filter(function(a){return a.tipo==="ingreso"&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
   var eM=cstM.reduce(function(s,c){return s+Number(c.monto||0);},0)
         +ajM.filter(function(a){return a.tipo==="egreso"&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
@@ -2528,8 +2582,8 @@ function rCaja(){
     // Build all movements for this day
     var movimientosD=[];
 
-    // Cobros
-    cobM.forEach(function(c){
+    // Cobros (del mes actual + adelantos de meses futuros pagados hoy)
+    cobM.concat(cobOtrosMeses).forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
         // Si el pago fue en cuenta de socio (MP Loli, MP Hugo, etc), va a columna Socios
         var esCuentaSocio=CTAS_SOCIOS.indexOf(p.cuenta)>=0;
@@ -4019,17 +4073,29 @@ function openFixSalAnt(ckey){
   var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0),saldo=tot-pg;
   var o="<div style='color:#94A3B8;font-size:12px;margin-bottom:12px'>";
   o+="<b>"+c.unidad+" - "+esc(c.inq)+" - Mes: "+c.mes+"</b></div>";
-  o+="<div style='background:#F59E0B11;border:1px solid #F59E0B44;border-radius:8px;padding:12px;margin-bottom:12px'>";
+  o+="<div style='background:#EF444411;border:1px solid #EF444444;border-radius:8px;padding:12px;margin-bottom:12px'>";
   o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:6px'>⚠ Saldo arrastrado del mes anterior</div>";
-  o+="<div style='color:#CBD5E1;font-size:13px'>Este cobro tiene <b>Ant.: "+fmt(c.sal_ant||0)+"</b> incorporado al total.</div>";
-  o+="<div style='color:#94A3B8;font-size:11px;margin-top:4px'>Alquiler del mes: "+fmt(c.monto_total)+" + Ant.: "+fmt(c.sal_ant||0)+" = Total: "+fmt(tot)+"</div>";
-  o+="<div style='color:#94A3B8;font-size:11px'>Ya pagado: "+fmt(pg)+" — Saldo actual: "+fmt(saldo)+"</div>";
+  o+="<div style='color:#CBD5E1;font-size:13px'>Alquiler mes: <b>"+fmt(c.monto_total)+"</b> + Ant. arrastrado: <b style='color:#EF4444'>"+fmt(c.sal_ant||0)+"</b> = Total: <b>"+fmt(tot)+"</b></div>";
+  o+="<div style='color:#94A3B8;font-size:11px;margin-top:4px'>Ya pagado: "+fmt(pg)+" — Saldo actual: <b style='color:#EF4444'>"+fmt(saldo)+"</b></div>";
   o+="</div>";
-  o+="<div style='color:#CBD5E1;font-size:12px;margin-bottom:6px'>Corregir el saldo anterior a:</div>";
-  o+="<input id='fix-sal-val' type='number' class='inp' value='"+(c.sal_ant||0)+"' style='margin-bottom:8px'/>";
-  o+="<div style='color:#64748B;font-size:11px;margin-bottom:12px'>Poné 0 si el saldo anterior fue error y no corresponde arrastrar nada.</div>";
-  o+="<button class='btn bx' onclick='doFixSalAnt("+JSON.stringify(ckey)+")'>Guardar corrección</button>";
-  openModal("Corregir saldo anterior",o,false);
+  o+="<div style='color:#10B981;font-size:12px;font-weight:700;margin-bottom:4px'>Opción 1 — Corregir el saldo arrastrado:</div>";
+  o+="<input id='fix-sal-val' type='number' class='inp' value='"+(c.sal_ant||0)+"' style='margin-bottom:4px'/>";
+  o+="<div style='color:#64748B;font-size:11px;margin-bottom:10px'>Poné 0 si fue un error y no corresponde arrastrar nada.</div>";
+  o+="<button class='btn bok' onclick='doFixSalAnt("+JSON.stringify(ckey)+")'  style='margin-bottom:14px;width:100%'>✓ Guardar corrección de saldo</button>";
+  if(pg===0){
+    o+="<div style='border-top:1px solid #334155;padding-top:12px'>";
+    o+="<div style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Opción 2 — Eliminar este cobro (sin pagos):</div>";
+    o+="<div style='color:#64748B;font-size:11px;margin-bottom:8px'>Borrá el cobro erróneo. Podés volver a generarlo desde Cobros → Generar y quedará limpio.</div>";
+    o+="<button class='btn bx' onclick='doDelCob("+JSON.stringify(ckey)+")' style='width:100%'>🗑 Eliminar cobro incorrecto</button>";
+    o+="</div>";
+  }
+  openModal("Corregir cobro",o,false);
+}
+function doDelCob(ckey){
+  if(!confirm("¿Eliminar este cobro? No tiene pagos registrados. Podrás regenerarlo desde Cobros → Generar."))return;
+  DB.ref("cob/"+ckey).remove();
+  closeModal();
+  setTimeout(rCob,500);
 }
 function doFixSalAnt(ckey){
   var v=Number(document.getElementById("fix-sal-val").value||0);
