@@ -930,8 +930,17 @@ function openFicha(key){
 function enviarFormFicha(){
   var d=window._fichaFormData||{};
   var i=DATA.iq[d.key];if(!i)return;
-  var base=location.origin+location.pathname.replace(/index\.html$/,"")+"form.html";
-  var link=base+"?id="+encodeURIComponent(i.id_ac||i._key||"")+"&u="+encodeURIComponent(i.unidad||"");
+  var base=location.origin+"/form.html";
+  var link=base+"?id="+encodeURIComponent(i.id_ac||i._key||"")
+    +"&u="+encodeURIComponent(i.unidad||"")
+    +"&nom="+encodeURIComponent(i.nombre||"")
+    +"&dni="+encodeURIComponent(i.dni||"")
+    +"&tel="+encodeURIComponent(i.tel||i.telefono||"")
+    +"&alq="+encodeURIComponent(i.alquiler||"")
+    +"&dep="+encodeURIComponent(i.deposito||"")
+    +"&gs="+encodeURIComponent(i.gastos||"")
+    +"&ing="+encodeURIComponent(i.ingreso||"")
+    +"&egr="+encodeURIComponent(i.egreso||"");
   var nom=(i.nombre||"").split(",")[0].trim();
   var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+" Adm: 1555787641";
   if(d.tel){
@@ -1198,8 +1207,11 @@ function saveReserva(){
   closeModal();
 
   // Mostrar link del form para enviar al inquilino
-  var base=location.href.replace(/index\.html.*$/,"").replace(/\?.*$/,"")+"form.html";
-  var link=base+"?id="+id_res+"&u="+encodeURIComponent(u)+"&nom="+encodeURIComponent(nom)+"&tel="+encodeURIComponent(tel)+"&alq="+encodeURIComponent(alq)+"&dep="+encodeURIComponent(dep)+"&gs="+encodeURIComponent(gas);
+  var base=location.origin+"/form.html";
+  var fi2=G("rs-fi")?G("rs-fi").value:"";
+  var fegr2=G("rs-fegr")?G("rs-fegr").value:"";
+  var dni2=G("rs-dni")?G("rs-dni").value:"";
+  var link=base+"?id="+id_res+"&u="+encodeURIComponent(u)+"&nom="+encodeURIComponent(nom)+"&tel="+encodeURIComponent(tel)+"&dni="+encodeURIComponent(dni2)+"&alq="+encodeURIComponent(alq)+"&dep="+encodeURIComponent(dep)+"&gs="+encodeURIComponent(gas)+"&ing="+encodeURIComponent(fi2)+"&egr="+encodeURIComponent(fegr2)+"&senia="+encodeURIComponent(senia);
   var wa="https://wa.me/"+tel.replace(/\D/g,"")+"?text="+encodeURIComponent("Hola "+nom.split(" ")[0]+"! Para completar el ingreso al depto "+u+" por favor completa este formulario: "+link);
 
   var oLink="<div style='background:#0F172A;border-radius:10px;padding:16px;margin-top:8px'>";
