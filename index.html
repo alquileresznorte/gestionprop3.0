@@ -1159,6 +1159,7 @@ function openReserva(){
   o+="<div class='g2'>";
   o+=fld("rs-fi","Fecha inicio contrato",hoy(),"date");
   o+=fld("rs-fegr","Fecha fin contrato","","date");
+  o+=fld("rs-pos","Fecha de posesión (si difiere del inicio)","","date");
   o+="</div>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin:8px 0'>";
   o+="<div style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:8px'>Seña recibida</div>";
@@ -1182,6 +1183,8 @@ function saveReserva(){
   var cta=(G("rs-cta")||{value:"Efectivo"}).value;
   var fecha=G("rs-f").value;
   var fi=(G("rs-fi")||{value:hoy()}).value;
+  var fegr=(G("rs-fegr")||{value:""}).value;
+  var pos=(G("rs-pos")||{value:""}).value;
   var obs=(G("rs-obs")||{value:""}).value;
 
   if(!u){alert("Selecciona un depto");return;}
@@ -1220,10 +1223,7 @@ function saveReserva(){
 
   // Mostrar link del form para enviar al inquilino
   var base=location.href.split("/").slice(0,-1).join("/")+"/form.html";
-  var fi2=G("rs-fi")?G("rs-fi").value:"";
-  var fegr2=G("rs-fegr")?G("rs-fegr").value:"";
-  var dni2=G("rs-dni")?G("rs-dni").value:"";
-  var link=base+"?id="+id_res+"&u="+encodeURIComponent(u)+"&nom="+encodeURIComponent(nom)+"&tel="+encodeURIComponent(tel)+"&dni="+encodeURIComponent(dni2)+"&alq="+encodeURIComponent(alq)+"&dep="+encodeURIComponent(dep)+"&gs="+encodeURIComponent(gas)+"&ing="+encodeURIComponent(fi2)+"&egr="+encodeURIComponent(fegr2)+"&senia="+encodeURIComponent(senia);
+  var link=base+"?id="+id_res+"&u="+encodeURIComponent(u)+"&nom="+encodeURIComponent(nom)+"&tel="+encodeURIComponent(tel)+"&dni="+encodeURIComponent(dni)+"&alq="+encodeURIComponent(alq)+"&dep="+encodeURIComponent(dep)+"&gs="+encodeURIComponent(gas)+"&ing="+encodeURIComponent(fi)+"&egr="+encodeURIComponent(fegr)+"&senia="+encodeURIComponent(senia)+"&pos="+encodeURIComponent(pos);
   var wa="https://wa.me/"+tel.replace(/\D/g,"")+"?text="+encodeURIComponent("Hola "+nom.split(" ")[0]+"! Para completar el ingreso al depto "+u+" por favor completa este formulario: "+link);
 
   var oLink="<div style='background:#0F172A;border-radius:10px;padding:16px;margin-top:8px'>";
