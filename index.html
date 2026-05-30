@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+"+mesSelect('cst-mes-inp',_cstMes,"_cstMes=this.value;rCostos()")+"<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -155,6 +155,18 @@ var CF=[
 // helpers
 function ls(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function lw(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function mesSelect(id,val,onchange){
+  var meses=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  var now=new Date();
+  var o="<select class='inp' id='"+id+"' style='max-width:160px'"+(onchange?" onchange='"+onchange+"'":"")+"><option value=''></option>";
+  for(var i=-3;i<15;i++){
+    var d=new Date(now.getFullYear(),now.getMonth()+i,1);
+    var y=d.getFullYear(),m=d.getMonth()+1;
+    var v=y+"-"+String(m).padStart(2,"0");
+    o+="<option value='"+v+"'"+(v===val?" selected":"")+">"+meses[m-1]+" "+y+"</option>";
+  }
+  return o+"</select>";
+}
 function mesLabel(m){
   if(!m||m.length<7)return m||"--";
   var meses=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -782,6 +794,29 @@ function driveSubirArchivos(){
 }
 
 
+function openVerDocs(key){
+  var i=DATA.iq[key]; if(!i)return;
+  var docs=[
+    {label:"DNI Frente",key:"doc_dni_f"},
+    {label:"DNI Dorso",key:"doc_dni_d"},
+    {label:"Recibo de sueldo",key:"doc_sueldo"},
+    {label:"DNI Frente 2do inquilino",key:"foto_dni2f"},
+    {label:"DNI Dorso 2do inquilino",key:"foto_dni2d"},
+    {label:"Recibo sueldo 2do inquilino",key:"foto_sue2"},
+  ];
+  var o="";
+  var found=false;
+  docs.forEach(function(d){
+    if(!i[d.key]) return;
+    found=true;
+    o+="<div style='margin-bottom:14px'>";
+    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+d.label+"</div>";
+    o+="<img src='"+i[d.key]+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
+    o+="</div>";
+  });
+  if(!found) o="<p style='color:#64748B'>No hay documentos cargados para este inquilino.</p>";
+  openModal("📷 Documentos — "+esc(i.nombre),o,false);
+}
 function openEditDatos(key){
   var i=DATA.iq[key]; if(!i)return;
   var o="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>";
@@ -926,7 +961,7 @@ function openFicha(key){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
     o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";
-    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
+    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";if(i.doc_dni_f||i.doc_dni_d||i.doc_sueldo) o+="<button class='btn bsm' style='background:#0F172A;color:#06B6D4;border:1px solid #06B6D4' data-verdocs='"+ki+"'>📷 Ver docs</button>";o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
     if((i.deposito||0)>0)o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";
   }
   o+="</div>";
@@ -937,7 +972,7 @@ function openFicha(key){
     if(t.dataset.drivefoto)openDriveFotos(kget(parseInt(t.dataset.drivefoto)));
     else if(t.dataset.ac)verAc(kget(parseInt(t.dataset.ac)));
     else if(t.dataset.obs)editObs(kget(parseInt(t.dataset.obs)));
-    else if(t.dataset.editdatos)openEditDatos(kget(parseInt(t.dataset.editdatos)));else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
+    else if(t.dataset.editdatos)openEditDatos(kget(parseInt(t.dataset.editdatos)));else if(t.dataset.verdocs)openVerDocs(kget(parseInt(t.dataset.verdocs)));else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
     else if(t.dataset.renovar)openRenovar(kget(parseInt(t.dataset.renovar)));
     else if(t.dataset.adicional)openAdicional(kget(parseInt(t.dataset.adicional)));
     else if(t.dataset.hev)openHistorialEventos(kget(parseInt(t.dataset.hev)));
@@ -1724,7 +1759,7 @@ function rCob(){
 
   var html="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'>";
   html+="<div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#06B6D4;font-size:12px;font-weight:600'>📅 "+mesLabel(_cobMes)+"</p><p style='color:#64748B;font-size:11px'>"+cobA.length+" de "+allCob.length+" registros</p></div>";
-  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' id='cob-mes-inp'/><button class='btn bg bsm' onclick='genCob()'>Generar</button>"+(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
+  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'>"+mesSelect('cob-mes-inp',_cobMes,"_cobMes=this.value;rCob()")+"<button class='btn bg bsm' onclick='genCob()'>Generar</button>"+(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
 
   html+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>";
   html+="<select class='inp' style='max-width:110px' id='cob-ed'><option value=''>Todos</option>"+edOpts+"</select>";
@@ -2069,7 +2104,7 @@ function rCostos(){
     o+="</div>";
   }
   o+="</div>";
-  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><input type='month' class='inp' value='"+_cstMes+"' style='max-width:140px' onchange=\"_cstMes=this.value;_editC=null;rCostos()\"/><select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
+  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><input"+mesSelect('cst-mes-inp',_cstMes,"_cstMes=this.value;rCostos()")+"<select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
   o+="<input class='inp' id='cst-busq' type='text' placeholder=\"\uD83D\uDD0D Buscar costo...\" style='width:100%;max-width:340px;margin-bottom:10px' oninput=\"window._cstBusq=this.value;_editC=null;rCostos()\"  value='"+(window._cstBusq||"")+"'/>"; 
   setTimeout(function(){var so=G("cst-ord");if(so)so.onchange=function(){rCostos();};},50);
   var cstOrd=(G("cst-ord")||{value:"cat"}).value;
@@ -2112,7 +2147,7 @@ function rCostos(){
       row+="<div style='background:#0F172A;border-radius:7px;padding:8px;margin-bottom:8px;font-size:11px'>";
       row+="<div style='color:#94A3B8;margin-bottom:4px'>Pagos registrados:</div>";
       pagosC.forEach(function(p){
-        row+="<div style='display:flex;justify-content:space-between;padding:2px 0'><span style='color:#10B981'>"+fmt(p.monto)+"</span><span style='color:#64748B'>"+esc(p.cuenta||"")+" — "+esc(p.fecha||"")+"</span></div>";
+        row+="<div style='display:flex;justify-content:space-between;padding:2px 0'><span style='color:#10B981'>"+fmt(p.monto)+"</span><span style='color:#64748B'>"+esc(p.cuenta||"")+" — "+fecDisp(p.fecha||"")+"</span></div>";
       });
       row+="<div style='color:#F59E0B;font-weight:700;margin-top:4px'>Saldo: "+fmt(Math.max(0,saldoC))+"</div>";
       row+="</div>";
@@ -2851,7 +2886,7 @@ function rCaja(){
 
     } else {
     // MONTHLY VIEW
-    o+="<input type='month' class='inp' value='"+m+"' style='max-width:150px;margin-bottom:12px' id='caja-mes'/>";
+    o+=""+mesSelect('caja-mes',_cajaMes,"_cajaMes=this.value;rCaja()")+"";
     if(esA){
       o+="<div style='display:flex;gap:8px;margin-bottom:12px;align-items:flex-end;flex-wrap:wrap'>";
       o+="<div class='fld' style='margin:0'><label class='lbl'>Tipo de cambio USD del mes</label>";
@@ -3381,7 +3416,7 @@ function renderCfgProp(){
     o += "<div class='card' style='margin-bottom:10px'><h3 style='font-size:13px;font-weight:700;margin-bottom:8px;color:#64748B'>Propiedades vendidas / dadas de baja</h3>";
     vendidas.forEach(function(p){
       o += "<div style='display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E293B;font-size:11px;color:#64748B'>";
-      o += "<span>"+esc(p.nombre)+"</span><span>Baja: "+esc(p.fecha_baja||"--")+"</span></div>";
+      o += "<span>"+esc(p.nombre)+"</span><span>Baja: "+fecDisp(p.fecha_baja||"")+"</span></div>";
     });
     o += "</div>";
   }
@@ -4305,7 +4340,7 @@ function openEditPagos(ckey){
     o+="<div style='background:#0F172A;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center'>";
     o+="<div style='font-size:12px'>";
     o+="<div style='color:#10B981;font-weight:700'>"+fmt(p.monto)+"</div>";
-    o+="<div style='color:#64748B;font-size:10px'>"+esc(p.fecha)+" - "+esc(p.cuenta)+"</div>";
+    o+="<div style='color:#64748B;font-size:10px'>"+fecDisp(p.fecha)+" - "+esc(p.cuenta)+"</div>";
     o+="<div style='color:#94A3B8;font-size:10px'>"+esc(p.concepto||"")+"</div></div>";
     o+="<button class='btn bx bsm' data-delpago='"+pki+"'>Borrar</button>";
     o+="</div>";
