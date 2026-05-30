@@ -794,7 +794,7 @@ function saveEditDatos(key){
   var emtel=document.getElementById("ed-emtel").value.trim();
   if(!nombre){alert("El nombre es obligatorio");return;}
   var posesion=document.getElementById("ed-posesion").value||"";
-  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,telefono:tel,trabajo:trabajo,email:email,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel,fecha_posesion:posesion||null});
+  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,tel:tel,telefono:tel,trabajo:trabajo,email:email,tel2:tel2,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel,fecha_posesion:posesion||null});
   closeModal();closeModal();
   alert("Datos actualizados correctamente");
 }
@@ -1860,7 +1860,7 @@ function regPago(ckey){
     if(!usd_monto||!tc_usado){alert("Ingresa monto en U$S y tipo de cambio");return;}
     m=Math.round(usd_monto*tc_usado); // pesos
   } else {
-    m=Number(G("p-m").value);
+    m=fmtInputVal(G("p-m"));
     if(!m){alert("Ingresa el monto");return;}
   }
 
