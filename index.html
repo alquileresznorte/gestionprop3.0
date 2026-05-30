@@ -552,7 +552,7 @@ var _gfUnidad='';function genFormLink(unidad){
   var ing=G("gf-ing").value,egr=G("gf-egr").value,pos=G("gf-pos").value;
   if(!alq){alert("El alquiler es obligatorio");return;}
   var cod=unidad.split("-")[0],e=ED[cod]||{};
-  var base=location.href.replace(/index\.html.*$/,"").replace(/\?.*$/,"")+"form.html";
+  var base=location.origin+"/form.html";
   var url=base+"?u="+encodeURIComponent(unidad)+"&ed="+encodeURIComponent(cod)+"&dir="+encodeURIComponent(e.d||"")+"&alq="+alq+"&dep="+(dep||0)+"&gs="+(gs||0)+"&ing="+ing+"&egr="+egr+"&pos="+pos;
   var el=G("gf-link");el.textContent=url;el.style.display="block";
   var wa=G("gf-wa");
