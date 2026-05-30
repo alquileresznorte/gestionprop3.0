@@ -175,9 +175,10 @@ function fmtInput(el){
   el.dataset.raw=raw||"0";
 }
 function fmtInputVal(el){
-  // Get the numeric value from a fmtInput field
-  var raw=el.dataset.raw||(el.value||"0").replace(/\./g,"").replace(/[^\d]/g,"");
-  return Number(raw)||0;
+  if(!el) return 0;
+  // Strip dots (thousands separator in es-AR) and parse
+  var raw=el.dataset&&el.dataset.raw?el.dataset.raw:(el.value||"0").replace(/\./g,"").replace(/[^\d]/g,"");
+  return parseInt(raw)||0;
 }
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
 function hoy(){return new Date().toISOString().split("T")[0];}
@@ -1040,8 +1041,8 @@ function openRenovar(key){
   md.onclick=function(e){if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));else if(e.target.classList.contains("ov"))closeModal();};
 }
 function saveRenovar(key){
-  var alq=Number(G("rv-alq").value||0);
-  var gs=Number(G("rv-gs").value||0);
+  var alq=fmtInputVal(G("rv-alq"));
+  var gs=fmtInputVal(G("rv-gs"));
   var ing=G("rv-ing").value;
   var egr=G("rv-egr").value;
   var cuotas=parseInt(G("rv-cuotas").value)||1;
@@ -1119,7 +1120,7 @@ function saveRecargo(ckey){
   var c=DATA.cob[ckey];
   var tardio=G("rc-tardio").checked;
   var digital=G("rc-digital").checked;
-  var manual=Number(G("rc-monto").value||0);
+  var manual=fmtInputVal(G("rc-monto"));
   var monto=manual>0?manual:0;
   var cr3=getCfgRec();var diaH=new Date().getDate();
   if(tardio)monto+=Math.round(c.monto_total*(diaH>=20?cr3.rec_d20:diaH>=10?cr3.rec_d10:cr3.rec_d5)/100);
@@ -1480,7 +1481,7 @@ function saveNA(){
   var id=nid();
   var moneda=(G("na-moneda")||{value:"ARS"}).value||"ARS";
   var alqUSD=fmtInputVal(G("na-alq-usd")||{value:"0",dataset:{raw:"0"}});
-  var alq=moneda==="USD"?0:Number(G("na-alq").value||0);
+  var alq=moneda==="USD"?0:fmtInputVal(G("na-alq"));
   // Para USD guardamos 0 en alquiler (pesos) y alquiler_usd en USD
   var ing=G("na-ing").value;
   var mesInicio=ing?ing.slice(0,7):mes();
@@ -1543,11 +1544,11 @@ function saveNA(){
 
   } else {
     // CONTRATO NUEVO - full flow
-    var dep=Number(G("na-dep").value||0);
-    var gs=Number(G("na-gs").value||0);
-    var desc=Number(G("na-desc-gs").value||0);
+    var dep=fmtInputVal(G("na-dep"));
+    var gs=fmtInputVal(G("na-gs"));
+    var desc=fmtInputVal(G("na-desc-gs"));
     var gsNeto=Math.max(0,gs-desc);
-    var pc=Number(G("na-pc").value||0);
+    var pc=fmtInputVal(G("na-pc"));
     var posMonto=fmtInputVal(G("na-pos-monto")||{value:"0",dataset:{raw:"0"}});
     var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
@@ -2138,7 +2139,7 @@ function rCostos(){
   };
 }
 function saveCosto(ckey){
-  var m=Number(G("ec-m").value||0);
+  var m=fmtInputVal(G("ec-m"));
   var f=G("ec-f").value;
   var checkboxPagado=G("ec-p").checked;
   var pm=fmtInputVal(G("ec-pm")||{value:"0",dataset:{raw:"0"}});
@@ -2190,7 +2191,7 @@ function addExtraFactura(ckey){
 
 function saveExtraFactura(ckey){
   var c=DATA.cst[ckey];if(!c)return;
-  var m=Number(G("ef-m").value||0);
+  var m=fmtInputVal(G("ef-m"));
   if(!m){alert("Ingresa el monto");return;}
   // Create a new cst record (copy of original, different instance)
   DB.ref("cst").push({
@@ -3794,7 +3795,7 @@ function openAjusteCuat(){
   },50);
 }
 window.aplicarPct=function(){
-  var pct=Number(G("aj-pct").value||0); if(!pct) return;
+  var pct=fmtInputVal(G("aj-pct")); if(!pct) return;
   (window._iqAjuste||[]).forEach(function(i){
     var inp=G("ajv-"+i._key); if(!inp) return;
     var nuevo=Math.round(i.alquiler*(1+pct/100));
@@ -3856,8 +3857,8 @@ function openRenovar(key){
 }
 function saveRenovar(key){
   var i=DATA.iq[key];
-  var alq=Number(G("rv-alq").value||0);
-  var gs=Number(G("rv-gs").value||0);
+  var alq=fmtInputVal(G("rv-alq"));
+  var gs=fmtInputVal(G("rv-gs"));
   var cuotas=G("rv-cuotas").value.includes("2")?2:1;
   var ini=G("rv-ini").value;
   var egr=G("rv-egr").value;
@@ -4114,7 +4115,7 @@ function saveAdicional(key){
   var i=DATA.iq[key];
   var con=G("adl-con").value; if(!con){alert("El concepto es obligatorio");return;}
   var tipo=G("adl-tipo").value;
-  var val=Number(G("adl-val").value||0); if(!val){alert("El valor es obligatorio");return;}
+  var val=fmtInputVal(G("adl-val")); if(!val){alert("El valor es obligatorio");return;}
   var monto=tipo==="pct"?Math.round(i.alquiler*(val/100)):val;
   var desde=G("adl-desde").value||mes();
   var hasta=G("adl-hasta").value||"";
@@ -4221,7 +4222,7 @@ function openDevolverDeposito(key){
 }
 function saveDevolucionDep(key){
   var i=DATA.iq[key]; if(!i) return;
-  var monto=Number(G("dd-monto").value||0);
+  var monto=fmtInputVal(G("dd-monto"));
   if(!monto){alert("Ingresa el monto");return;}
   if(!confirm("Registrar devolucion de "+fmt(monto)+" del deposito de "+i.nombre+"?"))return;
   // Register as egreso in aj (caja)
@@ -4428,7 +4429,7 @@ function saveGastoAjuste(){
   }
   // Gasto
   var desc=G("gc-desc").value.trim();
-  var monto=Number(G("gc-monto").value||0);
+  var monto=fmtInputVal(G("gc-monto"));
   var cta=G("gc-cta").value||"Efectivo";
   if(!desc){alert("La descripcion es obligatoria");return;}
   if(!monto){alert("El monto es obligatorio");return;}
@@ -4483,7 +4484,7 @@ function openGastoCaja(){
 
 function saveGastoCaja(){
   var desc=G("gc-desc").value;
-  var monto=Number(G("gc-monto").value||0);
+  var monto=fmtInputVal(G("gc-monto"));
   if(!desc){alert("La descripcion es obligatoria");return;}
   if(!monto){alert("El monto es obligatorio");return;}
   // Save directly to cst for current month
@@ -4536,8 +4537,8 @@ function openAhorro(){
 
 function saveAhorro(){
   var f=G("ah-f").value;
-  var usd=Number(G("ah-usd").value||0);
-  var tc=Number(G("ah-tc").value||0);
+  var usd=fmtInputVal(G("ah-usd"));
+  var tc=fmtInputVal(G("ah-tc"));
   var cta=G("ah-cta").value;
   if(!usd||!tc){alert("Ingresa monto USD y TC");return;}
   var pesos=usd*tc;
@@ -4652,9 +4653,9 @@ function renderCfgRecargos(){
 
 function saveCfgRecargos(){
   var ups={
-    desc_pronto: Number(G("cr-desc").value||0),
+    desc_pronto: fmtInputVal(G("cr-desc")),
     rec_digital: Number(G("cr-dig").value||10),
-    rec_d5:      Number(G("cr-d5").value||0),
+    rec_d5:      fmtInputVal(G("cr-d5")),
     rec_d10:     Number(G("cr-d10").value||10),
     rec_d20:     Number(G("cr-d20").value||15),
     dias_mora:   Number(G("cr-dora")||{value:10}).value||10,
@@ -5242,8 +5243,8 @@ function openNuevaInversion(){
 function saveNuevaInversion(){
   var desc=G("inv-desc").value.trim();
   var f=G("inv-f").value;
-  var pesos=Number(G("inv-pesos").value||0);
-  var tc=Number(G("inv-tc").value||0);
+  var pesos=fmtInputVal(G("inv-pesos"));
+  var tc=fmtInputVal(G("inv-tc"));
   if(!desc){alert("Ingresa una descripcion");return;}
   if(!f){alert("Ingresa la fecha");return;}
   if(!pesos||!tc){alert("Ingresa el valor en pesos y el TC");return;}
@@ -5284,8 +5285,8 @@ function openVenderInversion(key){
 
 function saveVentaInversion(key){
   var f=G("vnd-f").value;
-  var pesos=Number(G("vnd-pesos").value||0);
-  var tc=Number(G("vnd-tc").value||0);
+  var pesos=fmtInputVal(G("vnd-pesos"));
+  var tc=fmtInputVal(G("vnd-tc"));
   if(!f){alert("Ingresa la fecha");return;}
   if(!pesos||!tc){alert("Ingresa el precio de venta y el TC");return;}
   var usdVenta=Math.round(pesos/tc);
@@ -5306,7 +5307,7 @@ function openStockUSD(){
 }
 
 function saveStockUSD(){
-  var usd=Number(G("su-usd").value||0);
+  var usd=fmtInputVal(G("su-usd"));
   var f=G("su-f").value;
   if(!f){alert("Ingresa la fecha");return;}
   DB.ref("cfg_aho").update({stock_usd:usd,stock_fecha:f});
