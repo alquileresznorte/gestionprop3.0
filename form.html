@@ -238,7 +238,7 @@ function renderPaso1(){
     <div class="card-title">🏠 Tu acuerdo de alquiler</div>
     <div style="background:#0F172A;border-radius:8px;padding:12px;margin-bottom:12px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-        <div><div style="color:#64748B;font-size:10px">Unidad</div><div style="color:#F1F5F9;font-weight:700">${PRE.unidad}${PRE.dir?" — "+PRE.dir:""}</div></div>
+        <div><div style="color:#64748B;font-size:10px">Unidad</div><div style="color:#F1F5F9;font-weight:700">${PRE.unidad}</div></div>
         <div><div style="color:#64748B;font-size:10px">Titular</div><div style="color:#F1F5F9;font-weight:700">${PRE.nom||"—"}</div></div>
         <div><div style="color:#64748B;font-size:10px">DNI</div><div style="color:#F1F5F9">${PRE.dni||"—"}</div></div>
         <div><div style="color:#64748B;font-size:10px">Teléfono</div><div style="color:#F1F5F9">${PRE.tel||"—"}</div></div>
@@ -470,7 +470,6 @@ function renderPaso5(){
   const total=Number(DATA.alquiler||0)+Number(DATA.deposito||0)+Number(DATA.gastos||0);
   const rows=[
     ["Unidad",DATA.unidad||PRE.unidad],
-    ["Dirección",DATA.dir||PRE.dir],
     ["Titular",DATA.nom1],
     ["DNI",DATA.dni1],
     ["Teléfono",DATA.tel1],
@@ -485,6 +484,7 @@ function renderPaso5(){
     ["Depósito",fmt(DATA.deposito||PRE.deposito)],
     ["Gastos gestión",fmt(DATA.gastos||PRE.gastos)],
     ["TOTAL AL INGRESO",fmt(total||Number(PRE.alquiler||0)+Number(PRE.deposito||0)+Number(PRE.gastos||0))],
+    ...(Number(PRE.senia||0)>0?[["Seña abonada","- "+fmt(Number(PRE.senia||0))],["Saldo al ingreso",fmt(total-Number(PRE.senia||0))]]:[]),
 
     ["Acuerdo aceptado","✅ Sí"],
   ];
@@ -556,7 +556,7 @@ function renderExito(){
     +(PRE.posesion?"Posesión: "+PRE.posesion+"\n":"")
     +"Alquiler mensual: "+fmt(DATA.alquiler||PRE.alquiler)+"\n"
     +(Number(PRE.saldo||0)>0?"Saldo a abonar al ingresar: "+fmt(PRE.saldo)+"\n":"")
-    +"\n— Acuerdo de Convivencia —\n"+acuerdoTexto.slice(0,800)+"...\n"
+    +"\n— Acuerdo de Convivencia —\n"+acuerdoTexto+"\n"
     +"\nAdministración: 1555787641";
   app.innerHTML=`
   <div class="card">
