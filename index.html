@@ -743,6 +743,35 @@ function driveSubirArchivos(){
 }
 
 
+function openEditDatos(key){
+  var i=DATA.iq[key]; if(!i)return;
+  var o="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>";
+  o+="<div><div class='lbl'>Nombre / Titular</div><input class='inp' id='ed-nombre' value='"+esc(i.nombre||"")+"'/></div>";
+  o+="<div><div class='lbl'>DNI</div><input class='inp' id='ed-dni' value='"+esc(i.dni||"")+"'/></div>";
+  o+="<div><div class='lbl'>Teléfono</div><input class='inp' id='ed-tel' value='"+esc(i.telefono||"")+"'/></div>";
+  o+="<div><div class='lbl'>Trabajo</div><input class='inp' id='ed-trabajo' value='"+esc(i.trabajo||"")+"'/></div>";
+  o+="<div><div class='lbl'>Email</div><input class='inp' id='ed-email' value='"+esc(i.email||"")+"'/></div>";
+  o+="<div><div class='lbl'>Teléfono 2</div><input class='inp' id='ed-tel2' value='"+esc(i.telefono2||"")+"'/></div>";
+  o+="</div>";
+  o+="<div style='margin-bottom:10px'><div class='lbl'>Contacto de emergencia - Nombre</div><input class='inp' id='ed-emnom' value='"+esc(i.emergencia_nombre||"")+"'/></div>";
+  o+="<div style='margin-bottom:12px'><div class='lbl'>Contacto de emergencia - Teléfono</div><input class='inp' id='ed-emtel' value='"+esc(i.emergencia_tel||"")+"'/></div>";
+  o+="<button class='btn bok' onclick='saveEditDatos("+JSON.stringify(key)+")' style='width:100%'>Guardar cambios</button>";
+  openModal("Editar datos - "+esc(i.nombre),o,false);
+}
+function saveEditDatos(key){
+  var nombre=document.getElementById("ed-nombre").value.trim();
+  var dni=document.getElementById("ed-dni").value.trim();
+  var tel=document.getElementById("ed-tel").value.trim();
+  var trabajo=document.getElementById("ed-trabajo").value.trim();
+  var email=document.getElementById("ed-email").value.trim();
+  var tel2=document.getElementById("ed-tel2").value.trim();
+  var emnom=document.getElementById("ed-emnom").value.trim();
+  var emtel=document.getElementById("ed-emtel").value.trim();
+  if(!nombre){alert("El nombre es obligatorio");return;}
+  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,telefono:tel,trabajo:trabajo,email:email,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel});
+  closeModal();closeModal();
+  alert("Datos actualizados correctamente");
+}
 function openFicha(key){
   var i=DATA.iq[key];if(!i)return;
   var esA=USER.r==="admin";
@@ -834,7 +863,7 @@ function openFicha(key){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
     o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";
-    o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
+    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
     if((i.deposito||0)>0)o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";
   }
   o+="</div>";
@@ -845,7 +874,7 @@ function openFicha(key){
     if(t.dataset.drivefoto)openDriveFotos(kget(parseInt(t.dataset.drivefoto)));
     else if(t.dataset.ac)verAc(kget(parseInt(t.dataset.ac)));
     else if(t.dataset.obs)editObs(kget(parseInt(t.dataset.obs)));
-    else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
+    else if(t.dataset.editdatos)openEditDatos(kget(parseInt(t.dataset.editdatos)));else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
     else if(t.dataset.renovar)openRenovar(kget(parseInt(t.dataset.renovar)));
     else if(t.dataset.adicional)openAdicional(kget(parseInt(t.dataset.adicional)));
     else if(t.dataset.hev)openHistorialEventos(kget(parseInt(t.dataset.hev)));
@@ -3370,7 +3399,7 @@ function renderCfgCostos(){
       var ki=kpush(c._key);
       o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
       o+="<div><b style='color:"+(c.activo?"#F1F5F9":"#64748B")+"'>"+esc(c.desc)+"</b>  <span style='color:#64748B;font-size:10px'>"+esc(c.cat||"")+"  "+esc(c.ed||"General")+(c.cta_num?"  Cta:"+esc(c.cta_num):"")+"</span></div>";
-      var tipoBadge=c.tipo==="costo_fijo_extra"?"Fijo mensual":"Eventual";var tipoColor=c.tipo==="costo_fijo_extra"?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
+      var tipoBadge=ing.recurrente?"Recurrente":"Unico";var tipoColor=ing.recurrente?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
       o+="<button class='btn bw bsm' data-editcosto='"+ki+"'>Editar</button>";
       o+="<button class='btn "+(c.activo?"bg":"bok")+" bsm' data-togglecosto='"+ki+"'>"+(c.activo?"Desactivar":"Activar")+"</button>";
       o+="<button class='btn bx bsm' data-delcosto='"+ki+"'>Borrar</button>";
@@ -3527,6 +3556,43 @@ function renderCfgIngresos(){
   }
   o+="</div>";
 
+  // Adicionales por inquilino
+  var adiqA=oA(DATA.cfg).filter(function(x){return x.tipo==="adicional_iq";}).sort(function(a,b){
+    return (a.unidad||"").localeCompare(b.unidad||"");
+  });
+  o+="<div class='card' style='margin-bottom:10px'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Adicionales por Inquilino</h3>";
+  o+="<span style='color:#64748B;font-size:11px'>"+adiqA.length+" registros</span></div>";
+  if(adiqA.length){
+    o+="<div style='overflow-x:auto'><table class='tbl'><thead><tr><th>Unidad</th><th>Inquilino</th><th>Concepto</th><th>Monto</th><th>Desde</th><th>Hasta</th><th>Estado</th><th></th></tr></thead><tbody>";
+    adiqA.forEach(function(a){
+      var ki=kpush(a._key);
+      var activo=a.activo!==false;
+      var iq=oA(DATA.iq).find(function(i){return i.unidad===a.unidad&&i.estado==="activo";});
+      var nombreIq=iq?iq.nombre:(a.inq||"--");
+      var estadoColor=activo?"#10B981":"#64748B";
+      var estadoLabel=activo?"Activo":"Inactivo";
+      o+="<tr style='"+(activo?"":"opacity:0.5")+"'>";
+      o+="<td><span class='badge'>"+esc(a.unidad||"--")+"</span></td>";
+      o+="<td style='font-size:11px'>"+esc(nombreIq)+"</td>";
+      o+="<td style='font-size:11px'>"+esc(a.concepto||"--")+"</td>";
+      o+="<td style='color:#10B981;font-weight:600'>"+fmt(a.monto||0)+"</td>";
+      o+="<td style='font-size:11px;color:#94A3B8'>"+esc(a.desde||"--")+"</td>";
+      o+="<td style='font-size:11px;color:#94A3B8'>"+(a.hasta?esc(a.hasta):"∞ indefinido")+"</td>";
+      o+="<td><span style='background:"+estadoColor+"22;color:"+estadoColor+";border-radius:4px;padding:2px 6px;font-size:10px'>"+estadoLabel+"</span></td>";
+      o+="<td style='display:flex;gap:4px'>";
+      o+="<button class='btn bsm' style='background:#06B6D422;color:#06B6D4' data-editadiq='"+ki+"'>Editar</button>";
+      if(activo) o+="<button class='btn bsm' style='background:#F59E0B22;color:#F59E0B' data-deactivadiq='"+ki+"'>Desactivar</button>";
+      o+="<button class='btn bx bsm' data-deladiq='"+ki+"'>Borrar</button>";
+      o+="</td></tr>";
+    });
+    o+="</tbody></table></div>";
+  } else {
+    o+="<p style='color:#64748B;font-size:12px'>No hay adicionales por inquilino cargados.</p>";
+  }
+  o+="</div>";
+
   // Historial cierres
   o+="<div class='card'>";
   o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Historial de Cierres Mensuales</h3>";
@@ -3548,7 +3614,49 @@ function renderCfgIngresos(){
   el.onclick=function(e){
     var ei=e.target.closest("[data-editing]"); if(ei)openEditIngreso(kget(parseInt(ei.dataset.editing)));
     var di=e.target.closest("[data-deling]"); if(di)borrarIngreso(kget(parseInt(di.dataset.deling)));
+    var ea=e.target.closest("[data-editadiq]"); if(ea)openEditAdiq(kget(parseInt(ea.dataset.editadiq)));
+    var da=e.target.closest("[data-deactivadiq]"); if(da)deactivarAdiq(kget(parseInt(da.dataset.deactivadiq)));
+    var xa=e.target.closest("[data-deladiq]"); if(xa)borrarAdiq(kget(parseInt(xa.dataset.deladiq)));
   };
+}
+function openEditAdiq(key){
+  var a=DATA.cfg[key]; if(!a)return;
+  var ki=kpush(key);
+  var o="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'>";
+  o+="<div><div class='lbl'>Unidad</div><input class='inp' id='adiq-unidad' value='"+esc(a.unidad||"")+"'/></div>";
+  o+="<div><div class='lbl'>Concepto</div><input class='inp' id='adiq-concepto' value='"+esc(a.concepto||"")+"'/></div>";
+  o+="<div><div class='lbl'>Monto $</div><input class='inp' type='number' id='adiq-monto' value='"+(a.monto||0)+"'/></div>";
+  o+="<div><div class='lbl'>Estado</div><select class='inp' id='adiq-activo'><option value='1'"+(a.activo!==false?" selected":"")+">Activo</option><option value='0'"+(a.activo===false?" selected":"")+">Inactivo</option></select></div>";
+  o+="<div><div class='lbl'>Desde (mes)</div><input class='inp' type='month' id='adiq-desde' value='"+(a.desde||"")+"'/></div>";
+  o+="<div><div class='lbl'>Hasta (mes, vacío = indefinido)</div><input class='inp' type='month' id='adiq-hasta' value='"+(a.hasta||"")+"'/></div>";
+  o+="</div>";
+  o+="<button class='btn bok' onclick='saveEditAdiq("+JSON.stringify(key)+")' style='width:100%'>Guardar cambios</button>";
+  openModal("Editar Adicional - "+esc(a.unidad||""),o,false);
+}
+function saveEditAdiq(key){
+  var unidad=document.getElementById("adiq-unidad").value.trim();
+  var concepto=document.getElementById("adiq-concepto").value.trim();
+  var monto=Number(document.getElementById("adiq-monto").value||0);
+  var activo=document.getElementById("adiq-activo").value==="1";
+  var desde=document.getElementById("adiq-desde").value||"";
+  var hasta=document.getElementById("adiq-hasta").value||"";
+  if(!unidad||!concepto||!monto){alert("Completá unidad, concepto y monto");return;}
+  DB.ref("cfg/"+key).update({unidad:unidad,concepto:concepto,monto:monto,activo:activo,desde:desde,hasta:hasta||null});
+  closeModal();
+  setTimeout(function(){renderCfgIngresos();},500);
+  alert("Adicional actualizado");
+}
+function deactivarAdiq(key){
+  var a=DATA.cfg[key]; if(!a)return;
+  if(!confirm("¿Desactivar el adicional de "+esc(a.unidad)+" ("+esc(a.concepto)+")?\nNo se aplicará a cobros futuros."))return;
+  DB.ref("cfg/"+key).update({activo:false,hasta:hoy().slice(0,7)});
+  setTimeout(function(){renderCfgIngresos();},500);
+}
+function borrarAdiq(key){
+  var a=DATA.cfg[key]; if(!a)return;
+  if(!confirm("¿Borrar definitivamente el adicional de "+esc(a.unidad)+"?\nEsta acción no se puede deshacer."))return;
+  DB.ref("cfg/"+key).remove();
+  setTimeout(function(){renderCfgIngresos();},500);
 }
 function openAddIngreso(){
   var cats=["Venta propiedad","Alquiler cochera","Alquiler comercial","Ingreso extraordinario","Reintegro","Otro"];
