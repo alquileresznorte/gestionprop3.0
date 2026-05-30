@@ -232,7 +232,7 @@ function renderPaso1(){
   const c=document.getElementById("step-content");
   const total=Number(PRE.alquiler||0)+Number(PRE.deposito||0)+Number(PRE.gastos||0);
   const senia=Number(PRE.senia||0);
-  const saldo=Number(PRE.saldo||0)||total;
+  const saldo=senia>0?(total-senia):total;
   c.innerHTML=`
   <div class="card">
     <div class="card-title">🏠 Tu acuerdo de alquiler</div>
@@ -276,57 +276,42 @@ function next1(){
 // PASO 2 — Datos adicionales + Documentación
 function renderPaso2(){
   const c=document.getElementById("step-content");
-  // Pre-fill DATA with PRE values for nom1/dni1/tel1
   if(!DATA.nom1&&PRE.nom) DATA.nom1=PRE.nom;
   if(!DATA.dni1&&PRE.dni) DATA.dni1=PRE.dni;
   if(!DATA.tel1&&PRE.tel) DATA.tel1=PRE.tel;
-  c.innerHTML=`
-  <div class="card">
-    <div class="card-title">👤 Inquilino Titular</div>
-    <div style="background:#0F172A;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <div><div style="color:#64748B;font-size:10px">Nombre</div><div style="color:#F1F5F9;font-weight:700">${PRE.nom||DATA.nom1||"—"}</div></div>
-        <div><div style="color:#64748B;font-size:10px">DNI</div><div style="color:#F1F5F9">${PRE.dni||DATA.dni1||"—"}</div></div>
-        <div><div style="color:#64748B;font-size:10px">Teléfono</div><div style="color:#F1F5F9">${PRE.tel||DATA.tel1||"—"}</div></div>
-      </div>
-      <div style="color:#64748B;font-size:10px;margin-top:6px">Si algún dato es incorrecto, comunicate con nosotros antes de continuar.</div>
-    </div>
-    <div class="card-title" style="font-size:12px;margin-top:8px">💼 Lugar de trabajo</div>
-    <div class="field">
-      <label class="lbl">Empresa / Actividad</label>
-      <input class="inp" id="f-trabajo1" value="${esc(DATA.trabajo1)}" placeholder="Empresa, profesión, actividad"/>
-    </div>
-    <div class="field">
-      <label class="lbl">Dirección del trabajo</label>
-      <input class="inp" id="f-trabajo_dir" value="${esc(DATA.trabajo_dir||"")}" placeholder="Calle, número, localidad"/>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div class="field">
-        <label class="lbl">Teléfono del trabajo</label>
-        <input class="inp" id="f-trabajo_tel" value="${esc(DATA.trabajo_tel||"")}" placeholder="Teléfono"/>
-      </div>
-      <div class="field">
-        <label class="lbl">Superior / Persona a cargo</label>
-        <input class="inp" id="f-trabajo_jefe" value="${esc(DATA.trabajo_jefe||"")}" placeholder="Nombre y apellido"/>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-      <div class="field"><label class="lbl">Contacto emergencia</label><input class="inp" id="f-ct_emerg" value="${esc(DATA.ct_emerg)}" placeholder="Nombre"/></div>
-      <div class="field"><label class="lbl">Teléfono emergencia</label><input class="inp" id="f-tel_emerg" value="${esc(DATA.tel_emerg)}" placeholder="11..."/></div>
-      <div class="field"><label class="lbl">Relación</label><input class="inp" id="f-rel_emerg" value="${esc(DATA.rel_emerg)}" placeholder="Madre, Padre..."/></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title">📸 Documentación requerida</div>
-    <p style="color:#64748B;font-size:11px;margin-bottom:12px">Tomá fotos nítidas con buena iluminación</p>
-    ${uploadArea("doc-dni-f","📋 Foto DNI frente",true)}
-    ${uploadArea("doc-dni-d","📋 Foto DNI dorso",true)}
-    ${uploadArea("doc-sueldo","💼 Recibo de sueldo",false)}
-  </div>
-  <div class="btn-nav">
-    <button class="btn btn-g" onclick="paso=1;render()">← Atrás</button>
-    <button class="btn btn-p" onclick="next2()">Siguiente →</button>
-  </div>`;
+  var o='';
+  o+="<div class='card'>";
+  o+="<div class='card-title'>👤 Inquilino Titular</div>";
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:6px'>";
+  o+="<div><div style='color:#64748B;font-size:10px'>Nombre</div><div style='color:#F1F5F9;font-weight:700'>"+esc(PRE.nom||DATA.nom1||"—")+"</div></div>";
+  o+="<div><div style='color:#64748B;font-size:10px'>DNI</div><div style='color:#F1F5F9'>"+esc(PRE.dni||DATA.dni1||"—")+"</div></div>";
+  o+="<div><div style='color:#64748B;font-size:10px'>Teléfono</div><div style='color:#F1F5F9'>"+esc(PRE.tel||DATA.tel1||"—")+"</div></div>";
+  o+="</div><div style='color:#64748B;font-size:10px;margin-top:6px'>Si algún dato es incorrecto, comunicate con nosotros antes de continuar.</div></div>";
+  o+="<div class='card-title' style='font-size:12px;margin-top:8px'>💼 Lugar de trabajo</div>";
+  o+="<div class='field'><label class='lbl'>Empresa / Actividad</label><input class='inp' id='f-trabajo1' value='"+esc(DATA.trabajo1||"")+"' placeholder='Empresa, profesión, actividad'/></div>";
+  o+="<div class='field'><label class='lbl'>Dirección del trabajo</label><input class='inp' id='f-trabajo_dir' value='"+esc(DATA.trabajo_dir||"")+"' placeholder='Calle, número, localidad'/></div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  o+="<div class='field'><label class='lbl'>Teléfono del trabajo</label><input class='inp' id='f-trabajo_tel' value='"+esc(DATA.trabajo_tel||"")+"' placeholder='Teléfono'/></div>";
+  o+="<div class='field'><label class='lbl'>Superior / Persona a cargo</label><input class='inp' id='f-trabajo_jefe' value='"+esc(DATA.trabajo_jefe||"")+"' placeholder='Nombre y apellido'/></div>";
+  o+="</div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px'>";
+  o+="<div class='field'><label class='lbl'>Contacto emergencia</label><input class='inp' id='f-ct_emerg' value='"+esc(DATA.ct_emerg||"")+"' placeholder='Nombre'/></div>";
+  o+="<div class='field'><label class='lbl'>Teléfono emergencia</label><input class='inp' id='f-tel_emerg' value='"+esc(DATA.tel_emerg||"")+"' placeholder='11...'/></div>";
+  o+="<div class='field'><label class='lbl'>Relación</label><input class='inp' id='f-rel_emerg' value='"+esc(DATA.rel_emerg||"")+"' placeholder='Madre, Padre...'/></div>";
+  o+="</div></div>";
+  o+="<div class='card'>";
+  o+="<div class='card-title'>📸 Documentación requerida</div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:12px'>Tomá fotos nítidas con buena iluminación</p>";
+  o+=uploadField("doc_dni_f","📋 Foto DNI frente","doc-dni-f",true);
+  o+=uploadField("doc_dni_d","📋 Foto DNI dorso","doc-dni-d",true);
+  o+=uploadField("doc_sueldo","💼 Recibo de sueldo","doc-sueldo",false);
+  o+="</div>";
+  o+="<div class='btn-nav'>";
+  o+="<button class='btn btn-g' onclick='paso=1;render()'>← Atrás</button>";
+  o+="<button class='btn btn-p' onclick='next2()'>Siguiente →</button>";
+  o+="</div>";
+  c.innerHTML=o;
   initUploads(["doc-dni-f","doc-dni-d","doc-sueldo"]);
 }
 function next2(){
