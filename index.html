@@ -155,7 +155,30 @@ var CF=[
 // helpers
 function ls(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function lw(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function mesLabel(m){
+  if(!m||m.length<7)return m||"--";
+  var meses=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  var yr=m.slice(0,4),mo=parseInt(m.slice(5,7));
+  return meses[mo-1]+" "+yr;
+}
 function fmt(n){return "$"+Number(n||0).toLocaleString("es-AR");}
+function fmtInput(el){
+  // Format number input with dots as thousands separator while typing
+  var raw=el.value.replace(/\./g,"").replace(/[^\d]/g,"");
+  var num=parseInt(raw||"0");
+  if(!isNaN(num)&&num>0){
+    el.value=num.toLocaleString("es-AR");
+  } else if(raw===""){
+    el.value="";
+  }
+  // Store raw value as data attribute for reading
+  el.dataset.raw=raw||"0";
+}
+function fmtInputVal(el){
+  // Get the numeric value from a fmtInput field
+  var raw=el.dataset.raw||(el.value||"0").replace(/\./g,"").replace(/[^\d]/g,"");
+  return Number(raw)||0;
+}
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
 function hoy(){return new Date().toISOString().split("T")[0];}
 function mes(){return new Date().toISOString().slice(0,7);}
@@ -190,7 +213,7 @@ function pT(c){
 function H(tag,attrs,inner){var a=Object.keys(attrs).map(function(k){return k+'="'+attrs[k]+'"';}).join(" ");return "<"+tag+(a?" "+a:"")+">"+inner+"</"+tag+">";}
 function sc(ic,lb,val,sub,col){return "<div class='sc'><div style='font-size:18px'>"+ic+"</div><div style='color:#94A3B8;font-size:10px;font-weight:600;text-transform:uppercase;margin-top:4px'>"+lb+"</div><div style='font-size:20px;font-weight:800;color:"+(col||"#F1F5F9")+"'>"+val+"</div><div style='color:#64748B;font-size:10px'>"+(sub||"")+"</div></div>";}
 function bdg(t,c){return "<span class='bdg' style='background:"+c+"22;color:"+c+"'>"+esc(t)+"</span>";}
-function fld(id,lb,val,tp){return "<div class='fld'><label class='lbl'>"+lb+"</label><input class='inp' id='"+id+"' type='"+(tp||"text")+"' value='"+esc(val||"")+"'/></div>";}
+function fld(id,lb,val,tp){var isMoney=(tp==="number"||tp==="money");var inputType=isMoney?"text":"text";var oninp=isMoney?" oninput='fmtInput(this)' inputmode='numeric'": "";var dispVal=isMoney&&Number(val||0)>0?Number(val).toLocaleString("es-AR"):(val||"")+"";return "<div class='fld'><label class='lbl'>"+lb+"</label><input class='inp' id='"+id+"' type='"+inputType+"' value='"+esc(dispVal)+"'"+oninp+" data-raw='"+esc(String(val||"0"))+"'/></div>";}
 function sld(id,lb,opts,val){var o=opts.map(function(x){return "<option"+(x===val?" selected":"")+">"+x+"</option>";}).join("");return "<div class='fld'><label class='lbl'>"+lb+"</label><select class='inp' id='"+id+"'>"+o+"</select></div>";}
 function tad(id,lb,val){return "<div class='fld'><label class='lbl'>"+lb+"</label><textarea class='inp' id='"+id+"' style='min-height:70px'>"+esc(val||"")+"</textarea></div>";}
 
@@ -753,6 +776,8 @@ function openEditDatos(key){
   o+="<div><div class='lbl'>Email</div><input class='inp' id='ed-email' value='"+esc(i.email||"")+"'/></div>";
   o+="<div><div class='lbl'>Teléfono 2</div><input class='inp' id='ed-tel2' value='"+esc(i.telefono2||"")+"'/></div>";
   o+="</div>";
+  o+="<div><div class='lbl'>Fecha real de posesión</div><input class='inp' type='date' id='ed-posesion' value='"+(i.fecha_posesion||i.ingreso||"")+"'/><div style='color:#64748B;font-size:10px;margin-top:3px'>Si tomó posesión en fecha distinta al inicio del contrato</div></div>";
+  o+="</div>";
   o+="<div style='margin-bottom:10px'><div class='lbl'>Contacto de emergencia - Nombre</div><input class='inp' id='ed-emnom' value='"+esc(i.emergencia_nombre||"")+"'/></div>";
   o+="<div style='margin-bottom:12px'><div class='lbl'>Contacto de emergencia - Teléfono</div><input class='inp' id='ed-emtel' value='"+esc(i.emergencia_tel||"")+"'/></div>";
   o+="<button class='btn bok' onclick='saveEditDatos("+JSON.stringify(key)+")' style='width:100%'>Guardar cambios</button>";
@@ -768,7 +793,8 @@ function saveEditDatos(key){
   var emnom=document.getElementById("ed-emnom").value.trim();
   var emtel=document.getElementById("ed-emtel").value.trim();
   if(!nombre){alert("El nombre es obligatorio");return;}
-  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,telefono:tel,trabajo:trabajo,email:email,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel});
+  var posesion=document.getElementById("ed-posesion").value||"";
+  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,telefono:tel,trabajo:trabajo,email:email,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel,fecha_posesion:posesion||null});
   closeModal();closeModal();
   alert("Datos actualizados correctamente");
 }
@@ -790,6 +816,7 @@ function openFicha(key){
   o+="<div><div class='lbl'>Deposito</div><div style='font-size:12px'>"+fmt(i.deposito||0)+"</div></div>";
   o+="<div><div class='lbl'>Inicio</div><div style='font-size:12px'>"+fecDisp(i.ingreso||"")+"</div></div>";
   o+="<div><div class='lbl'>Vencimiento</div><div style='font-size:12px'>"+fecDisp(i.egreso||"")+"</div></div>";
+  if(i.fecha_posesion&&i.fecha_posesion!==i.ingreso) o+="<div style='grid-column:1/-1;background:#0F172A;border-radius:6px;padding:6px 10px;font-size:11px;color:#F59E0B'>📅 Fecha real de posesión: "+fecDisp(i.fecha_posesion)+"</div>";
   o+="</div>";
 
   // 2do inquilino
@@ -1648,7 +1675,7 @@ function rCob(){
   var edOpts=Object.keys(ED).map(function(k){return "<option"+(k===edFil?" selected":"")+">"+k+"</option>";}).join("");
 
   var html="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'>";
-  html+="<div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#64748B;font-size:11px'>"+cobA.length+" de "+allCob.length+" registros</p></div>";
+  html+="<div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#06B6D4;font-size:12px;font-weight:600'>📅 "+mesLabel(_cobMes)+"</p><p style='color:#64748B;font-size:11px'>"+cobA.length+" de "+allCob.length+" registros</p></div>";
   html+="<div style='display:flex;gap:6px;flex-wrap:wrap'><input type='month' class='inp' value='"+_cobMes+"' style='max-width:140px' id='cob-mes-inp'/><button class='btn bg bsm' onclick='genCob()'>Generar</button>"+(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
 
   html+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>";
@@ -1798,10 +1825,10 @@ function openPago(ckey){
     o+="</div>";
     o+="<div id='p-usd-total' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#06B6D4;margin-bottom:8px'>Ingresa U$S y TC para ver total en pesos</div>";
   } else {
-    o+=fld("p-m","Monto $","","number");
+    o+=fld("p-m","Monto $","","money");
   }
   o+="<label style='display:flex;align-items:center;gap:7px;color:#94A3B8;font-size:11px;cursor:pointer;margin:8px 0'><input type='checkbox' id='p-d' onchange=\"G('p-d2').style.display=this.checked?'grid':'none'\"> Segundo medio de pago</label>";
-  o+="<div id='p-d2' style='display:none' class='g2'>"+sld("p-c2","Cuenta 2",CTAS)+fld("p-m2","Monto 2 $","","number")+"</div>";
+  o+="<div id='p-d2' style='display:none' class='g2'>"+sld("p-c2","Cuenta 2",CTAS)+fld("p-m2","Monto 2 $","","money")+"</div>";
   var ki=kpush(ckey);
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rp='"+ki+"'>Registrar</button></div>";
   openModal("Registrar pago - "+c.unidad+(esUSD?" (USD)":""),o);
@@ -1842,7 +1869,7 @@ function regPago(ckey){
     usd:esUSD?usd_monto:0,tc:esUSD?tc_usado:0};
 
   if(G("p-d").checked){
-    var m2=Number((G("p-m2")||{value:0}).value||0),cta2=(G("p-c2")||{value:""}).value;
+    var m2=fmtInputVal(G("p-m2")||{value:"0",dataset:{raw:"0"}}),cta2=(G("p-c2")||{value:""}).value;
     if(m2) ups["cob/"+ckey+"/pagos/"+(ts+1)]={fecha:fecha,monto:m2,cuenta:cta2,concepto:"Alquiler "+c.unidad};
   }
 
@@ -3546,7 +3573,7 @@ function renderCfgIngresos(){
       var ki=kpush(ing._key);
       o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
       o+="<div><b>"+esc(ing.nombre)+"</b>  <span style='color:#64748B;font-size:10px'>"+esc(ing.cat||"")+"  "+( ing.recurrente?"Recurrente":"Unico")+"</span></div>";
-      var tipoBadge=c.tipo==="costo_fijo_extra"?"Fijo mensual":"Eventual";var tipoColor=c.tipo==="costo_fijo_extra"?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
+      var tipoBadge=ing.recurrente?"Recurrente":"Unico";var tipoColor=ing.recurrente?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
       o+="<button class='btn bw bsm' data-editing='"+ki+"'>Editar</button>";
       o+="<button class='btn bx bsm' data-deling='"+ki+"'>Borrar</button>";
       o+="</div></div>";
