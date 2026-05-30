@@ -781,37 +781,49 @@ function openEditDatos(key){
   var o="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>";
   o+="<div><div class='lbl'>Nombre / Titular</div><input class='inp' id='ed-nombre' value='"+esc(i.nombre||"")+"'/></div>";
   o+="<div><div class='lbl'>DNI</div><input class='inp' id='ed-dni' value='"+esc(i.dni||"")+"'/></div>";
-  o+="<div><div class='lbl'>Teléfono</div><input class='inp' id='ed-tel' value='"+esc(i.telefono||"")+"'/></div>";
-  o+="<div><div class='lbl'>Trabajo</div><input class='inp' id='ed-trabajo' value='"+esc(i.trabajo||"")+"'/></div>";
-  o+="<div><div class='lbl'>Email</div><input class='inp' id='ed-email' value='"+esc(i.email||"")+"'/></div>";
-  o+="<div><div class='lbl'>Teléfono 2</div><input class='inp' id='ed-tel2' value='"+esc(i.telefono2||"")+"'/></div>";
+  o+="<div><div class='lbl'>Teléfono</div><input class='inp' id='ed-tel' value='"+esc(i.tel||i.telefono||"")+"'/></div>";
+  o+="<div><div class='lbl'>Teléfono 2</div><input class='inp' id='ed-tel2' value='"+esc(i.tel2||i.telefono2||"")+"'/></div>";
+  o+="<div><div class='lbl'>Trabajo</div><input class='inp' id='ed-trabajo' value='"+esc(i.trabajo||i.trabajo1||"")+"'/></div>";
+  o+="<div></div>";
   o+="</div>";
-  o+="<div><div class='lbl'>Fecha real de posesión</div><input class='inp' type='date' id='ed-posesion' value='"+(i.fecha_posesion||i.ingreso||"")+"'/><div style='color:#64748B;font-size:10px;margin-top:3px'>Si tomó posesión en fecha distinta al inicio del contrato</div></div>";
+  o+="<div style='margin-bottom:10px'><div class='lbl'>Fecha real de posesión</div><input class='inp' type='date' id='ed-posesion' value='"+(i.fecha_posesion||"")+"'/><div style='color:#64748B;font-size:10px;margin-top:3px'>Si tomó posesión en fecha distinta al inicio del contrato</div></div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>";
+  o+="<div><div class='lbl'>Contacto emergencia - Nombre</div><input class='inp' id='ed-emnom' value='"+esc(i.emergencia_nombre||"")+"'/></div>";
+  o+="<div><div class='lbl'>Contacto emergencia - Teléfono</div><input class='inp' id='ed-emtel' value='"+esc(i.emergencia_tel||"")+"'/></div>";
   o+="</div>";
-  o+="<div style='margin-bottom:10px'><div class='lbl'>Contacto de emergencia - Nombre</div><input class='inp' id='ed-emnom' value='"+esc(i.emergencia_nombre||"")+"'/></div>";
-  o+="<div style='margin-bottom:12px'><div class='lbl'>Contacto de emergencia - Teléfono</div><input class='inp' id='ed-emtel' value='"+esc(i.emergencia_tel||"")+"'/></div>";
+  if(i.tel_historial&&i.tel_historial.length){
+    o+="<div style='background:#0F172A;border-radius:6px;padding:8px;margin-bottom:10px;font-size:11px;color:#64748B'>Teléfonos anteriores: "+i.tel_historial.join(", ")+"</div>";
+  }
   o+="<button class='btn bok' onclick='saveEditDatos("+JSON.stringify(key)+")' style='width:100%'>Guardar cambios</button>";
   openModal("Editar datos - "+esc(i.nombre),o,false);
 }
 function saveEditDatos(key){
+  var i=DATA.iq[key]; if(!i)return;
   var nombre=document.getElementById("ed-nombre").value.trim();
   var dni=document.getElementById("ed-dni").value.trim();
   var tel=document.getElementById("ed-tel").value.trim();
-  var trabajo=document.getElementById("ed-trabajo").value.trim();
-  var email=document.getElementById("ed-email").value.trim();
   var tel2=document.getElementById("ed-tel2").value.trim();
+  var trabajo=document.getElementById("ed-trabajo").value.trim();
+  var posesion=document.getElementById("ed-posesion").value||"";
   var emnom=document.getElementById("ed-emnom").value.trim();
   var emtel=document.getElementById("ed-emtel").value.trim();
   if(!nombre){alert("El nombre es obligatorio");return;}
-  var posesion=document.getElementById("ed-posesion").value||"";
   // Preserve old phone in historial
   var oldTel=i.tel||i.telefono||"";
-  var telHistorial=i.tel_historial?i.tel_historial:[];
+  var telHistorial=Array.isArray(i.tel_historial)?i.tel_historial.slice():[];
   if(oldTel&&oldTel!==tel&&!telHistorial.includes(oldTel)) telHistorial.push(oldTel);
-  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,tel:tel,telefono:tel,tel_historial:telHistorial,trabajo:trabajo,email:email,tel2:tel2,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel,fecha_posesion:posesion||null});
+  DB.ref("iq/"+key).update({
+    nombre:nombre, dni:dni,
+    tel:tel, telefono:tel, tel_historial:telHistorial,
+    tel2:tel2, telefono2:tel2,
+    trabajo:trabajo, trabajo1:trabajo,
+    emergencia_nombre:emnom, emergencia_tel:emtel,
+    fecha_posesion:posesion||null
+  });
   closeModal();closeModal();
-  alert("Datos actualizados correctamente");
+  alert("Datos actualizados");
 }
+
 function openFicha(key){
   var i=DATA.iq[key];if(!i)return;
   var esA=USER.r==="admin";
