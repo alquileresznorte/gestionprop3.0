@@ -66,7 +66,7 @@ body{background:#0F172A;color:#F1F5F9;font-family:'Segoe UI',system-ui,sans-seri
 .success-icon{font-size:64px;margin-bottom:16px}
 .success-title{font-size:22px;font-weight:800;color:#10B981;margin-bottom:8px}
 .success-sub{color:#64748B;font-size:13px;line-height:1.6}
-.contrato-num{background:#10B98122;border:1px solid #10B98144;border-radius:10px;padding:16px;margin:16px 0;font-size:20px;font-weight:800;color:#10B981}
+.acuerdo-num{background:#10B98122;border:1px solid #10B98144;border-radius:10px;padding:16px;margin:16px 0;font-size:20px;font-weight:800;color:#10B981}
 
 .err-msg{color:#EF4444;font-size:11px;margin-top:3px;display:none}
 .err-msg.show{display:block}
@@ -211,7 +211,7 @@ function render(){
   const app=document.getElementById("app");
   if(paso===6){renderExito();return;}
   
-  const labels=["Contrato","Titular","2do Inquilino","Acuerdo","Confirmación"];
+  const labels=["Acuerdo","Titular","2do Inquilino","Acuerdo","Confirmación"];
   const dots=Array.from({length:PASOS},(_,i)=>`<div class="step-dot ${i+1<paso?"done":i+1===paso?"active":""}"></div>`).join("");
   
   app.innerHTML=`
@@ -564,7 +564,7 @@ function renderExito(){
       <div class="success-icon">🎉</div>
       <div class="success-title">¡Acuerdo registrado!</div>
       <div class="success-sub">Tus datos fueron registrados correctamente.<br>La administración confirmará tu ingreso a la brevedad.</div>
-      <div class="contrato-num">Acuerdo N° ${DATA._contrato}</div>
+      <div class="acuerdo-num">Acuerdo N° ${DATA._contrato}</div>
       <div class="success-sub" style="margin-top:8px">Guardá este número.<br>Lo vas a necesitar para consultas.</div>
     </div>
   </div>
