@@ -562,7 +562,7 @@ var _gfUnidad='';function genFormLink(unidad){
   if(!alq){alert("El alquiler es obligatorio");return;}
   if(!nom){alert("El nombre es obligatorio");return;}
   var cod=unidad.split("-")[0],e=ED[cod]||{};
-  var base=location.origin+"/form.html";
+  var base=location.href.split("/").slice(0,-1).join("/")+"/form.html";
   var url=base+"?u="+encodeURIComponent(unidad)+"&ed="+encodeURIComponent(cod)+"&dir="+encodeURIComponent(e.d||"")+"&alq="+alq+"&dep="+(dep||0)+"&gs="+(gs||0)+"&ing="+ing+"&egr="+egr+"&pos="+pos+"&nom="+encodeURIComponent(nom)+"&dni="+encodeURIComponent(dni)+"&tel="+encodeURIComponent(tel)+"&senia="+(senia||0)+"&saldo="+(saldo||0);
   var el=G("gf-link");el.textContent=url;el.style.display="block";
   var wa=G("gf-wa");
@@ -942,7 +942,7 @@ function openFicha(key){
 function enviarFormFicha(){
   var d=window._fichaFormData||{};
   var i=DATA.iq[d.key];if(!i)return;
-  var base=location.origin+"/form.html";
+  var base=location.href.split("/").slice(0,-1).join("/")+"/form.html";
   var link=base+"?id="+encodeURIComponent(i.id_ac||i._key||"")
     +"&u="+encodeURIComponent(i.unidad||"")
     +"&nom="+encodeURIComponent(i.nombre||"")
@@ -1219,7 +1219,7 @@ function saveReserva(){
   closeModal();
 
   // Mostrar link del form para enviar al inquilino
-  var base=location.origin+"/form.html";
+  var base=location.href.split("/").slice(0,-1).join("/")+"/form.html";
   var fi2=G("rs-fi")?G("rs-fi").value:"";
   var fegr2=G("rs-fegr")?G("rs-fegr").value:"";
   var dni2=G("rs-dni")?G("rs-dni").value:"";
