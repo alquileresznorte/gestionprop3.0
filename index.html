@@ -536,8 +536,15 @@ function rVD(iqA,el){
 
 function openGenForm(unidad){_gfUnidad=unidad;
   var cod=unidad.split("-")[0],e=ED[cod]||{};
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Pre-cargá los datos del acuerdo. El inquilino va a completar sus datos personales y firmar.</p>";
-  o+="<div class='g2'>"+fld("gf-alq","Alquiler mensual $","","number")+fld("gf-dep","Deposito $","","number")+fld("gf-gs","Gastos de gestion $","","number")+fld("gf-ing","Inicio contrato","","date")+fld("gf-egr","Fin contrato","","date")+fld("gf-pos","Fecha de posesion real","","date")+"</div>";
+  // Try to prefill from existing acuerdo if available
+  var iq=oA(DATA.iq).find(function(i){return i.unidad===unidad&&i.estado==="activo";});
+  var o="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;color:#94A3B8'>Pre-cargá los datos. El inquilino solo sube fotos, chequea sus datos y firma.</div>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>👤 Datos del inquilino</div>";
+  o+="<div class='g2'>"+fld("gf-nom","Nombre completo",iq?iq.nombre:"")+fld("gf-dni","DNI",iq?iq.dni:"")+fld("gf-tel","Teléfono",iq?iq.tel||iq.telefono:"")+"</div>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin:8px 0 6px'>🏠 Datos del acuerdo</div>";
+  o+="<div class='g2'>"+fld("gf-alq","Alquiler mensual $",iq?iq.alquiler:"","money")+fld("gf-dep","Deposito $",iq?iq.deposito:"","money")+fld("gf-gs","Gastos de gestion $",iq?iq.gastos:"","money")+fld("gf-ing","Inicio contrato",iq?iq.ingreso:"","date")+fld("gf-egr","Fin contrato",iq?iq.egreso:"","date")+fld("gf-pos","Fecha de posesion real",iq?iq.posesion||iq.fecha_posesion:"","date")+"</div>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin:8px 0 6px'>💰 Reserva</div>";
+  o+="<div class='g2'>"+fld("gf-senia","Seña abonada $","","money")+fld("gf-saldo","Saldo al ingreso $","","money")+"</div>";
   o+="<div id='gf-link' style='display:none;margin:10px 0;padding:10px;background:#0F172A;border-radius:8px;word-break:break-all;font-size:11px;color:#93C5FD'></div>";
   o+="<div style='display:flex;gap:7px;flex-wrap:wrap;margin-top:12px'>";
   o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
@@ -548,12 +555,15 @@ function openGenForm(unidad){_gfUnidad=unidad;
   setTimeout(function(){var b=G("gf-run");if(b)b.onclick=function(){genFormLink(_gfUnidad);};},100);
 }
 var _gfUnidad='';function genFormLink(unidad){
-  var alq=G("gf-alq").value,dep=G("gf-dep").value,gs=G("gf-gs").value;
+  var alq=fmtInputVal(G("gf-alq")),dep=fmtInputVal(G("gf-dep")),gs=fmtInputVal(G("gf-gs"));
   var ing=G("gf-ing").value,egr=G("gf-egr").value,pos=G("gf-pos").value;
+  var nom=G("gf-nom").value.trim(),dni=G("gf-dni").value.trim(),tel=G("gf-tel").value.trim();
+  var senia=fmtInputVal(G("gf-senia")),saldo=fmtInputVal(G("gf-saldo"));
   if(!alq){alert("El alquiler es obligatorio");return;}
+  if(!nom){alert("El nombre es obligatorio");return;}
   var cod=unidad.split("-")[0],e=ED[cod]||{};
   var base=location.origin+"/form.html";
-  var url=base+"?u="+encodeURIComponent(unidad)+"&ed="+encodeURIComponent(cod)+"&dir="+encodeURIComponent(e.d||"")+"&alq="+alq+"&dep="+(dep||0)+"&gs="+(gs||0)+"&ing="+ing+"&egr="+egr+"&pos="+pos;
+  var url=base+"?u="+encodeURIComponent(unidad)+"&ed="+encodeURIComponent(cod)+"&dir="+encodeURIComponent(e.d||"")+"&alq="+alq+"&dep="+(dep||0)+"&gs="+(gs||0)+"&ing="+ing+"&egr="+egr+"&pos="+pos+"&nom="+encodeURIComponent(nom)+"&dni="+encodeURIComponent(dni)+"&tel="+encodeURIComponent(tel)+"&senia="+(senia||0)+"&saldo="+(saldo||0);
   var el=G("gf-link");el.textContent=url;el.style.display="block";
   var wa=G("gf-wa");
   var msg="Hola! Te enviamos el formulario de ingreso para el departamento "+unidad+". Por favor completalo con tus datos y firma el acuerdo:\n\n"+url+"\n\nAdministracion: 1555787641";
@@ -794,7 +804,11 @@ function saveEditDatos(key){
   var emtel=document.getElementById("ed-emtel").value.trim();
   if(!nombre){alert("El nombre es obligatorio");return;}
   var posesion=document.getElementById("ed-posesion").value||"";
-  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,tel:tel,telefono:tel,trabajo:trabajo,email:email,tel2:tel2,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel,fecha_posesion:posesion||null});
+  // Preserve old phone in historial
+  var oldTel=i.tel||i.telefono||"";
+  var telHistorial=i.tel_historial?i.tel_historial:[];
+  if(oldTel&&oldTel!==tel&&!telHistorial.includes(oldTel)) telHistorial.push(oldTel);
+  DB.ref("iq/"+key).update({nombre:nombre,dni:dni,tel:tel,telefono:tel,tel_historial:telHistorial,trabajo:trabajo,email:email,tel2:tel2,telefono2:tel2,emergencia_nombre:emnom,emergencia_tel:emtel,fecha_posesion:posesion||null});
   closeModal();closeModal();
   alert("Datos actualizados correctamente");
 }
@@ -810,8 +824,12 @@ function openFicha(key){
   o+="<div><div class='lbl'>Unidad</div><div style='font-size:12px'>"+esc(i.unidad)+"</div></div>";
   o+="<div><div class='lbl'>Titular</div><div style='font-size:12px'>"+esc(i.nombre)+"</div></div>";
   o+="<div><div class='lbl'>DNI</div><div style='font-size:12px'>"+esc(i.dni||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel||"--")+(i.tel?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div></div>";
-  o+="<div><div class='lbl'>Trabajo</div><div style='font-size:12px'>"+esc(i.trabajo1||i.trabajo||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel||"--")+(i.tel?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div>"+(i.tel_historial&&i.tel_historial.length?"<div style='color:#64748B;font-size:10px'>Anteriores: "+i.tel_historial.join(", ")+"</div>":"")+"</div>";
+  o+="<div><div class='lbl'>Trabajo</div><div style='font-size:12px'>"+esc(i.trabajo1||i.trabajo||"--")+"</div>"+
+  (i.trabajo_dir?"<div style='font-size:10px;color:#64748B'>📍 "+esc(i.trabajo_dir)+"</div>":"")+
+  (i.trabajo_tel?"<div style='font-size:10px;color:#64748B'>📞 "+esc(i.trabajo_tel)+"</div>":"")+
+  (i.trabajo_jefe?"<div style='font-size:10px;color:#64748B'>👤 Jefe: "+esc(i.trabajo_jefe)+"</div>":"")+
+  "</div>";
   o+="<div><div class='lbl'>Alquiler</div><div style='font-size:12px'>"+fmt(i.alquiler)+"</div></div>";
   o+="<div><div class='lbl'>Deposito</div><div style='font-size:12px'>"+fmt(i.deposito||0)+"</div></div>";
   o+="<div><div class='lbl'>Inicio</div><div style='font-size:12px'>"+fecDisp(i.ingreso||"")+"</div></div>";
