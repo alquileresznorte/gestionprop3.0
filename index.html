@@ -176,9 +176,8 @@ function fmtInput(el){
 }
 function fmtInputVal(el){
   if(!el) return 0;
-  // Strip dots (thousands separator in es-AR) and parse
-  var raw=el.dataset&&el.dataset.raw?el.dataset.raw:(el.value||"0").replace(/\./g,"").replace(/[^\d]/g,"");
-  return parseInt(raw)||0;
+  var v=(el.value||"0").replace(/\./g,"").replace(/,/g,"").replace(/[^\d]/g,"");
+  return parseInt(v)||0;
 }
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
 function hoy(){return new Date().toISOString().split("T")[0];}
@@ -214,7 +213,13 @@ function pT(c){
 function H(tag,attrs,inner){var a=Object.keys(attrs).map(function(k){return k+'="'+attrs[k]+'"';}).join(" ");return "<"+tag+(a?" "+a:"")+">"+inner+"</"+tag+">";}
 function sc(ic,lb,val,sub,col){return "<div class='sc'><div style='font-size:18px'>"+ic+"</div><div style='color:#94A3B8;font-size:10px;font-weight:600;text-transform:uppercase;margin-top:4px'>"+lb+"</div><div style='font-size:20px;font-weight:800;color:"+(col||"#F1F5F9")+"'>"+val+"</div><div style='color:#64748B;font-size:10px'>"+(sub||"")+"</div></div>";}
 function bdg(t,c){return "<span class='bdg' style='background:"+c+"22;color:"+c+"'>"+esc(t)+"</span>";}
-function fld(id,lb,val,tp){var isMoney=(tp==="number"||tp==="money");var inputType=isMoney?"text":"text";var oninp=isMoney?" oninput='fmtInput(this)' inputmode='numeric'": "";var dispVal=isMoney&&Number(val||0)>0?Number(val).toLocaleString("es-AR"):(val||"")+"";return "<div class='fld'><label class='lbl'>"+lb+"</label><input class='inp' id='"+id+"' type='"+inputType+"' value='"+esc(dispVal)+"'"+oninp+" data-raw='"+esc(String(val||"0"))+"'/></div>";}
+function fld(id,lb,val,tp){
+  var isMoney=(tp==="money");
+  if(isMoney){
+    return "<div class='fld'><label class='lbl'>"+lb+"</label><input class='inp' id='"+id+"' type='text' inputmode='numeric' placeholder='Ej: 450000' value='"+esc(val||"")+"'/></div>";
+  }
+  return "<div class='fld'><label class='lbl'>"+lb+"</label><input class='inp' id='"+id+"' type='"+(tp||"text")+"' value='"+esc(val||"")+"'/></div>";
+}
 function sld(id,lb,opts,val){var o=opts.map(function(x){return "<option"+(x===val?" selected":"")+">"+x+"</option>";}).join("");return "<div class='fld'><label class='lbl'>"+lb+"</label><select class='inp' id='"+id+"'>"+o+"</select></div>";}
 function tad(id,lb,val){return "<div class='fld'><label class='lbl'>"+lb+"</label><textarea class='inp' id='"+id+"' style='min-height:70px'>"+esc(val||"")+"</textarea></div>";}
 
