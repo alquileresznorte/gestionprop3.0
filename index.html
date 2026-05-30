@@ -1031,7 +1031,7 @@ function openRenovar(key){
   var i=DATA.iq[key];
   var ki=kpush(key);
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Al renovar se registra un nuevo pago de gastos de gestion. Se puede pagar en cuotas.</p>";
-  o+="<div class='g2'>"+fld("rv-alq","Nuevo alquiler $",i.alquiler,"number")+fld("rv-gs","Gastos renovacion $","","number")+"</div>";
+  o+="<div class='g2'>"+fld("rv-alq","Nuevo alquiler $",i.alquiler,"money")+fld("rv-gs","Gastos renovacion $","","money")+"</div>";
   o+="<div class='g2'>"+fld("rv-ing","Nuevo inicio","","date")+fld("rv-egr","Nuevo fin","","date")+"</div>";
   o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
@@ -1152,9 +1152,9 @@ function openReserva(){
   o+=fld("rs-nom","Nombre inquilino *","");
   o+=fld("rs-dni","DNI","");
   o+=fld("rs-tel","Telefono","","tel");
-  o+=fld("rs-alq","Valor mensual acordado $","","number");
-  o+=fld("rs-dep","Deposito $","","number");
-  o+=fld("rs-gas","Gastos admin/mant $","","number");
+  o+=fld("rs-alq","Valor mensual acordado $","","money");
+  o+=fld("rs-dep","Deposito $","","money");
+  o+=fld("rs-gas","Gastos admin/mant $","","money");
   o+="</div>";
   o+="<div class='g2'>";
   o+=fld("rs-fi","Fecha inicio contrato",hoy(),"date");
@@ -1163,7 +1163,7 @@ function openReserva(){
   o+="</div>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin:8px 0'>";
   o+="<div style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:8px'>Seña recibida</div>";
-  o+="<div class='g2'>"+fld("rs-senia","Monto seña $","","number")+sld("rs-cta","Cuenta de pago",CTAS,"Efectivo")+"</div>";
+  o+="<div class='g2'>"+fld("rs-senia","Monto seña $","","money")+sld("rs-cta","Cuenta de pago",CTAS,"Efectivo")+"</div>";
   o+=sld("rs-cta","Cuenta de pago",CTAS,"Efectivo");
   o+="</div>";
   o+=fld("rs-obs","Observaciones (opcional)","");
@@ -1176,10 +1176,10 @@ function saveReserva(){
   var u=G("rs-u").value;
   var nom=G("rs-nom").value.trim();
   var tel=(G("rs-tel")||{value:""}).value;
-  var alq=Number((G("rs-alq")||{value:0}).value||0);
-  var dep=Number((G("rs-dep")||{value:0}).value||0);
-  var gas=Number((G("rs-gas")||{value:0}).value||0);
-  var senia=Number((G("rs-senia")||{value:0}).value||0);
+  var alq=fmtInputVal(G("rs-alq")||{value:"0",dataset:{raw:"0"}});
+  var dep=fmtInputVal(G("rs-dep")||{value:"0",dataset:{raw:"0"}});
+  var gas=fmtInputVal(G("rs-gas")||{value:"0",dataset:{raw:"0"}});
+  var senia=fmtInputVal(G("rs-senia")||{value:"0",dataset:{raw:"0"}});
   var cta=(G("rs-cta")||{value:"Efectivo"}).value;
   var fecha=G("rs-f").value;
   var fi=(G("rs-fi")||{value:hoy()}).value;
@@ -1267,13 +1267,13 @@ function saveEditReserva(key){
     nombre:G("re-nom").value.trim(),
     dni:(G("re-dni")||{value:""}).value.trim(),
     tel:(G("re-tel")||{value:""}).value,
-    alquiler:Number((G("re-alq")||{value:0}).value||0),
-    deposito:Number((G("re-dep")||{value:0}).value||0),
-    gastos:Number((G("re-gas")||{value:0}).value||0),
+    alquiler:fmtInputVal(G("re-alq")||{value:"0",dataset:{raw:"0"}}),
+    deposito:fmtInputVal(G("re-dep")||{value:"0",dataset:{raw:"0"}}),
+    gastos:fmtInputVal(G("re-gas")||{value:"0",dataset:{raw:"0"}}),
     fecha_ingreso:(G("re-fi")||{value:hoy()}).value,
     fecha_egreso:(G("re-fegr")||{value:""}).value,
-    senia:Number((G("re-senia")||{value:0}).value||0),
-    pago_posesion:Number((G("re-pos-monto")||{value:0}).value||0),
+    senia:fmtInputVal(G("re-senia")||{value:"0",dataset:{raw:"0"}}),
+    pago_posesion:fmtInputVal(G("re-pos-monto")||{value:"0",dataset:{raw:"0"}}),
     cta_posesion:(G("re-pos-cta")||{value:"Efectivo"}).value||"Efectivo",
     obs:(G("re-obs")||{value:""}).value
   };
@@ -1320,8 +1320,8 @@ function openNA(){
 
   var o="<div class='fld' style='grid-column:1/-1;margin-bottom:4px'>";
   o+="<div style='display:flex;gap:12px;background:#0F172A;padding:10px;border-radius:8px;border:1px solid #334155;flex-wrap:wrap'>";
-  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-nuevo' checked onchange='toggleModoNA()'> <b>Contrato nuevo</b></label>";
-  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-vigente' onchange='toggleModoNA()'> <b>Contrato vigente</b> (ya firmado, cargar al sistema)</label>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-nuevo' checked onchange='toggleModoNA()'> <b>Acuerdo nuevo</b></label>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'><input type='radio' name='na-modo' id='na-vigente' onchange='toggleModoNA()'> <b>Acuerdo vigente</b> (ya firmado, cargar al sistema)</label>";
   o+="</div></div>";
   o+="<div class='g2'>";
   o+="<div class='fld' style='grid-column:1/-1'><label class='lbl'>Unidad *</label><select class='inp' id='na-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
@@ -1331,23 +1331,23 @@ function openNA(){
   o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px solid #3B82F633'>";
   o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:10px'>MONTOS</div>";
   o+="<div class='g2'>";
-  o+=fld("na-alq","Valor mensual acordado $","","number");
+  o+=fld("na-alq","Valor mensual acordado $","","money");
   o+="<div class='fld'><label class='lbl'>Moneda del alquiler</label><select class='inp' id='na-moneda' onchange='toggleMonedaNA()'><option value='ARS'>Pesos ($)</option><option value='USD'>Dolares (U$S)</option></select></div>";
   o+="<div id='na-bloque-usd' style='display:none'>";
-  o+=fld("na-alq-usd","Alquiler en U$S","","number");
+  o+=fld("na-alq-usd","Alquiler en U$S","","money");
   o+="<p style='color:#06B6D4;font-size:11px;margin:2px 0 8px'>El monto en pesos se calcula al momento de cobrar segun el TC del dia.</p>";
   o+="</div>";
   // Contrato nuevo fields
   o+="<div id='na-bloque-nuevo'>";
-  o+=fld("na-dep","Deposito $","","number");
-  o+=fld("na-gs","Gastos de gestion $","","number");
-  o+=fld("na-desc-gs","Descuento en gastos $","0","number");
-  o+=fld("na-pc","Reserva / Pago a cuenta $","0","number");
+  o+=fld("na-dep","Deposito $","","money");
+  o+=fld("na-gs","Gastos de gestion $","","money");
+  o+=fld("na-desc-gs","Descuento en gastos $","0","money");
+  o+=fld("na-pc","Reserva / Pago a cuenta $","0","money");
   o+=sld("na-pc-cta","Cuenta del pago a cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
   o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin-bottom:8px'>";
   o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Pago al tomar posesion (opcional)</div>";
   o+="<div class='g2'>";
-  o+=fld("na-pos-monto","Monto $","","number");
+  o+=fld("na-pos-monto","Monto $","","money");
   o+=sld("na-pos-cta","Cuenta",CTAS,"Efectivo");
   o+="</div>";
   o+="<p style='color:#64748B;font-size:10px;margin-top:2px'>Se registra como ingreso en caja el dia de inicio del contrato.</p>";
@@ -1358,12 +1358,12 @@ function openNA(){
   // Contrato vigente fields
   o+="<div id='na-bloque-vigente' style='display:none'>";
   o+="<div style='background:#10B98111;border-radius:8px;padding:10px;margin-bottom:8px;font-size:11px;color:#6EE7B7;border:1px solid #10B98133'>El deposito y gastos ya fueron cobrados. Solo se genera la cobranza del mes en curso.</div>";
-  o+=fld("na-dep-info","Deposito cobrado al ingreso (informativo) $","","number");
-  o+=fld("na-gs-info","Gastos de gestion cobrados al ingreso (informativo) $","","number");
+  o+=fld("na-dep-info","Deposito cobrado al ingreso (informativo) $","","money");
+  o+=fld("na-gs-info","Gastos de gestion cobrados al ingreso (informativo) $","","money");
   o+="<div style='background:#F59E0B11;border-radius:8px;padding:10px;margin-bottom:8px;border:1px solid #F59E0B33'>";
   o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:6px'>DEUDA PENDIENTE (opcional)</div>";
   o+=fld("na-deuda-mes","Mes con deuda (ej: 2026-04)","","month");
-  o+=fld("na-deuda-monto","Monto adeudado $","0","number");
+  o+=fld("na-deuda-monto","Monto adeudado $","0","money");
   o+="</div></div>";
   o+="</div></div></div>";
   o+=fld("na-ing","Inicio del acuerdo (fecha de ingreso)","","date")+fld("na-egr","Fin del acuerdo","","date");
@@ -1424,23 +1424,23 @@ function toggleModoNA(){
 
 function actualizarResumenNA(){
   var vigente=G("na-vigente")&&G("na-vigente").checked;
-  var alq=Number((G("na-alq")||{value:0}).value||0);
+  var alq=fmtInputVal(G("na-alq")||{value:"0",dataset:{raw:"0"}});
   var el=G("na-resumen");if(!el)return;
   if(vigente){
-    var dep=Number((G("na-dep-info")||{value:0}).value||0);
-    var gs=Number((G("na-gs-info")||{value:0}).value||0);
-    var deuda=Number((G("na-deuda-monto")||{value:0}).value||0);
-    el.innerHTML="<b style='color:#F1F5F9'>Contrato vigente</b>"
+    var dep=fmtInputVal(G("na-dep-info")||{value:"0",dataset:{raw:"0"}});
+    var gs=fmtInputVal(G("na-gs-info")||{value:"0",dataset:{raw:"0"}});
+    var deuda=fmtInputVal(G("na-deuda-monto")||{value:"0",dataset:{raw:"0"}});
+    el.innerHTML="<b style='color:#F1F5F9'>Acuerdo vigente</b>"
       +"<br>Valor mensual acordado: "+fmt(alq)
       +(dep>0?"<br>Deposito (informativo): "+fmt(dep):"")
       +(gs>0?"<br>Gastos (informativo): "+fmt(gs):"")
       +(deuda>0?"<br><span style='color:#F59E0B'>Deuda pendiente: "+fmt(deuda)+"</span>":"")
       +"<br><span style='color:#10B981'>Se genera cobranza de alquiler para el mes en curso</span>";
   } else {
-    var dep2=Number((G("na-dep")||{value:0}).value||0);
-    var gs2=Number((G("na-gs")||{value:0}).value||0);
-    var desc=Number((G("na-desc-gs")||{value:0}).value||0);
-    var pc=Number((G("na-pc")||{value:0}).value||0);
+    var dep2=fmtInputVal(G("na-dep")||{value:"0",dataset:{raw:"0"}});
+    var gs2=fmtInputVal(G("na-gs")||{value:"0",dataset:{raw:"0"}});
+    var desc=fmtInputVal(G("na-desc-gs")||{value:"0",dataset:{raw:"0"}});
+    var pc=fmtInputVal(G("na-pc")||{value:"0",dataset:{raw:"0"}});
     var gsNeto=Math.max(0,gs2-desc);
     var total=alq+dep2+gsNeto;
     var saldo=Math.max(0,total-pc);
@@ -1479,7 +1479,7 @@ function saveNA(){
 
   var id=nid();
   var moneda=(G("na-moneda")||{value:"ARS"}).value||"ARS";
-  var alqUSD=Number((G("na-alq-usd")||{value:0}).value||0);
+  var alqUSD=fmtInputVal(G("na-alq-usd")||{value:"0",dataset:{raw:"0"}});
   var alq=moneda==="USD"?0:Number(G("na-alq").value||0);
   // Para USD guardamos 0 en alquiler (pesos) y alquiler_usd en USD
   var ing=G("na-ing").value;
@@ -1492,10 +1492,10 @@ function saveNA(){
 
   if(vigente){
     // CONTRATO VIGENTE - save with historical data, generate current month cobro
-    var depInfo=Number((G("na-dep-info")||{value:0}).value||0);
-    var gsInfo=Number((G("na-gs-info")||{value:0}).value||0);
+    var depInfo=fmtInputVal(G("na-dep-info")||{value:"0",dataset:{raw:"0"}});
+    var gsInfo=fmtInputVal(G("na-gs-info")||{value:"0",dataset:{raw:"0"}});
     var deudaMes=G("na-deuda-mes")?G("na-deuda-mes").value:"";
-    var deudaMonto=Number((G("na-deuda-monto")||{value:0}).value||0);
+    var deudaMonto=fmtInputVal(G("na-deuda-monto")||{value:"0",dataset:{raw:"0"}});
 
     DB.ref("iq").push({
       id_ac:id,unidad:u,estado:"activo",nombre:n,dni:d,
@@ -1535,7 +1535,7 @@ function saveNA(){
       }
     }
     closeModal();
-    var msg="Contrato vigente cargado. ";
+    var msg="Acuerdo vigente cargado. ";
     if(cobExistente.length>0) msg+="Cobranza de "+mes()+" actualizada. ";
     else msg+="Alquiler de "+mes()+" generado. ";
     if(deudaMonto>0) msg+="Deuda de "+deudaMes+": "+fmt(deudaMonto)+" registrada.";
@@ -1548,7 +1548,7 @@ function saveNA(){
     var desc=Number(G("na-desc-gs").value||0);
     var gsNeto=Math.max(0,gs-desc);
     var pc=Number(G("na-pc").value||0);
-    var posMonto=Number((G("na-pos-monto")||{value:0}).value||0);
+    var posMonto=fmtInputVal(G("na-pos-monto")||{value:"0",dataset:{raw:"0"}});
     var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcFecha=ing||hoy();
@@ -1863,7 +1863,7 @@ function openPago(ckey){
   if(esUSD){
     o+="<div class='g2'>";
     o+=fld("p-usd","Monto U$S",sal,"number");
-    o+=fld("p-tc","Tipo de cambio ($/U$S)","","number");
+    o+=fld("p-tc","Tipo de cambio ($/U$S)","","money");
     o+="</div>";
     o+="<div id='p-usd-total' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#06B6D4;margin-bottom:8px'>Ingresa U$S y TC para ver total en pesos</div>";
   } else {
@@ -1878,8 +1878,8 @@ function openPago(ckey){
     if(esUSD){
       ["p-usd","p-tc"].forEach(function(id){
         var el=G(id);if(el)el.oninput=function(){
-          var u=Number((G("p-usd")||{value:0}).value||0);
-          var tc=Number((G("p-tc")||{value:0}).value||0);
+          var u=fmtInputVal(G("p-usd")||{value:"0",dataset:{raw:"0"}});
+          var tc=fmtInputVal(G("p-tc")||{value:"0",dataset:{raw:"0"}});
           var t=G("p-usd-total");
           if(t&&u>0&&tc>0) t.innerHTML="Total en pesos: <b style='color:#10B981'>"+fmt(u*tc)+"</b> (U$S "+u.toLocaleString()+" x $"+tc.toLocaleString()+")";
         };
@@ -1897,8 +1897,8 @@ function regPago(ckey){
   var m,usd_monto=0,tc_usado=0;
 
   if(esUSD){
-    usd_monto=Number((G("p-usd")||{value:0}).value||0);
-    tc_usado=Number((G("p-tc")||{value:0}).value||0);
+    usd_monto=fmtInputVal(G("p-usd")||{value:"0",dataset:{raw:"0"}});
+    tc_usado=fmtInputVal(G("p-tc")||{value:"0",dataset:{raw:"0"}});
     if(!usd_monto||!tc_usado){alert("Ingresa monto en U$S y tipo de cambio");return;}
     m=Math.round(usd_monto*tc_usado); // pesos
   } else {
@@ -2141,7 +2141,7 @@ function saveCosto(ckey){
   var m=Number(G("ec-m").value||0);
   var f=G("ec-f").value;
   var checkboxPagado=G("ec-p").checked;
-  var pm=Number((G("ec-pm")||{value:0}).value||0);
+  var pm=fmtInputVal(G("ec-pm")||{value:"0",dataset:{raw:"0"}});
   var pc=(G("ec-pc")||{value:"Efectivo"}).value;
   // Fecha de pago: siempre usar el campo ec-fp
   var fechaPago=G("ec-fp")?(G("ec-fp").value||hoy()):hoy();
@@ -2176,7 +2176,7 @@ function addExtraFactura(ckey){
   var cats=Object.keys(CATC);
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Se agrega una nueva instancia de <b>"+esc(c.desc)+"</b> para el mes "+_cstMes+"</p>";
   o+="<div class='g2'>";
-  o+=fld("ef-m","Monto $","","number");
+  o+=fld("ef-m","Monto $","","money");
   o+=fld("ef-f","Nro. Factura","");
   o+=fld("ef-v","Fecha vencimiento","","date");
   o+=sld("ef-c","Cuenta",CTAS,"Banco");
@@ -3141,7 +3141,7 @@ function openAj(){
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='aj-t'><option value='egreso'>Egreso (-)</option><option value='ingreso'>Ingreso (+)</option></select></div>";
   o+="<div class='fld'><label class='lbl'>Categoria</label><select class='inp' id='aj-s'><option>Diferencia de caja</option><option>Compra insumos</option><option>Gastos bancarios</option><option>Impuesto/tasa</option><option>Gasto personal</option><option>Devolucion deposito</option><option>Otro</option></select></div>";
   o+=sld("aj-c","Cuenta",CTAS)+"</div>";
-  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","number");
+  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","money");
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveAj()'>Registrar</button></div>";
   openModal("Ajuste Manual",o);
 }
@@ -3159,7 +3159,7 @@ function openMov(){
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro (saca de caja)</option><option value='aporte'>Aporte (pone en caja)</option></select></div>";
   o+="<div class='fld'><label class='lbl'>Socio</label><select class='inp' id='mv-c'><option value='Cuenta Loli'>Loli</option><option value='Cuenta Hugo'>Hugo</option></select></div>";
   o+=sld("mv-caja","Cuenta de donde sale/entra el dinero",ctasCaja,"Efectivo");
-  o+=fld("mv-m","Monto $","","number")+"</div>";
+  o+=fld("mv-m","Monto $","","money")+"</div>";
   o+=fld("mv-n","Concepto (ej: medicamentos, viaje, compra estufa)");
   o+="<p style='color:#64748B;font-size:10px;margin-top:4px'>Retiro = el socio se lleva plata de caja. Aporte = el socio pone plata en caja o paga algo de su bolsillo.</p>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
@@ -3392,7 +3392,7 @@ function openAddProp(){
   var o = fld("ap-cod","Codigo (ej: R3, LP2)","")
         + fld("ap-nom","Nombre / descripcion *","")
         + fld("ap-dir","Direccion","")
-        + fld("ap-u","Cantidad de unidades","1","number")
+        + fld("ap-u","Cantidad de unidades","1","money")
         + fld("ap-obs","Notas","");
   o += "<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveProp()'>Agregar</button></div>";
   openModal("Agregar Propiedad / Inmueble",o);
@@ -3499,8 +3499,8 @@ function openAddCosto(){
     +sld("nc-cat","Categoria",cats)
     +fld("nc-ed","Edificio o General","General")
     +fld("nc-cta","Nro. cuenta / contrato","")
-    +fld("nc-dv","Dia de vencimiento","15","number");
-  o+="<div id='nc-monto-wrap'><div style='height:8px'></div>"+fld("nc-monto","Monto $ (solo para eventuales)","","number")+"</div>";
+    +fld("nc-dv","Dia de vencimiento","15","money");
+  o+="<div id='nc-monto-wrap'><div style='height:8px'></div>"+fld("nc-monto","Monto $ (solo para eventuales)","","money")+"</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNuevoCosto()'>Agregar</button></div>";
   openModal("Agregar Costo",o,true);
 }
@@ -3508,7 +3508,7 @@ function saveNuevoCosto(){
   var desc=G("nc-desc").value; if(!desc){alert("La descripcion es obligatoria");return;}
   var fijo=G("nc-fijo")&&G("nc-fijo").checked;
   var fijo=G("nc-fijo")&&G("nc-fijo").checked;
-  var monto=Number((G("nc-monto")||{value:0}).value||0);
+  var monto=fmtInputVal(G("nc-monto")||{value:"0",dataset:{raw:"0"}});
   var nuevo={
     tipo:fijo?"costo_fijo_extra":"otro_gasto",
     desc:desc,pv:G("nc-prov").value,cat:G("nc-cat").value,
@@ -3841,8 +3841,8 @@ function openRenovar(key){
   o+="</div></div>";
   o+="<div class='ibox' style='background:#10B98111;border-color:#10B981;color:#6EE7B7;margin-bottom:10px'>La fecha de ingreso original se mantiene. Solo se extiende la vigencia por 12 meses mas.</div>";
   o+="<div class='g2'>";
-  o+=fld("rv-alq","Nuevo alquiler mensual $",i.alquiler,"number");
-  o+=fld("rv-gs","Gastos de gestion y mant. $","","number");
+  o+=fld("rv-alq","Nuevo alquiler mensual $",i.alquiler,"money");
+  o+=fld("rv-gs","Gastos de gestion y mant. $","","money");
   o+="</div>";
   o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
   o+="<div class='g2'>";
@@ -4096,7 +4096,7 @@ function openAdicional(key){
   o+=fld("adl-con","Concepto *","Ej: Aire acondicionado, Cochera, Mascota...");
   o+="<div class='g2'>";
   o+="<div class='fld'><label class='lbl'>Tipo de adicional</label><select class='inp' id='adl-tipo'><option value='fijo'>Monto fijo $</option><option value='pct'>Porcentaje %</option></select></div>";
-  o+=fld("adl-val","Valor ($ o %)","","number");
+  o+=fld("adl-val","Valor ($ o %)","","money");
   o+="</div>";
   o+=fld("adl-desde","Desde (mes)","","month");
   o+=fld("adl-hasta","Hasta (mes, dejar vacio si es indefinido)","","month");
@@ -4353,7 +4353,7 @@ function openGastoAjuste(){
   o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Gasto puntual del dia "+_cajaF+". Si la cuenta es de socio va a Cta Socios.</p>";
   o+="<div class='g2'>";
   o+=fld("gc-desc","Descripcion *","");
-  o+=fld("gc-monto","Monto $","","number");
+  o+=fld("gc-monto","Monto $","","money");
   o+=fld("gc-fact","Nro. Factura","");
   o+=sld("gc-cat","Categoria",cats,"Otro");
   o+=sld("gc-cta","Cuenta",CTAS,"Efectivo");
@@ -4376,7 +4376,7 @@ function openGastoAjuste(){
   o+="<option value='otro'>Otro</option>";
   o+="</select></div>";
   o+=sld("aj-c","Cuenta",CTAS)+"</div>";
-  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","number");
+  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","money");
   o+="<div id='aj-error-info' style='background:#EF444411;border:1px solid #EF444433;border-radius:8px;padding:8px;font-size:11px;color:#EF4444;margin-top:6px'>⚠ Los errores solo los puede borrar el Admin desde Config → Limpieza.</div>";
   o+="</div>";
 
@@ -4468,7 +4468,7 @@ function openGastoCaja(){
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Registra un gasto puntual directamente en la caja del dia "+_cajaF+".</p>";
   o+="<div class='g2'>";
   o+=fld("gc-desc","Descripcion / Concepto *","");
-  o+=fld("gc-monto","Monto $","","number");
+  o+=fld("gc-monto","Monto $","","money");
   o+=fld("gc-fact","Nro. Factura (opcional)","");
   o+=sld("gc-cat","Categoria",cats,"Otro");
   o+=sld("gc-cta","Cuenta",CTAS,"Efectivo");
@@ -4511,8 +4511,8 @@ function saveGastoCaja(){
 function openAhorro(){
   var o="<div class='g2'>";
   o+=fld("ah-f","Fecha",hoy(),"date");
-  o+=fld("ah-usd","Monto USD $","","number");
-  o+=fld("ah-tc","TC (pesos por dolar)","","number");
+  o+=fld("ah-usd","Monto USD $","","money");
+  o+=fld("ah-tc","TC (pesos por dolar)","","money");
   o+=sld("ah-cta","Cuenta de origen",CTAS,"Efectivo");
   o+="</div>";
   o+="<div id='ah-total' style='background:#0F172A;border-radius:8px;padding:10px;font-size:12px;color:#94A3B8;margin-top:8px'>Completa los campos para ver el total en pesos</div>";
@@ -4525,8 +4525,8 @@ function openAhorro(){
     ["ah-usd","ah-tc"].forEach(function(id){
       var el=G(id);
       if(el) el.oninput=function(){
-        var usd=Number((G("ah-usd")||{value:0}).value||0);
-        var tc=Number((G("ah-tc")||{value:0}).value||0);
+        var usd=fmtInputVal(G("ah-usd")||{value:"0",dataset:{raw:"0"}});
+        var tc=fmtInputVal(G("ah-tc")||{value:"0",dataset:{raw:"0"}});
         var t=G("ah-total");
         if(t&&usd>0&&tc>0) t.innerHTML="<b style='color:#F1F5F9'>Total en pesos: "+fmt(usd*tc)+"</b><br><span style='color:#06B6D4'>U$S "+usd.toLocaleString()+" x $"+tc.toLocaleString()+" = "+fmt(usd*tc)+"</span>";
       };
@@ -5221,8 +5221,8 @@ function openNuevaInversion(){
   o+="<div class='g2'>";
   o+=fld("inv-desc","Descripcion (ej: Moto Honda)","","text");
   o+=fld("inv-f","Fecha de compra",hoy(),"date");
-  o+=fld("inv-pesos","Valor total en pesos $","","number");
-  o+=fld("inv-tc","TC al momento de compra","","number");
+  o+=fld("inv-pesos","Valor total en pesos $","","money");
+  o+=fld("inv-tc","TC al momento de compra","","money");
   o+="</div>";
   o+="<div id='inv-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver el valor en USD</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNuevaInversion()'>Guardar</button></div>";
@@ -5230,8 +5230,8 @@ function openNuevaInversion(){
   setTimeout(function(){
     ["inv-pesos","inv-tc"].forEach(function(id){
       var el=G(id);if(el)el.oninput=function(){
-        var p=Number((G("inv-pesos")||{value:0}).value||0);
-        var tc=Number((G("inv-tc")||{value:0}).value||0);
+        var p=fmtInputVal(G("inv-pesos")||{value:"0",dataset:{raw:"0"}});
+        var tc=fmtInputVal(G("inv-tc")||{value:"0",dataset:{raw:"0"}});
         var t=G("inv-preview");
         if(t&&p>0&&tc>0) t.innerHTML="Valor dolarizado: <b style='color:#F59E0B'>U$S "+Math.round(p/tc).toLocaleString()+"</b> ("+fmt(p)+" / $"+tc.toLocaleString()+")";
       };
@@ -5258,8 +5258,8 @@ function openVenderInversion(key){
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Activo: <b>"+esc(inv.desc)+"</b> — Compra: <b style='color:#06B6D4'>U$S "+Number(inv.usd).toLocaleString()+"</b></p>";
   o+="<div class='g2'>";
   o+=fld("vnd-f","Fecha de venta",hoy(),"date");
-  o+=fld("vnd-pesos","Precio de venta en pesos $","","number");
-  o+=fld("vnd-tc","TC al momento de venta","","number");
+  o+=fld("vnd-pesos","Precio de venta en pesos $","","money");
+  o+=fld("vnd-tc","TC al momento de venta","","money");
   o+="</div>";
   o+="<div id='vnd-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver resultado</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-invkey='"+key+"' onclick='saveVentaInversion(this.dataset.invkey)'>Registrar venta</button></div>";
@@ -5267,8 +5267,8 @@ function openVenderInversion(key){
   setTimeout(function(){
     ["vnd-pesos","vnd-tc"].forEach(function(id){
       var el=G(id);if(el)el.oninput=function(){
-        var p=Number((G("vnd-pesos")||{value:0}).value||0);
-        var tc=Number((G("vnd-tc")||{value:0}).value||0);
+        var p=fmtInputVal(G("vnd-pesos")||{value:"0",dataset:{raw:"0"}});
+        var tc=fmtInputVal(G("vnd-tc")||{value:"0",dataset:{raw:"0"}});
         var t=G("vnd-preview");
         if(t&&p>0&&tc>0){
           var usdVenta=Math.round(p/tc);
