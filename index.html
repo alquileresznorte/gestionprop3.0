@@ -1770,6 +1770,13 @@ function rCob(){
 
   html+="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px'>";
   html+=sc("$","Esperado",fmt(esp),"","#3B82F6")+sc("V","Cobrado",fmt(cob),"","#10B981")+sc("X","Pendiente",fmt(esp-cob),"","#EF4444")+sc("%","%",(esp?Math.round((cob/esp)*100):0)+"%","","#8B5CF6");
+  var tcCob=Number(localStorage.getItem("gp_tc_"+_cobMes)||0);
+  if(tcCob>0) html+=sc("U$S","Cobrado USD",fusd(cob,tcCob),"TC $"+tcCob,"#06B6D4");
+  html+="</div>";
+  // TC input for this month
+  html+="<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px'>";
+  html+="<span style='color:#64748B'>TC del mes (para ver en U$S):</span>";
+  html+="<input class='inp' type='text' style='max-width:100px;padding:4px 8px' id='cob-tc' value='"+(tcCob>0?tcCob:"")+"'  placeholder='Ej: 1400' onchange='_setCobTC(this.value)'/>"
   html+="</div>";
 
   if(!cobA.length){
@@ -5123,6 +5130,12 @@ function limpiarDuplicadosCostos(){
 }
 
 
+function _setCobTC(v){
+  var num=v.replace(/[^0-9]/g,"");
+  if(num) localStorage.setItem("gp_tc_"+_cobMes,num);
+  else localStorage.removeItem("gp_tc_"+_cobMes);
+  rCob();
+}
 function _ctsMesChange(v){localStorage.setItem("gp_cts_mes",v);rCtaCte();}
 function rCtaCte(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
