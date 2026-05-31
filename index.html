@@ -4844,6 +4844,18 @@ function renderCfgLimpieza(){
   o+="<div id='limp-cob-res'></div>";
   o+="</div>";
 
+  // Borrar costo específico
+  o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:10px'>";
+  o+="<div style='color:#EF4444;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar costo específico</div>";
+  o+="<div style='color:#64748B;font-size:11px;margin-bottom:8px'>Buscá un costo por descripción y mes para eliminarlo.</div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end'>";
+  o+="<div><label class='lbl'>Descripción (parcial)</label><input class='inp' id='limp-cst-desc' placeholder='Ej: Administrativo'/></div>";
+  o+="<div><label class='lbl'>Mes</label><input type='month' class='inp' id='limp-cst-mes' value='"+mes()+"'/></div>";
+  o+="<button class='btn bp bsm' onclick='buscarCostosLimp()'>Buscar</button>";
+  o+="</div>";
+  o+="<div id='limp-cst-res'></div>";
+  o+="</div>";
+
   o+="</div>";
   el.innerHTML=o;
   // Wire buscar cobros
@@ -4851,6 +4863,34 @@ function renderCfgLimpieza(){
   if(lcu) lcu.addEventListener("keydown",function(e){if(e.key==="Enter")buscarCobrosLimp();});
 }
 
+function buscarCostosLimp(){
+  var desc=(G("limp-cst-desc")||{value:""}).value.trim().toLowerCase();
+  var mes=(G("limp-cst-mes")||{value:""}).value;
+  var res=G("limp-cst-res");if(!res)return;
+  var costos=oA(DATA.cst).filter(function(c){
+    var matchDesc=!desc||(c.desc||"").toLowerCase().includes(desc);
+    var matchMes=!mes||c.mes===mes;
+    return matchDesc&&matchMes;
+  });
+  if(!costos.length){res.innerHTML="<p style='color:#64748B;font-size:12px;margin-top:8px'>Sin resultados.</p>";return;}
+  var html="<div style='margin-top:8px'>";
+  costos.forEach(function(c){
+    var ki=kpush(c._key);
+    html+="<div style='display:flex;justify-content:space-between;align-items:center;padding:8px;background:#0F172A;border-radius:6px;margin-bottom:4px'>";
+    html+="<div><div style='font-size:12px;font-weight:600'>"+esc(c.desc||"--")+"</div>";
+    html+="<div style='color:#64748B;font-size:10px'>"+c.mes+" — "+fmt(c.monto||0)+(c.pagado?" — Pagado":"")+"</div></div>";
+    html+="<button class='btn bx bsm' onclick='borrarCostoLimp("+JSON.stringify(c._key)+")'>Borrar</button>";
+    html+="</div>";
+  });
+  html+="</div>";
+  res.innerHTML=html;
+}
+function borrarCostoLimp(key){
+  var c=DATA.cst[key];if(!c)return;
+  if(!confirm("¿Borrar el costo \""+esc(c.desc||"")+"\" de $"+fmt(c.monto||0)+"? Esta acción no se puede deshacer."))return;
+  DB.ref("cst/"+key).remove();
+  setTimeout(function(){buscarCostosLimp();renderCfgLimpieza();},500);
+}
 function buscarCobrosLimp(){
   var u=(G("limp-cob-u")||{value:""}).value.trim();
   var m=(G("limp-cob-mes")||{value:""}).value.trim();
@@ -5238,6 +5278,19 @@ function rCtaCte(){
   var saldoAnteriorUSD=ahoAnterior.reduce(function(s,a){return s+Number(a.usd||0);},0);
   var movMesUSD=ahoMes.reduce(function(s,a){return s+Number(a.usd||0);},0);
   var totalUSDRegistrado=ahoTodos.reduce(function(s,a){return s+Number(a.usd||0);},0);
+  // If there is a declared stock, use it as base
+  // stockManual declared at stockFecha overrides the calculated balance
+  if(stockManual>0&&stockFecha){
+    var stockMesBase=stockFecha.slice(0,7);
+    // Movements AFTER the stock declaration date
+    var movAfterDecl=ahoTodos.filter(function(a){return(a.fecha||"")>stockFecha;});
+    var movAfterDeclAnterior=_ctsM!=="todos"?movAfterDecl.filter(function(a){return(a.mes||a.fecha||"").slice(0,7)<_ctsM;}):movAfterDecl;
+    var movAfterDeclMes=_ctsM!=="todos"?movAfterDecl.filter(function(a){return(a.mes||a.fecha||"").slice(0,7)===_ctsM;}):[];
+    // Recalculate using declared stock as base
+    saldoAnteriorUSD=stockManual+movAfterDeclAnterior.reduce(function(s,a){return s+Number(a.usd||0);},0);
+    movMesUSD=movAfterDeclMes.reduce(function(s,a){return s+Number(a.usd||0);},0);
+    totalUSDRegistrado=stockManual+movAfterDecl.reduce(function(s,a){return s+Number(a.usd||0);},0);
+  }
   var stockManual=Number((DATA.cfg_aho||{}).stock_usd||0);
   var stockFecha=(DATA.cfg_aho||{}).stock_fecha||"";
   o+="<div class='card' style='margin-bottom:14px;border-left:3px solid #06B6D4'>";
