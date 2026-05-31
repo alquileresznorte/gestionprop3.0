@@ -2971,15 +2971,17 @@ function rCaja(){
     if(ahoM.length){
       o+="<table class='tbl'><thead><tr><th>Fecha</th><th>USD</th><th>TC</th><th>Pesos</th><th>Cuenta</th></tr></thead><tbody>";
       ahoM.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");}).forEach(function(a){
-        o+="<tr><td>"+esc(a.fecha||"")+"</td>";
-        o+="<td style='color:#06B6D4;font-weight:700'>U$S "+Number(a.usd||0).toLocaleString()+"</td>";
-        o+="<td style='color:#94A3B8'>$"+Number(a.tc||0).toLocaleString()+"</td>";
-        o+="<td style='color:#F59E0B'>"+fmt(a.pesos||0)+"</td>";
-        o+="<td style='color:#64748B;font-size:11px'>"+esc(a.cuenta||"")+"</td></tr>";
+        o+="<tr>";
+      o+="<td style='color:#64748B;font-size:11px'>"+fecDisp(a.fecha||"")+"</td>";
+      var esVenta=a.tipo==="venta"||Number(a.usd||0)<0;
+      o+="<td style='color:"+(esVenta?"#EF4444":"#06B6D4")+";font-weight:700'>"+(esVenta?"- U$S "+Math.abs(Number(a.usd||0)).toLocaleString():"+ U$S "+Number(a.usd||0).toLocaleString())+"</td>";
+      o+="<td style='color:#94A3B8'>$"+Number(a.tc||0).toLocaleString()+"</td>";
+      o+="<td style='color:"+(esVenta?"#10B981":"#F59E0B")+"'>"+(esVenta?"+":"- ")+fmt(Math.abs(Number(a.pesos||0)))+"</td>";
+      o+="<td style='color:#64748B;font-size:11px'>"+esc(a.tipo==="venta"?"Venta":"Compra")+" - "+esc(a.cuenta||"")+"</td></tr>";
       });
       o+="</tbody></table>";
     } else {
-      o+="<p style='color:#64748B;font-size:12px'>Sin compras de dólares registradas</p>";
+      o+="<p style='color:#64748B;font-size:12px'>Sin compras de dolares registradas</p>";
     }
     o+="</div>";
 
@@ -3753,7 +3755,7 @@ function saveEditAdiq(key){
   var activo=document.getElementById("adiq-activo").value==="1";
   var desde=document.getElementById("adiq-desde").value||"";
   var hasta=document.getElementById("adiq-hasta").value||"";
-  if(!unidad||!concepto||!monto){alert("Completá unidad, concepto y monto");return;}
+  if(!unidad||!concepto||!monto){alert("Completa unidad, concepto y monto");return;}
   DB.ref("cfg/"+key).update({unidad:unidad,concepto:concepto,monto:monto,activo:activo,desde:desde,hasta:hasta||null});
   closeModal();
   setTimeout(function(){renderCfgIngresos();},500);
@@ -4564,7 +4566,7 @@ function openAhorro(){
   o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
   o+="<button class='btn bok bsm' onclick='saveAhorro()'>Registrar compra</button>";
   o+="</div>";
-  openModal("Compra de dólares — Fondo de Ahorro",o);
+  openModal("Compra de dolares — Fondo de Ahorro",o);
   setTimeout(function(){
     ["ah-usd","ah-tc"].forEach(function(id){
       var el=G(id);
@@ -4846,7 +4848,7 @@ function buscarCobrosLimp(){
   var u=(G("limp-cob-u")||{value:""}).value.trim();
   var m=(G("limp-cob-mes")||{value:""}).value.trim();
   var res=G("limp-cob-res"); if(!res) return;
-  if(!u&&!m){res.innerHTML="<p style='color:#EF4444;font-size:11px'>Ingresá una unidad o un mes</p>";return;}
+  if(!u&&!m){res.innerHTML="<p style='color:#EF4444;font-size:11px'>Ingresa una unidad o un mes</p>";return;}
   var cobros=oA(DATA.cob).filter(function(c){
     var okU=!u||c.unidad===u;
     var okM=!m||c.mes===m;
@@ -5121,6 +5123,7 @@ function limpiarDuplicadosCostos(){
 }
 
 
+function _ctsMesChange(v){localStorage.setItem("gp_cts_mes",v);rCtaCte();}
 function rCtaCte(){
   if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
   var movs=oA(DATA.movs||{});
@@ -5167,11 +5170,24 @@ function rCtaCte(){
   movLoli.sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
   movHugo.sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");});
 
+  var _ctsM=localStorage.getItem("gp_cts_mes")||"todos";
+  var o="<h2 style='font-size:20px;font-weight:800;margin-bottom:4px'>Cuenta Corriente Socios</h2>";
+  o+="<div style='display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap'>";
+  o+="<select class='inp' style='max-width:180px' id='cts-mes-sel' onchange='_ctsMesChange(this.value)'>";
+  o+="<option value='todos'"+((_ctsM==="todos")?" selected":"")+">Todos los meses</option>";
+  // Show last 18 months
+  var nowD=new Date();
+  for(var mi=-3;mi<15;mi++){var dd=new Date(nowD.getFullYear(),nowD.getMonth()+mi,1);var mv=dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0");var mLbl=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][dd.getMonth()]+" "+dd.getFullYear();o+="<option value='"+mv+"'"+(_ctsM===mv?" selected":"")+">"+mLbl+"</option>";}
+  o+="</select>";
+  o+="<span style='color:#64748B;font-size:11px'>"+ (_ctsM==="todos"?"Mostrando todo el historial":"Mes: "+_ctsM)+"</span>";
+  o+="</div>";
+  // Filter movements by month if selected
+  if(_ctsM!=="todos"){
+    movLoli=movLoli.filter(function(mv){return (mv.fecha||"").startsWith(_ctsM);});
+    movHugo=movHugo.filter(function(mv){return (mv.fecha||"").startsWith(_ctsM);});
+  }
   var totLoli=movLoli.reduce(function(s,m){return s+m.monto;},0);
   var totHugo=movHugo.reduce(function(s,m){return s+m.monto;},0);
-
-  var o="<h2 style='font-size:20px;font-weight:800;margin-bottom:4px'>Cuenta Corriente Socios</h2>";
-  o+="<p style='color:#64748B;font-size:11px;margin-bottom:14px'>Movimientos en nombre de Loli y Hugo. Solo Admin.</p>";
 
   function socioTable(nombre,movs,total,color){
     var r="<div class='card' style='margin-bottom:14px;border-left:3px solid "+color+"'>";
@@ -5198,10 +5214,11 @@ function rCtaCte(){
   o+="<div class='card' style='margin-bottom:14px;border-left:3px solid #06B6D4'>";
   o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
   o+="<div><h3 style='font-size:14px;font-weight:700;color:#06B6D4'>Fondo de Ahorro USD</h3>";
-  o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Compras acumuladas: <b style='color:#06B6D4'>U$S "+totalUSDRegistrado.toLocaleString()+"</b></p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-top:2px'>Stock neto (compras - ventas): <b style='color:#06B6D4'>U$S "+totalUSDRegistrado.toLocaleString()+"</b></p>";
   if(stockManual>0) o+="<p style='color:#10B981;font-size:12px;margin-top:2px'>Stock actual declarado: <b>U$S "+stockManual.toLocaleString()+"</b>"+(stockFecha?" al "+fecDisp(stockFecha):"")+"</p>";
   o+="</div>";
-  o+="<button class='btn bp bsm' onclick='openStockUSD()'>✎ Actualizar stock</button></div>";
+  o+="<button class='btn bp bsm' onclick='openStockUSD()'>✎ Actualizar stock</button>";
+  o+="<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444466' onclick='openVenderUSD()'>💵 Vender USD</button></div>";
   if(ahoTodos.length){
     o+="<table class='tbl'><thead><tr><th>Fecha</th><th>USD</th><th>TC</th><th>Pesos</th><th>Cuenta</th></tr></thead><tbody>";
     ahoTodos.forEach(function(a){
@@ -5304,6 +5321,7 @@ function openVenderInversion(key){
   o+=fld("vnd-f","Fecha de venta",hoy(),"date");
   o+=fld("vnd-pesos","Precio de venta en pesos $","","money");
   o+=fld("vnd-tc","TC al momento de venta","","money");
+  o+=sld("vnd-cta","Acreditar en cuenta",CTAS,"Efectivo");
   o+="</div>";
   o+="<div id='vnd-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa pesos y TC para ver resultado</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-invkey='"+key+"' onclick='saveVentaInversion(this.dataset.invkey)'>Registrar venta</button></div>";
@@ -5330,14 +5348,62 @@ function saveVentaInversion(key){
   var f=G("vnd-f").value;
   var pesos=fmtInputVal(G("vnd-pesos"));
   var tc=fmtInputVal(G("vnd-tc"));
+  var ctaVenta=G("vnd-cta")?G("vnd-cta").value:"Efectivo";
   if(!f){alert("Ingresa la fecha");return;}
   if(!pesos||!tc){alert("Ingresa el precio de venta y el TC");return;}
   var usdVenta=Math.round(pesos/tc);
+  var m=f.slice(0,7);
   DB.ref("inv/"+key).update({vendido:true,fecha_venta:f,pesos_venta:pesos,tc_venta:tc,usd_venta:usdVenta});
+  // Register pesos income in caja
+  DB.ref("aj").push({fecha:f,mes:m,tipo:"ingreso",concepto:"Venta inversión: "+esc(inv.desc)+" U$S "+Number(inv.usd).toLocaleString()+" → U$S "+usdVenta,monto:pesos,cuenta:ctaVenta,auto:false,esAhorro:true});
   closeModal();
+  alert("Venta registrada. Se acreditaron "+fmt(pesos)+" en "+ctaVenta);
   setTimeout(rCtaCte,400);
 }
 
+function openVenderUSD(){
+  var totalUSD=oA(DATA.aho||{}).reduce(function(s,a){return s+Number(a.usd||0);},0);
+  var stockManual=Number((DATA.cfg_aho||{}).stock_usd||0);
+  var stockActual=stockManual>0?stockManual:totalUSD;
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Stock disponible: <b style='color:#06B6D4'>U$S "+stockActual.toLocaleString()+"</b></p>";
+  o+="<div class='g2'>";
+  o+=fld("vusd-f","Fecha",hoy(),"date");
+  o+=fld("vusd-usd","Cantidad USD a vender","","money");
+  o+=fld("vusd-tc","TC (pesos por dolar)","","money");
+  o+=sld("vusd-cta","Acreditar en cuenta",CTAS,"Efectivo");
+  o+="</div>";
+  o+="<div id='vusd-preview' style='background:#0F172A;border-radius:8px;padding:10px;font-size:12px;color:#94A3B8;margin:8px 0'>Ingresa USD y TC para ver el total en pesos</div>";
+  o+="<button class='btn bok' onclick='saveVenderUSD()' style='width:100%;margin-top:8px'>Registrar venta</button>";
+  openModal("💵 Vender USD",o,false);
+  setTimeout(function(){
+    ["vusd-usd","vusd-tc"].forEach(function(id){
+      var el=G(id);if(el)el.oninput=function(){
+        var usd=fmtInputVal(G("vusd-usd")),tc=fmtInputVal(G("vusd-tc"));
+        var t=G("vusd-preview");
+        if(t&&usd>0&&tc>0) t.innerHTML="<b style='color:#10B981'>Total: "+fmt(usd*tc)+"</b> (U$S "+usd.toLocaleString()+" × $"+tc.toLocaleString()+")";
+      };
+    });
+  },100);
+}
+function saveVenderUSD(){
+  var f=G("vusd-f").value;
+  var usd=fmtInputVal(G("vusd-usd"));
+  var tc=fmtInputVal(G("vusd-tc"));
+  var cta=G("vusd-cta")?G("vusd-cta").value:"Efectivo";
+  if(!usd||!tc){alert("Ingresa USD y TC");return;}
+  var pesos=usd*tc;
+  var m=f.slice(0,7);
+  // Register as ahorro with negative value (venta)
+  DB.ref("aho").push({fecha:f,mes:m,usd:-usd,tc:tc,pesos:-pesos,cuenta:cta,tipo:"venta"});
+  // Register pesos income in caja
+  DB.ref("aj").push({fecha:f,mes:m,tipo:"ingreso",concepto:"Venta USD U$S "+usd.toLocaleString()+" (TC $"+tc.toLocaleString()+")",monto:pesos,cuenta:cta,auto:false,esAhorro:true});
+  // Update stock
+  var stockActual=Number((DATA.cfg_aho||{}).stock_usd||0);
+  if(stockActual>0) DB.ref("cfg_aho").update({stock_usd:Math.max(0,stockActual-usd),stock_fecha:f});
+  closeModal();
+  alert("Venta registrada. Se acreditaron "+fmt(pesos)+" en "+cta);
+  setTimeout(rCtaCte,400);
+}
 function openStockUSD(){
   var actual=Number((DATA.cfg_aho||{}).stock_usd||0);
   var o="<p style='color:#64748B;font-size:12px;margin-bottom:12px'>Ingresa el stock real de dolares que tienen hoy. Esto no afecta la caja, es solo para llevar el control del ahorro.</p>";
