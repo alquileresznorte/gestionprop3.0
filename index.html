@@ -2917,7 +2917,7 @@ function rCaja(){
     o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:8px'>Saldo por cuenta — "+m+"</h3>";
     o+="<table class='tbl'><thead><tr><th>Cuenta</th><th>Ingresos</th><th>Egresos</th><th>Saldo del mes</th><th>Acumulado</th></tr></thead><tbody>";
     var lastDayM=m+"-31"; // approximate last day for accumulation
-    CTAS.forEach(function(cta){
+    CTAS_CAJA.forEach(function(cta){
       var ingC=cobM.reduce(function(s,c){return s+pA(c).filter(function(p){return p.cuenta===cta;}).reduce(function(a,p){return a+p.monto;},0);},0)
                +ajM.filter(function(a){return a.tipo==="ingreso"&&a.cuenta===cta&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
       var egrC=cstM.filter(function(c){return c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)
