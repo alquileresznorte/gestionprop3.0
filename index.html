@@ -928,6 +928,8 @@ function openFicha(key){
       var CE={pagado:"#10B981",parcial:"#F59E0B",pendiente:"#EF4444"};
       var color=CE[c.estado]||"#94A3B8";
       var concepto=c.concepto||c.concepto_extra||"Alquiler";
+    var esIng=c.concepto&&(c.concepto.indexOf('Deposito')>=0||c.concepto.indexOf('Gastos')>=0);
+    if(esIng) concepto+=' <span style="background:#06B6D422;color:#06B6D4;border-radius:3px;padding:1px 4px;font-size:9px">al ingreso</span>';
       var salAntLabel=c.sal_ant>0?" <span style='color:#F59E0B;font-size:10px'>(+Ant:"+fmt(c.sal_ant)+")</span>":"";
       // Detalle de pagos
       var pagosArr=c.pagos?Object.values(c.pagos).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");}):[];
@@ -2104,7 +2106,7 @@ function rCostos(){
     o+="</div>";
   }
   o+="</div>";
-  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'><input"+mesSelect('cst-mes-inp',_cstMes,"_cstMes=this.value;rCostos()")+"<select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
+  o+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>"+mesSelect('cst-mes-inp',_cstMes,"_cstMes=this.value;_editC=null;rCostos()")+"<select class='inp' style='max-width:130px' onchange=\"_cstCat=this.value;_editC=null;rCostos()\"><option>Todas</option>"+cats.map(function(c){return "<option"+(c===_cstCat?" selected":"")+" >"+c+"</option>";}).join("")+"</select><select class='inp' style='max-width:100px' onchange=\"_cstEd=this.value;_editC=null;rCostos()\"><option>Todos</option><option>General</option>"+Object.keys(ED).map(function(k){return "<option"+(k===_cstEd?" selected":"")+" >"+k+"</option>";}).join("")+"</select><select class='inp' style='max-width:130px' id='cst-ord'><option value='cat'>Por categoria</option><option value='venc'>Por vencimiento</option><option value='pend'>Pendientes primero</option></select></div>";
   o+="<input class='inp' id='cst-busq' type='text' placeholder=\"\uD83D\uDD0D Buscar costo...\" style='width:100%;max-width:340px;margin-bottom:10px' oninput=\"window._cstBusq=this.value;_editC=null;rCostos()\"  value='"+(window._cstBusq||"")+"'/>"; 
   setTimeout(function(){var so=G("cst-ord");if(so)so.onchange=function(){rCostos();};},50);
   var cstOrd=(G("cst-ord")||{value:"cat"}).value;
@@ -3116,13 +3118,14 @@ function openSubc(){
   var o="<div class='wbx' style='margin-bottom:12px'>Al confirmar, la caja del dia <b>"+_cajaF+"</b> queda cerrada por <b>"+USER.n+"</b>. No se puede modificar.</div>";
   o+="<table class='tbl' style='margin-bottom:14px'><thead><tr><th>Cuenta</th><th>Saldo al cierre</th></tr></thead><tbody>";
   var total=0;
-  CTAS.forEach(function(cta){
-    var sal=saldosDia[cta];
-    if(sal!==0){
-      total+=sal;
-      o+="<tr><td style='font-weight:600'>"+cta+"</td>";
-      o+="<td style='color:"+(sal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(sal)+"</td></tr>";
-    }
+  CTAS_CAJA.forEach(function(cta){
+    var sal=saldosDia[cta]||0;
+    total+=sal;
+    o+="<tr><td style='font-weight:600'>"+cta+"</td><td style='color:"+(sal>=0?"#10B981":"#EF4444")+";font-weight:700'>"+fmt(sal)+"</td></tr>";
+  });
+  CTAS_SOCIOS.forEach(function(cta){
+    var sal=saldosDia[cta]||0;
+    if(sal!==0){total+=sal;o+="<tr><td style='color:#64748B;font-size:11px'>"+cta+"</td><td style='color:#64748B;font-size:11px'>"+fmt(sal)+"</td></tr>";}
   });
   o+="<tr style='border-top:2px solid #334155;font-weight:700'><td>TOTAL</td><td style='color:"+(total>=0?"#10B981":"#EF4444")+"'>"+fmt(total)+"</td></tr>";
   o+="</tbody></table>";
