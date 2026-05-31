@@ -5278,21 +5278,18 @@ function rCtaCte(){
   var saldoAnteriorUSD=ahoAnterior.reduce(function(s,a){return s+Number(a.usd||0);},0);
   var movMesUSD=ahoMes.reduce(function(s,a){return s+Number(a.usd||0);},0);
   var totalUSDRegistrado=ahoTodos.reduce(function(s,a){return s+Number(a.usd||0);},0);
-  // If there is a declared stock, use it as base
-  // stockManual declared at stockFecha overrides the calculated balance
+
+  var stockManual=Number((DATA.cfg_aho||{}).stock_usd||0);
+  var stockFecha=(DATA.cfg_aho||{}).stock_fecha||"";
+  // Use declared stock as base if available
   if(stockManual>0&&stockFecha){
-    var stockMesBase=stockFecha.slice(0,7);
-    // Movements AFTER the stock declaration date
     var movAfterDecl=ahoTodos.filter(function(a){return(a.fecha||"")>stockFecha;});
     var movAfterDeclAnterior=_ctsM!=="todos"?movAfterDecl.filter(function(a){return(a.mes||a.fecha||"").slice(0,7)<_ctsM;}):movAfterDecl;
     var movAfterDeclMes=_ctsM!=="todos"?movAfterDecl.filter(function(a){return(a.mes||a.fecha||"").slice(0,7)===_ctsM;}):[];
-    // Recalculate using declared stock as base
     saldoAnteriorUSD=stockManual+movAfterDeclAnterior.reduce(function(s,a){return s+Number(a.usd||0);},0);
     movMesUSD=movAfterDeclMes.reduce(function(s,a){return s+Number(a.usd||0);},0);
     totalUSDRegistrado=stockManual+movAfterDecl.reduce(function(s,a){return s+Number(a.usd||0);},0);
   }
-  var stockManual=Number((DATA.cfg_aho||{}).stock_usd||0);
-  var stockFecha=(DATA.cfg_aho||{}).stock_fecha||"";
   o+="<div class='card' style='margin-bottom:14px;border-left:3px solid #06B6D4'>";
   o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
   o+="<div><h3 style='font-size:14px;font-weight:700;color:#06B6D4'>Fondo de Ahorro USD</h3>";
