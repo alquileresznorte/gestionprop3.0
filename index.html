@@ -4928,7 +4928,6 @@ function borrarTodosCobrosLimp(){
   cobros.forEach(function(c){ups["cob/"+c._key]=null;});
   DB.ref("/").update(ups);
   setTimeout(function(){buscarCobrosLimp();},800);
-  alert("Se borraron "+cobros.length+" cobros.");
 }
 function borrarCostoLimp(key){
   var c=DATA.cst[key];if(!c)return;
@@ -4973,9 +4972,7 @@ function buscarCobrosLimp(){
     if(!b) return;
     var key=b.dataset.delcob;
     var c=DATA.cob[key];
-    if(!confirm("Borrar cobro de "+esc((c||{}).unidad||"")+" — "+(c||{}).mes+" — "+fmt((c||{}).monto_total||0)+"?")) return;
     DB.ref("cob/"+key).remove(function(){
-      alert("Cobro borrado.");
       buscarCobrosLimp();
     });
   };
