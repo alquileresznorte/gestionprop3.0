@@ -538,9 +538,17 @@ function rVD(iqA,el){
       var u=cod+"-"+i,inq=iqA.filter(function(x){return x.unidad===u;})[0];
       var ki=inq?kpush(inq._key):-1;
       o+="<div style='background:"+(inq?color+"22":"#0F172A")+";border:1px solid "+(inq?color:"#334155")+";border-radius:7px;padding:4px 8px;cursor:"+(inq?"pointer":"default")+";min-width:50px;text-align:center'"+(inq?" data-ficha='"+ki+"'":"")+">";
-      o+="<div style='color:"+(inq?color:"#64748B")+";font-weight:700;font-size:11px'>"+u+"</div>";
+      var resUnitColor=!inq?oA(DATA.res||{}).find(function(r){return r.unidad===u&&r.estado!=="cancelado"&&r.estado!=="convertido";})!=null:false;
+      o+="<div style='color:"+(inq?color:resUnitColor?"#F59E0B":"#64748B")+";font-weight:700;font-size:11px'>"+u+"</div>";
       o+="<div style='color:#94A3B8;font-size:9px'>"+(inq?inq.nombre.split(",")[0]:"Libre")+"</div>";
-      if(!inq){o+="<button style='font-size:8px;background:#3B82F6;color:#fff;border:none;border-radius:4px;padding:2px 4px;cursor:pointer;display:block;margin-top:2px;width:100%' data-genform='"+u+"'>Enviar Form</button>";}
+      if(!inq){
+        // Check if there is a reserva for this unit
+        var resUnit=oA(DATA.res||{}).find(function(r){return r.unidad===u&&r.estado!=="cancelado"&&r.estado!=="convertido";});
+        if(resUnit){
+          o+="<div style='color:#F59E0B;font-size:9px;font-weight:700'>Reservado</div>";
+          o+="<button style='font-size:8px;background:#F59E0B;color:#000;border:none;border-radius:4px;padding:2px 4px;cursor:pointer;display:block;margin-top:2px;width:100%' data-genform='"+u+"'>Enviar Form</button>";
+        }
+      }
       o+="</div>";
     }
     o+="</div></div>";
