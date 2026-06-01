@@ -120,6 +120,7 @@ const PRE = {
   tel:      params.get("tel") || "",
   senia:    params.get("senia") || "0",
   saldo:    params.get("saldo") || "0",
+  id_res:   params.get("id") || "",
 };
 
 const PASOS = 5;
@@ -539,9 +540,21 @@ function guardar(){
     firma:DATA.firma,firma2:DATA.firma2||null,fecha_firma:hoy(),
     fecha_registro:new Date().toISOString(),
   };
-  // Guardar en Firebase (compartido con todos los dispositivos)
+  // Guardar en Firebase
   try{
-    DB.ref("iq").push(registro);
+    if(PRE.id_res){
+      // Update existing reserva with form data
+      DB.ref("res").orderByChild("id_res").equalTo(PRE.id_res).once("value",function(snap){
+        if(snap.exists()){
+          var key=Object.keys(snap.val())[0];
+          DB.ref("res/"+key).update(Object.assign(registro,{id_res:PRE.id_res,estado:"form_completado",fecha_form:new Date().toISOString()}));
+        } else {
+          DB.ref("iq").push(registro);
+        }
+      });
+    } else {
+      DB.ref("iq").push(registro);
+    }
     console.log("Guardado en Firebase OK");
   }catch(e){
     console.error("Error Firebase:",e);
