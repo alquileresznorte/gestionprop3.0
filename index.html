@@ -2690,11 +2690,7 @@ function rCaja(){
   var cobM=oA(DATA.cob).filter(function(c){return c.mes===m;});
   // Para la vista DIARIA: también incluir cobros de otros meses con pagos en este mes
   // (ej: inquilino que paga por adelantado el mes siguiente)
-  var cobOtrosMeses=oA(DATA.cob).filter(function(c){
-    if(c.mes===m) return false; // ya incluido
-    var pagosDelMes=pA(c).filter(function(p){return (p.fecha||"").startsWith(m);});
-    return pagosDelMes.length>0;
-  });
+  
   var cstM=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
   var ajM=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m);});
   var movsM=oA(DATA.movs).filter(function(mv){return mv.fecha&&mv.fecha.startsWith(m);});
@@ -2703,11 +2699,7 @@ function rCaja(){
   var tcVal=Number(localStorage.getItem("gp_tc_"+m)||0);
 
   // Monthly totals (ingresos = cobrado, egresos = costos pagados + aj egresos)
-  // Ingresos: pagos del mes actual (de cobros de este mes + adelantos de otros meses)
-  var _pagosMesExtra=cobOtrosMeses.reduce(function(s,c){
-    return s+pA(c).filter(function(p){return (p.fecha||"").startsWith(m);}).reduce(function(ss,p){return ss+Number(p.monto||0);},0);
-  },0);
-  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)+_pagosMesExtra
+  var iM=cobM.reduce(function(s,c){return s+pT(c);},0)
         +ajM.filter(function(a){return a.tipo==="ingreso"&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
   var eM=cstM.reduce(function(s,c){return s+Number(c.monto||0);},0)
         +ajM.filter(function(a){return a.tipo==="egreso"&&!a.auto;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
@@ -2730,7 +2722,7 @@ function rCaja(){
     var movimientosD=[];
 
     // Cobros (del mes actual + adelantos de meses futuros pagados hoy)
-    cobM.concat(cobOtrosMeses).forEach(function(c){
+    cobM.forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
         // Si el pago fue en cuenta de socio (MP Loli, MP Hugo, etc), va a columna Socios
         var esCuentaSocio=CTAS_SOCIOS.indexOf(p.cuenta)>=0;
