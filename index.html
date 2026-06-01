@@ -4914,6 +4914,22 @@ function buscarCostosLimp(){
   html+="</div>";
   res.innerHTML=html;
 }
+function borrarTodosCobrosLimp(){
+  var u=(G("limp-cob-u")||{value:""}).value.trim();
+  var m=(G("limp-cob-mes")||{value:""}).value.trim();
+  var cobros=oA(DATA.cob).filter(function(c){
+    var okU=!u||c.unidad===u;
+    var okM=!m||c.mes===m;
+    return okU&&okM&&pT(c)===0;
+  });
+  if(!cobros.length){alert("No hay cobros sin pagos para borrar");return;}
+  if(!confirm("¿Borrar "+cobros.length+" cobro(s) sin pagos de "+m+"? Esta acción no se puede deshacer."))return;
+  var ups={};
+  cobros.forEach(function(c){ups["cob/"+c._key]=null;});
+  DB.ref("/").update(ups);
+  setTimeout(function(){buscarCobrosLimp();},800);
+  alert("Se borraron "+cobros.length+" cobros.");
+}
 function borrarCostoLimp(key){
   var c=DATA.cst[key];if(!c)return;
   if(!confirm("¿Borrar el costo \""+esc(c.desc||"")+"\" de $"+fmt(c.monto||0)+"? Esta acción no se puede deshacer."))return;
@@ -4931,7 +4947,12 @@ function buscarCobrosLimp(){
     return okU&&okM;
   });
   if(!cobros.length){res.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:6px'>No hay cobros para esos filtros.</p>";return;}
-  var o="<div style='margin-top:8px'><p style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+cobros.length+" cobro(s) encontrado(s):</p>";
+  var sinPagos=cobros.filter(function(c){return pT(c)===0;});
+  var o="<div style='margin-top:8px'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>";
+  o+="<p style='color:#94A3B8;font-size:11px;margin:0'>"+cobros.length+" cobro(s) encontrado(s)</p>";
+  if(sinPagos.length>0) o+="<button class='btn bx bsm' onclick='borrarTodosCobrosLimp()'>🗑 Borrar todos sin pagos ("+sinPagos.length+")</button>";
+  o+="</div>";
   cobros.sort(function(a,b){return(a.mes||"").localeCompare(b.mes||"");}).forEach(function(c){
     var pagado=pT(c);
     o+="<div style='background:#0F172A;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>";
