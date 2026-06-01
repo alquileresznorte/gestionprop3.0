@@ -834,7 +834,7 @@ function openEditDatos(key){
   o+="<div><div class='lbl'>Teléfono</div><input class='inp' id='ed-tel' value='"+esc(i.tel||i.telefono||"")+"'/></div>";
   o+="<div><div class='lbl'>Teléfono 2</div><input class='inp' id='ed-tel2' value='"+esc(i.tel2||i.telefono2||"")+"'/></div>";
   o+="<div><div class='lbl'>Trabajo</div><input class='inp' id='ed-trabajo' value='"+esc(i.trabajo||i.trabajo1||"")+"'/></div>";
-  o+="<div></div>";
+  o+="<div><div class='lbl'>Fin de contrato</div><input class='inp' type='date' id='ed-egreso' value='"+esc(i.egreso||"")+"'/></div>";
   o+="</div>";
   o+="<div style='margin-bottom:10px'><div class='lbl'>Fecha real de posesión</div><input class='inp' type='date' id='ed-posesion' value='"+(i.fecha_posesion||"")+"'/><div style='color:#64748B;font-size:10px;margin-top:3px'>Si tomó posesión en fecha distinta al inicio del contrato</div></div>";
   o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>";
@@ -862,13 +862,15 @@ function saveEditDatos(key){
   var oldTel=i.tel||i.telefono||"";
   var telHistorial=Array.isArray(i.tel_historial)?i.tel_historial.slice():[];
   if(oldTel&&oldTel!==tel&&!telHistorial.includes(oldTel)) telHistorial.push(oldTel);
+  var egreso=document.getElementById("ed-egreso").value||"";
   DB.ref("iq/"+key).update({
     nombre:nombre, dni:dni,
     tel:tel, telefono:tel, tel_historial:telHistorial,
     tel2:tel2, telefono2:tel2,
     trabajo:trabajo, trabajo1:trabajo,
     emergencia_nombre:emnom, emergencia_tel:emtel,
-    fecha_posesion:posesion||null
+    fecha_posesion:posesion||null,
+    egreso:egreso||null
   });
   closeModal();closeModal();
   alert("Datos actualizados");
@@ -1007,12 +1009,32 @@ function enviarFormFicha(){
     +"&egr="+encodeURIComponent(i.egreso||"");
   var nom=(i.nombre||"").split(",")[0].trim();
   var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+" Adm: 1555787641";
-  if(d.tel){
-    window.open("https://wa.me/"+d.tel.replace(/[^0-9]/g,"")+"?text="+encodeURIComponent(msg),"_blank");
-  } else {
-    navigator.clipboard.writeText(link);
-    alert("Link copiado (sin telefono registrado)");
-  }
+  var o="<div style='margin-bottom:10px'>";
+  o+="<div class='lbl'>Teléfono destinatario</div>";
+  o+="<input class='inp' id='fef-tel' value='"+(i.tel||i.telefono||"")+"' placeholder='5491...' style='margin-bottom:8px'/>";
+  o+="<div class='lbl'>Mensaje</div>";
+  o+="<textarea class='inp' id='fef-msg' style='height:80px;font-size:11px;margin-bottom:8px'>"+msg+"</textarea>";
+  o+="<div style='background:#0F172A;border-radius:6px;padding:8px;margin-bottom:10px;font-size:10px;word-break:break-all;color:#64748B'>"+esc(link)+"</div>";
+  o+="</div>";
+  o+="<div style='display:flex;gap:8px'>";
+  o+="<button class='btn bg' onclick='_fefWA()' style='flex:1'>💬 Enviar por WhatsApp</button>";
+  o+="<button class='btn' style='background:#334155;flex:1' onclick='_fefCopy("+JSON.stringify(link)+")'>📋 Copiar link</button>";
+  o+="</div>";
+  window._fefLink=link;
+  openModal("Enviar formulario — "+esc(i.unidad),o,false);
+}
+function _fefWA(){
+  var tel=(G("fef-tel")||{value:""}).value.replace(/[^0-9]/g,"");
+  var msg=(G("fef-msg")||{value:""}).value;
+  if(!tel){alert("Ingresa el telefono");return;}
+  window.open("https://wa.me/"+tel+"?text="+encodeURIComponent(msg),"_blank");
+  closeModal();
+}
+function _fefCopy(link){
+  var l=link||window._fefLink||"";
+  if(navigator.clipboard){navigator.clipboard.writeText(l).then(function(){alert("Link copiado");});}
+  else{prompt("Copiá este link:",l);}
+  closeModal();
 }
 
 
