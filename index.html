@@ -574,7 +574,8 @@ function openGenForm(unidad){_gfUnidad=unidad;
 }
 var _gfUnidad='';function genFormLink(unidad){
   var alq=fmtInputVal(G("gf-alq")),dep=fmtInputVal(G("gf-dep")),gs=fmtInputVal(G("gf-gs"));
-  var ing=G("gf-ing").value,egr=G("gf-egr").value,pos=G("gf-pos").value;
+  function fixDate(d){if(!d)return "";var m=d.match(/(\d{4})-?(\d{2})-?(\d{2})$/);return m?m[1].slice(-4)+"-"+m[2]+"-"+m[3]:d;}
+  var ing=fixDate(G("gf-ing").value),egr=fixDate(G("gf-egr").value),pos=fixDate(G("gf-pos").value);
   var nom=G("gf-nom").value.trim(),dni=G("gf-dni").value.trim(),tel=G("gf-tel").value.trim();
   var senia=fmtInputVal(G("gf-senia")),saldo=fmtInputVal(G("gf-saldo"));
   if(!alq){alert("El alquiler es obligatorio");return;}
@@ -1225,8 +1226,9 @@ function saveReserva(){
   var senia=fmtInputVal(G("rs-senia")||{value:"0",dataset:{raw:"0"}});
   var cta=(G("rs-cta")||{value:"Efectivo"}).value;
   var fecha=G("rs-f").value;
-  var fi=(G("rs-fi")||{value:hoy()}).value;
-  var fegr=(G("rs-fegr")||{value:""}).value;
+  function _fixD(d){if(!d)return "";var m=d.match(/(\d{4})-?(\d{2})-?(\d{2})$/);return m?m[1].slice(-4)+"-"+m[2]+"-"+m[3]:d;}
+  var fi=_fixD((G("rs-fi")||{value:hoy()}).value);
+  var fegr=_fixD((G("rs-fegr")||{value:""}).value);
   var pos=(G("rs-pos")||{value:""}).value;
   var obs=(G("rs-obs")||{value:""}).value;
 
@@ -1385,7 +1387,7 @@ function openNA(){
   o+=fld("na-dep","Deposito $","","money");
   o+=fld("na-gs","Gastos de gestion $","","money");
   o+=fld("na-desc-gs","Descuento en gastos $","0","money");
-  o+=fld("na-pc","Reserva / Pago a cuenta $","0","money");
+  o+=fld("na-pc","Reserva / Pago a cuenta $","0","money");o+="<input type='hidden' id='na-from-res' value='0'/>";o+="<input type='hidden' id='na-pc-fecha' value=''/>";
   o+=sld("na-pc-cta","Cuenta del pago a cuenta",CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;}),"Efectivo");
   o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin-bottom:8px'>";
   o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Pago al tomar posesion (opcional)</div>";
@@ -1436,6 +1438,8 @@ function openNA(){
       // Pre-cargar seña como pago a cuenta
       if(r.senia&&r.senia>0&&G("na-pc")){
         G("na-pc").value=r.senia;
+        // Store the actual payment date (reserva date, not ingreso date)
+        var pcFechaEl=G("na-pc-fecha");if(pcFechaEl)pcFechaEl.value=r.fecha||"";
       }
       if(r.pago_posesion&&r.pago_posesion>0&&G("na-pos-monto")){
         G("na-pos-monto").value=r.pago_posesion;
@@ -1594,7 +1598,8 @@ function saveNA(){
     var posMonto=fmtInputVal(G("na-pos-monto")||{value:"0",dataset:{raw:"0"}});
     var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
-    var pcFecha=ing||hoy();
+    var pcFechaGuardada=G("na-pc-fecha")&&G("na-pc-fecha").value?G("na-pc-fecha").value:"";
+    var pcFecha=pcFechaGuardada||ing||hoy();
     var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
     var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
     var pcRestante=pc;
@@ -1635,8 +1640,10 @@ function saveNA(){
     if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?_pcAplicar(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?_pcAplicar(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
 
-    // Registrar pago a cuenta en caja
-    if(pc>0){
+    // Registrar pago a cuenta en caja SOLO si NO viene de reserva
+    // (si viene de reserva, la seña ya fue a caja cuando se registró la reserva)
+    var _pcDesdeRes=G("na-pc-fecha")&&G("na-pc-fecha").value;
+    if(pc>0&&!_pcDesdeRes){
       DB.ref("aj").push({fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
         cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,monto:pc,auto:true});
     }
