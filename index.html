@@ -253,8 +253,8 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 
 // State
 var USER=null,SEC="login";
-var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{}};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo","hist_cst"];
+var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{},forms:{}};
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo","hist_cst","forms"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -369,13 +369,17 @@ function rShell(){
   var m=mes(),al=oA(DATA.cob).filter(function(c){return c.mes===m&&c.estado!=="pagado";}).length;
   var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
   var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).length;
+  // Formularios pendientes: enviados por el inquilino, sin acuerdo creado aún
+  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente";}).length;
   var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["ctacte","Cta Socios"],["stats","Stats"],["config","Config"]];
   var navE=[["alertas","Alertas"],["acuerdos","Acuerdos"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"]];
   var nav=esA?navA:navE;
   var nh=nav.map(function(n){
     var s=n[0],lb=n[1];
     var cls="nb"+(SEC===s?" on":"");
-    var ab=s==="cobranzas"&&al>0?"<span style='background:#EF4444;color:#fff;border-radius:8px;font-size:8px;padding:1px 4px;font-weight:800;margin-left:2px'>"+al+"</span>":"";
+    var ab="";
+    if(s==="cobranzas"&&al>0) ab="<span style='background:#EF4444;color:#fff;border-radius:8px;font-size:8px;padding:1px 4px;font-weight:800;margin-left:2px'>"+al+"</span>";
+    if(s==="acuerdos"&&formsPend>0) ab="<span style='background:#06B6D4;color:#000;border-radius:8px;font-size:8px;padding:1px 4px;font-weight:800;margin-left:2px'>"+formsPend+" form</span>";
     return "<button class='"+cls+"' data-go='"+s+"'>"+lb+ab+"</button>";
   }).join("");
   G("app").innerHTML="<div style='min-height:100vh'><div style='background:#1E293B;border-bottom:1px solid #334155;padding:0 10px;position:sticky;top:0;z-index:100'><div style='max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:46px;gap:6px'><div style='font-weight:800;color:#3B82F6;font-size:14px'>GP</div><nav style='display:flex;gap:1px;flex-wrap:wrap;justify-content:center;flex:1' id='nav'>"+nh+"</nav><div style='display:flex;align-items:center;gap:6px;flex-shrink:0'><div style='text-align:right'><div style='color:#F1F5F9;font-size:10px;font-weight:600'>"+USER.n+"</div><div style='font-size:9px;color:"+(esA?"#8B5CF6":"#10B981")+"'>"+act+"/"+totU+"</div></div><button class='btn bg bsm' onclick='logout()'>Salir</button></div></div></div><div id='main' style='max-width:1200px;margin:0 auto;padding:14px 12px'></div></div>";
@@ -470,6 +474,42 @@ function rAcuerdos(){
 }
 function fAc(){
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
+
+  // ── FORMULARIOS PENDIENTES (enviados por el inquilino, sin acuerdo) ────────
+  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente";});
+  var formsEl=G("iq-forms");
+  if(!formsEl){
+    var formsDiv=document.createElement("div");formsDiv.id="iq-forms";
+    var listEl0=G("iq-list");
+    if(listEl0&&listEl0.parentNode) listEl0.parentNode.insertBefore(formsDiv,listEl0);
+    formsEl=formsDiv;
+  }
+  if(formsPend.length&&formsEl){
+    var fHtml="<div style='margin-bottom:12px'><div style='font-size:11px;font-weight:700;color:#06B6D4;margin-bottom:6px'>📋 FORMULARIOS RECIBIDOS ("+formsPend.length+")</div>";
+    formsPend.forEach(function(f){
+      var fki=kpush(f._key);
+      fHtml+="<div style='background:#1E293B;border:1px solid #06B6D444;border-left:3px solid #06B6D4;border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px'>";
+      fHtml+="<div><div style='font-weight:700;font-size:13px'>"+esc(f.unidad||"")+" — "+esc(f.nombre||"")+"</div>";
+      fHtml+="<div style='color:#64748B;font-size:11px'>DNI: "+esc(f.dni||"--")+" · Tel: "+esc(f.tel||"--")+" · Enviado: "+fecDisp(f.fecha_envio||"")+"</div>";
+      fHtml+="<div style='color:#94A3B8;font-size:10px'>Alq: "+fmt(f.alquiler||0)+" · Dep: "+fmt(f.deposito||0)+"</div></div>";
+      fHtml+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
+      fHtml+="<button class='btn bp bsm' style='font-size:10px' data-verform='"+fki+"'>Ver datos</button>";
+      fHtml+="<button class='btn bok bsm' style='font-size:10px' data-convertform='"+fki+"'>Crear acuerdo</button>";
+      if(USER.r==="admin") fHtml+="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-descartarform='"+fki+"'>Descartar</button>";
+      fHtml+="</div></div>";
+    });
+    fHtml+="</div>";
+    formsEl.innerHTML=fHtml;
+    // handlers
+    formsEl.onclick=function(e){
+      var vf=e.target.closest("[data-verform]");if(vf){openVerForm(kget(parseInt(vf.dataset.verform)));return;}
+      var cf=e.target.closest("[data-convertform]");if(cf){convertirForm(kget(parseInt(cf.dataset.convertform)));return;}
+      var df=e.target.closest("[data-descartarform]");if(df){if(confirm("Descartar este formulario?"))DB.ref("forms/"+kget(parseInt(df.dataset.descartarform))).update({estado:"descartado"});return;}
+    };
+  } else if(formsEl){
+    formsEl.innerHTML="";
+  }
+
   // Mostrar reservas activas
   var resActivas=oA(DATA.res||{}).filter(function(r){return r.estado==="reservado";});
   var resEl=G("iq-reservas");
@@ -1445,7 +1485,7 @@ function openNA(){
   o+="<div class='fld' style='grid-column:1/-1'>"+tad("na-obs","Observaciones al ingreso")+"</div>";
   o+="</div>";
   o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:4px'>Completa los montos para ver el resumen</div>";
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNA()'>Crear Acuerdo</button></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='window._resConvert=null;window._resConvertKey=null;window._formConvertKey=null;closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNA()'>Crear Acuerdo</button></div>";
   openModal("Nuevo Acuerdo"+(r?" (desde reserva "+r.unidad+")":""),o,true);
   setTimeout(function(){
     ["na-alq","na-dep","na-gs","na-desc-gs","na-pc","na-dep-info","na-gs-info","na-deuda-monto"].forEach(function(id){
@@ -1645,6 +1685,7 @@ function saveNA(){
     closeModal();
     window._resConvert=null;
     window._resConvertKey=null;
+    window._formConvertKey=null;
 
     // Guardar inquilino
     DB.ref("iq").push({
@@ -1704,6 +1745,12 @@ function saveNA(){
       DB.ref("res/"+resKeyLocal).update({estado:"convertida",id_acuerdo:id,fecha_conversion:hoy()},function(err){
         if(err) alert("Error al marcar reserva: "+err.message);
       });
+    }
+    // Marcar formulario como convertido
+    var _formCK=window._formConvertKey||null;
+    window._formConvertKey=null;
+    if(_formCK){
+      DB.ref("forms/"+_formCK).update({estado:"convertido",id_acuerdo:id,fecha_conversion:hoy()});
     }
     setTimeout(rAcuerdos,600);
   }
@@ -5563,6 +5610,63 @@ function saveStockUSD(){
   DB.ref("cfg_aho").update({stock_usd:usd,stock_fecha:f});
   closeModal();
   setTimeout(rCtaCte,400);
+}
+
+// ── FORMULARIOS RECIBIDOS ─────────────────────────────────────────────────────
+function openVerForm(fKey){
+  var f=(DATA.forms||{})[fKey];if(!f)return;
+  var docs=[
+    {label:"DNI Frente",key:"doc_dni_f"},
+    {label:"DNI Dorso",key:"doc_dni_d"},
+    {label:"Recibo de sueldo",key:"doc_sueldo"},
+    {label:"DNI Frente 2do inquilino",key:"foto_dni2f"},
+    {label:"DNI Dorso 2do inquilino",key:"foto_dni2d"},
+    {label:"Recibo sueldo 2do inquilino",key:"foto_sue2"},
+  ];
+  var o="<div class='g2' style='margin-bottom:12px'>";
+  o+="<div><div class='lbl'>Nombre</div><div style='font-size:13px;font-weight:700'>"+esc(f.nombre||"--")+"</div></div>";
+  o+="<div><div class='lbl'>DNI</div><div style='font-size:13px'>"+esc(f.dni||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Teléfono</div><div style='font-size:13px'>"+esc(f.tel||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Trabajo</div><div style='font-size:13px'>"+esc(f.trabajo||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Contacto emergencia</div><div style='font-size:13px'>"+esc(f.ct_emerg||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Tel emergencia</div><div style='font-size:13px'>"+esc(f.tel_emerg||"--")+"</div></div>";
+  o+="</div>";
+  o+="<div class='ibox' style='margin-bottom:10px'>Unidad: <b>"+esc(f.unidad||"")+"</b> · Alq: <b>"+fmt(f.alquiler||0)+"</b> · Dep: <b>"+fmt(f.deposito||0)+"</b> · Enviado: "+fecDisp(f.fecha_envio||"")+"</div>";
+  var hayDocs=false;
+  docs.forEach(function(d){
+    if(!f[d.key])return;
+    hayDocs=true;
+    o+="<div style='margin-bottom:10px'><div style='color:#94A3B8;font-size:11px;margin-bottom:4px'>"+d.label+"</div>";
+    o+="<img src='"+f[d.key]+"' style='max-width:100%;max-height:260px;border-radius:8px;border:1px solid #334155'/></div>";
+  });
+  if(!hayDocs) o+="<p style='color:#64748B;font-size:12px'>Sin documentos adjuntos.</p>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cerrar</button>";
+  o+="<button class='btn bok bsm' onclick='closeModal();convertirForm("+JSON.stringify(fKey)+")'>Crear acuerdo con estos datos</button>";
+  o+="</div>";
+  openModal("📋 Formulario — "+esc(f.unidad||"")+" "+esc(f.nombre||""),o,true);
+}
+
+function convertirForm(fKey){
+  var f=(DATA.forms||{})[fKey];if(!f)return;
+  // Setear como si viniera de reserva para pre-llenar openNA
+  window._resConvert={
+    unidad:f.unidad||"",
+    nombre:f.nombre||"",
+    dni:f.dni||"",
+    tel:f.tel||"",
+    alquiler:f.alquiler||0,
+    deposito:f.deposito||0,
+    gastos:f.gastos||0,
+    fecha_ingreso:f.ingreso||"",
+    fecha_egreso:f.egreso||"",
+    senia:f.senia||0,
+    ct_emerg:f.ct_emerg||"",
+    tel_emerg:f.tel_emerg||""
+  };
+  window._resConvertKey=null;
+  window._formConvertKey=fKey; // para marcarlo como convertido al guardar
+  openNA();
 }
 
 render();
