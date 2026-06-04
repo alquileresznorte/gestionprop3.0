@@ -194,12 +194,17 @@ function hoy(){return new Date().toISOString().split("T")[0];}
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function saveField(k){
   const el=document.getElementById("f-"+k);
-  if(el)DATA[k]=el.value;
+  // Solo sobreescribir si el campo existe en el DOM (algunos son solo texto en ciertos pasos)
+  if(el) DATA[k]=el.value;
 }
 function saveAllFields(){
   ["nom1","dni1","tel1","email1","trabajo1","trabajo_dir","trabajo_tel","trabajo_jefe",
    "nom2","dni2","tel2","email2","trabajo2","trabajo2_dir","trabajo2_tel","trabajo2_jefe",
    "ct_emerg","tel_emerg","rel_emerg","firma","obs_ingreso"].forEach(saveField);
+  // Asegurar que los datos pre-cargados nunca se borren
+  if(!DATA.nom1&&PRE.nom) DATA.nom1=PRE.nom;
+  if(!DATA.dni1&&PRE.dni) DATA.dni1=PRE.dni;
+  if(!DATA.tel1&&PRE.tel) DATA.tel1=PRE.tel;
 }
 function nc(){
   let n=parseInt(localStorage.getItem("gp_nc")||"1005")+1;
@@ -512,13 +517,15 @@ function guardar(){
   const contrato=nc();
   const registro={
     id:Date.now(),contrato,
+    estado:"pendiente",  // admin lo convierte a acuerdo desde index.html
+    fecha_envio:hoy(),
     unidad:DATA.unidad||PRE.unidad,
     dir:DATA.dir||PRE.dir,
-    estado:"activo",tipo:"depto",
     nombre:DATA.nom1+(DATA.nom2?` / ${DATA.nom2}`:""),
     dni:DATA.dni1+(DATA.nom2&&DATA.dni2?` / ${DATA.dni2}`:""),
     tel:DATA.tel1,email:DATA.email1,trabajo:DATA.trabajo1,
-    trabajo1:DATA.trabajo1,trabajo_dir:DATA.trabajo_dir||"",trabajo_tel:DATA.trabajo_tel||"",trabajo_jefe:DATA.trabajo_jefe||"",trabajo2:DATA.trabajo2,trabajo2_dir:DATA.trabajo2_dir||"",trabajo2_tel:DATA.trabajo2_tel||"",trabajo2_jefe:DATA.trabajo2_jefe||"",
+    trabajo1:DATA.trabajo1,trabajo_dir:DATA.trabajo_dir||"",trabajo_tel:DATA.trabajo_tel||"",trabajo_jefe:DATA.trabajo_jefe||"",
+    trabajo2:DATA.trabajo2,trabajo2_dir:DATA.trabajo2_dir||"",trabajo2_tel:DATA.trabajo2_tel||"",trabajo2_jefe:DATA.trabajo2_jefe||"",
     nom2:DATA.nom2,dni2:DATA.dni2,tel2:DATA.tel2,email2:DATA.email2,
     ct_emerg:DATA.ct_emerg,tel_emerg:DATA.tel_emerg,rel_emerg:DATA.rel_emerg,
     ingreso:DATA.ingreso||PRE.ingreso,
@@ -527,10 +534,9 @@ function guardar(){
     alquiler:Number(DATA.alquiler||PRE.alquiler||0),
     deposito:Number(DATA.deposito||PRE.deposito||0),
     gastos:Number(DATA.gastos||PRE.gastos||0),
+    senia:Number(PRE.senia||0),
     total_ingreso:total,
-    ultimo_ajuste:DATA.ingreso||PRE.ingreso,
     obs_ingreso:DATA.obs_ingreso||"",
-    obs_egreso:"",
     doc_dni_f:DATA.doc_dni_f||null,
     doc_dni_d:DATA.doc_dni_d||null,
     doc_sueldo:DATA.doc_sueldo||null,
@@ -539,23 +545,23 @@ function guardar(){
     foto_sue2:DATA.foto_sue2||null,
     firma:DATA.firma,firma2:DATA.firma2||null,fecha_firma:hoy(),
     fecha_registro:new Date().toISOString(),
+    id_res:PRE.id_res||null,
   };
-  // Guardar en Firebase
   try{
+    // Siempre guardar en "forms" como pendiente — el admin lo convierte a acuerdo
+    DB.ref("forms").push(registro,function(err){
+      if(err){console.error("Error Firebase:",err);}
+      else{console.log("Guardado en forms OK");}
+    });
+    // Si venía de una reserva, marcarla como form_completado
     if(PRE.id_res){
-      // Update existing reserva with form data
       DB.ref("res").orderByChild("id_res").equalTo(PRE.id_res).once("value",function(snap){
         if(snap.exists()){
           var key=Object.keys(snap.val())[0];
-          DB.ref("res/"+key).update(Object.assign(registro,{id_res:PRE.id_res,estado:"form_completado",fecha_form:new Date().toISOString()}));
-        } else {
-          DB.ref("iq").push(registro);
+          DB.ref("res/"+key).update({estado:"form_completado",fecha_form:hoy()});
         }
       });
-    } else {
-      DB.ref("iq").push(registro);
     }
-    console.log("Guardado en Firebase OK");
   }catch(e){
     console.error("Error Firebase:",e);
   }
@@ -606,13 +612,34 @@ function uploadField(key,label,inputId,req){
   </div>`;
 }
 
+function comprimirImagen(file, maxW, quality, callback){
+  // Comprime la imagen a maxW px de ancho máximo y calidad JPEG reducida
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+      var canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      var ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0,w,h);
+      callback(canvas.toDataURL("image/jpeg",quality));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function handleUpload(key,inputId){
   const input=document.getElementById("up-"+inputId);
   if(!input||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    DATA[key]=e.target.result;
-    const area=document.getElementById("ua-"+inputId);
+  const area=document.getElementById("ua-"+inputId);
+  // Mostrar "cargando..." mientras comprime
+  if(area){area.querySelector(".upload-text").textContent="Procesando foto...";}
+  // Comprimir: max 1200px ancho, calidad 0.7 (~200KB aprox)
+  comprimirImagen(input.files[0], 1200, 0.70, function(dataUrl){
+    DATA[key]=dataUrl;
     if(area){
       area.className="upload-area upload-done";
       area.querySelector(".upload-icon").textContent="✅";
@@ -620,11 +647,10 @@ function handleUpload(key,inputId){
       const existing=area.querySelector(".upload-preview");
       if(existing)existing.remove();
       const img=document.createElement("img");
-      img.src=e.target.result;img.className="upload-preview";
+      img.src=dataUrl;img.className="upload-preview";
       area.appendChild(img);
     }
-  };
-  reader.readAsDataURL(input.files[0]);
+  });
 }
 
 function bindUploads(){
