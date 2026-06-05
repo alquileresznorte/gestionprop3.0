@@ -254,6 +254,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 // State
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{},forms:{}};
+var _formsConvertidosLocal={};
 var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo","hist_cst","forms"];
 
 // Base CF - never modified directly, overrides stored separately
@@ -370,7 +371,7 @@ function rShell(){
   var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
   var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).length;
   // Formularios pendientes: enviados por el inquilino, sin acuerdo creado aún
-  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente";}).length;
+  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente"&&!_formsConvertidosLocal[f._key];}).length;
   var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["ctacte","Cta Socios"],["stats","Stats"],["config","Config"]];
   var navE=[["alertas","Alertas"],["acuerdos","Acuerdos"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"]];
   var nav=esA?navA:navE;
@@ -476,7 +477,7 @@ function fAc(){
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
 
   // ── FORMULARIOS PENDIENTES (enviados por el inquilino, sin acuerdo) ────────
-  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente";});
+  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente"&&!_formsConvertidosLocal[f._key];});
   var formsEl=G("iq-forms");
   if(!formsEl){
     var formsDiv=document.createElement("div");formsDiv.id="iq-forms";
@@ -1788,28 +1789,35 @@ function saveNA(){
     if(dep>0){var cuotaDep=Math.round(dep/cuotasDep);for(var cd=0;cd<cuotasDep;cd++){var cad=cd===0?_pcAplicar(cuotaDep):{monto:cuotaDep,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cd),monto_total:cad.monto,sal_ant:0,estado:cad.estado,pagos:cad.pagos,concepto:"Deposito cuota "+(cd+1)+"/"+cuotasDep});}}
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?_pcAplicar(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
 
-    // Registrar pago a cuenta en caja SOLO si NO viene de reserva Y no está marcado como "ya en caja"
+    // Registrar pago a cuenta en caja SOLO si: no viene de reserva, no está marcado "ya en caja", y la caja NO está cerrada
     if(pc>0&&!_pcDesdeRes&&!_pcYaCaja){
-      DB.ref("aj").push({fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
-        cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,monto:pc,auto:true});
+      var _cajaCerradaPC=oA(DATA.subc||{}).filter(function(s){return s.fecha===pcFecha;})[0];
+      if(_cajaCerradaPC){
+        alert("⚠ La caja del "+pcFecha+" ya está cerrada. El pago a cuenta de "+fmt(pc)+" NO se registró en caja. Cargalo manualmente como ajuste de ingreso.");
+      } else {
+        DB.ref("aj").push({fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
+          cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,monto:pc,auto:true});
+      }
     }
 
-    // Registrar pago al tomar posesion en caja — fecha = HOY (no la fecha de inicio del contrato)
+    // Registrar pago al tomar posesion — fecha = HOY, SOLO si la caja no está cerrada
     if(posMonto>0){
       var _socioMapP={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
         "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
-      var fechaPosesion=hoy(); // siempre hoy, no la fecha de inicio del contrato
-      // Avisar si la caja de hoy ya está cerrada (el movimiento igual se registra)
+      var fechaPosesion=hoy();
       var _cajaCerradaHoy=oA(DATA.subc||{}).filter(function(s){return s.fecha===fechaPosesion;})[0];
-      if(_cajaCerradaHoy) alert("⚠ Aviso: la caja de hoy ya está cerrada. El pago de posesión quedará registrado fuera del cierre. Revisá manualmente.");
-      if(CTAS_SOCIOS.indexOf(posCta)>=0){
-        DB.ref("movs").push({fecha:fechaPosesion,mes:fechaPosesion.slice(0,7),tipo:"aporte",
-          cuenta:_socioMapP[posCta]||"Cuenta Loli",cuenta_caja:posCta,monto:posMonto,
-          nota:"Pago posesion #"+id+" - "+n+" - "+u});
+      if(_cajaCerradaHoy){
+        alert("⚠ La caja de hoy ya está cerrada. El pago de posesión de "+fmt(posMonto)+" NO se registró en caja. Cargalo manualmente mañana como ajuste de ingreso.");
       } else {
-        DB.ref("aj").push({fecha:fechaPosesion,tipo:"ingreso",sub:"Pago posesion",
-          cuenta:posCta,concepto:"Pago al tomar posesion #"+id+" - "+n+" - "+u,
-          monto:posMonto,auto:true});
+        if(CTAS_SOCIOS.indexOf(posCta)>=0){
+          DB.ref("movs").push({fecha:fechaPosesion,mes:fechaPosesion.slice(0,7),tipo:"aporte",
+            cuenta:_socioMapP[posCta]||"Cuenta Loli",cuenta_caja:posCta,monto:posMonto,
+            nota:"Pago posesion #"+id+" - "+n+" - "+u});
+        } else {
+          DB.ref("aj").push({fecha:fechaPosesion,tipo:"ingreso",sub:"Pago posesion",
+            cuenta:posCta,concepto:"Pago al tomar posesion #"+id+" - "+n+" - "+u,
+            monto:posMonto,auto:true});
+        }
       }
     }
 
@@ -5814,8 +5822,9 @@ function openVerForm(fKey){
 
 function convertirForm(fKey){
   var f=(DATA.forms||{})[fKey];if(!f)return;
-  // Ocultar inmediatamente de la UI marcando localmente como procesando
+  _formsConvertidosLocal[fKey]=true;
   if(DATA.forms&&DATA.forms[fKey]) DATA.forms[fKey].estado="procesando";
+  rShell();
   window._resConvert={
     unidad:f.unidad||"",
     nombre:f.nombre||"",
