@@ -3760,8 +3760,10 @@ function renderCfgCostos(){
       var ki=kpush(c._key);
       o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
       o+="<div><b style='color:"+(c.activo?"#F1F5F9":"#64748B")+"'>"+esc(c.desc)+"</b>  <span style='color:#64748B;font-size:10px'>"+esc(c.cat||"")+"  "+esc(c.ed||"General")+(c.cta_num?"  Cta:"+esc(c.cta_num):"")+"</span></div>";
-      var tipoBadge=ing.recurrente?"Recurrente":"Unico";var tipoColor=ing.recurrente?"#10B981":"#F59E0B";o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
-      o+="<button class='btn bw bsm' data-editcosto='"+ki+"'>Editar</button>";
+      var tipoBadge=c.tipo==="costo_fijo_extra"?"Fijo mensual":"Gastos Varios";
+      var tipoColor=c.tipo==="costo_fijo_extra"?"#10B981":"#F59E0B";
+      o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
+      o+="<button class='btn bw bsm' data-editcosto='"+ki+"'"+">Editar</button>";
       o+="<button class='btn "+(c.activo?"bg":"bok")+" bsm' data-togglecosto='"+ki+"'>"+(c.activo?"Desactivar":"Activar")+"</button>";
       o+="<button class='btn bx bsm' data-delcosto='"+ki+"'>Borrar</button>";
       o+="</div></div>";
