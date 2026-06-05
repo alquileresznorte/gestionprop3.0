@@ -980,15 +980,17 @@ function openFicha(key){
       var CE={pagado:"#10B981",parcial:"#F59E0B",pendiente:"#EF4444"};
       var color=CE[c.estado]||"#94A3B8";
       var concepto=c.concepto||c.concepto_extra||"Alquiler";
-    var esIng=c.concepto&&(c.concepto.indexOf('Deposito')>=0||c.concepto.indexOf('Gastos')>=0);
-    if(esIng) concepto+=' <span style="background:#06B6D422;color:#06B6D4;border-radius:3px;padding:1px 4px;font-size:9px">al ingreso</span>';
+      // Limpiar HTML que pudo haberse guardado en el campo concepto
+      concepto=concepto.replace(/<[^>]*>/g,"").trim();
+      var esIng=concepto.indexOf('Deposito')>=0||concepto.indexOf('Gastos')>=0||concepto.indexOf('Dep')>=0;
+      var concLabel=esc(concepto)+(esIng?' <span style="background:#06B6D422;color:#06B6D4;border-radius:3px;padding:1px 4px;font-size:9px">al ingreso</span>':"");
       var salAntLabel=c.sal_ant>0?" <span style='color:#F59E0B;font-size:10px'>(+Ant:"+fmt(c.sal_ant)+")</span>":"";
       // Detalle de pagos
       var pagosArr=c.pagos?Object.values(c.pagos).sort(function(a,b){return(a.fecha||"").localeCompare(b.fecha||"");}):[];
       var detalle=pagosArr.map(function(p){return "<div style='color:#94A3B8;font-size:10px;padding-left:8px'>↳ "+fecDisp(p.fecha||"")+" — "+fmt(p.monto)+(p.cuenta?" ("+p.cuenta+")":"")+"</div>";}).join("");
       o+="<tr style='border-top:1px solid #1E293B'>";
       o+="<td style='padding:5px 6px;color:#CBD5E1'>"+(c.mes||"--")+"</td>";
-      o+="<td style='padding:5px 6px;color:#94A3B8'>"+esc(concepto)+salAntLabel+"</td>";
+      o+="<td style='padding:5px 6px;color:#94A3B8'>"+concLabel+salAntLabel+"</td>";
       o+="<td style='padding:5px 6px;text-align:right;color:#CBD5E1'>"+fmt(tot)+"</td>";
       o+="<td style='padding:5px 6px;text-align:right;color:#10B981'>"+fmt(pg)+"</td>";
       o+="<td style='padding:5px 6px;text-align:right;color:"+(saldo>0?"#EF4444":"#10B981")+"'>"+fmt(saldo)+"</td>";
@@ -1007,10 +1009,12 @@ function openFicha(key){
   // Enviar form: disponible para todos
   window._fichaFormData={tel:i.tel||"",nom:(i.nombre||"").split(",")[0].trim(),key:key};
   o+="<button class='btn bsm' style='background:#06B6D4;color:#000' onclick='enviarFormFicha()'>Enviar form</button>";
-  // Fotos en Drive
+  // Fotos en Drive — solo mostrar si tiene docs cargados o Drive configurado
   window._driveInq=i;
   var dki=kpush(key);
-  o+="<button class='btn bsm' style='background:#4285F4;color:#fff' data-drivefoto='"+dki+"'>📷 Fotos Drive</button>";
+  var tieneDocs=i.doc_dni_f||i.doc_dni_d||i.doc_sueldo||i.foto_dni2f||i.firma;
+  var driveConf=DATA.cfg&&DATA.cfg.drive_folder;
+  if(tieneDocs||driveConf) o+="<button class='btn bsm' style='background:#4285F4;color:#fff' data-drivefoto='"+dki+"'>📷 Fotos Drive</button>";
   if(esA){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
@@ -1083,7 +1087,14 @@ function verAc(key){
   var i=DATA.iq[key];if(!i)return;
   var ki=kpush(key);
   var o="<div style='background:#0F172A;border-radius:10px;padding:14px;max-height:300px;overflow-y:auto;font-size:11px;color:#CBD5E1;line-height:1.8;white-space:pre-wrap;margin-bottom:12px'>"+esc(getAcuerdo())+"</div>";
-  o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'><b style='color:#10B981'>Firmado por:</b> "+esc(i.firma||"--")+" el "+esc(i.fecha_firma||"--")+"</div>";
+  var firmaHtml="";
+  if(i.firma&&i.firma.startsWith("data:image")){
+    firmaHtml="<img src='"+i.firma+"' style='max-height:60px;border-radius:4px;background:#fff;padding:4px'/>";
+    if(i.firma2) firmaHtml+=" <img src='"+i.firma2+"' style='max-height:60px;border-radius:4px;background:#fff;padding:4px'/>";
+  } else {
+    firmaHtml=esc(i.firma||"Sin firma");
+  }
+  o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'><b style='color:#10B981'>Firmado por:</b> "+firmaHtml+" <span style='color:#64748B'>el "+esc(i.fecha_firma||"--")+"</span></div>";
   o+="<div style='display:flex;gap:7px;flex-wrap:wrap'>";
   o+="<button class='btn bg bsm' onclick='navigator.clipboard.writeText(ACUERDO)'>Copiar</button>";
   if(i.tel)o+="<a class='wa' href='https://wa.me/"+i.tel+"?text="+encodeURIComponent(ACUERDO)+"' target='_blank'>Enviar WA</a>";
@@ -1712,6 +1723,9 @@ function saveNA(){
     var _egr=G("na-egr")?G("na-egr").value:"";
     var _obs=G("na-obs")?G("na-obs").value:"";
     var _posesion=G("na-posesion")?G("na-posesion").value:"";
+    // Leer checkbox y fecha ANTES de closeModal (que destruye el DOM del modal)
+    var _pcDesdeRes=G("na-pc-fecha")&&G("na-pc-fecha").value;
+    var _pcYaCaja=G("na-pc-ya-caja")&&G("na-pc-ya-caja").checked;
     // Leer datos del form ANTES de limpiar la key
     var _formData=(window._formConvertKey&&DATA.forms)?(DATA.forms[window._formConvertKey]||null):null;
 
@@ -1775,8 +1789,6 @@ function saveNA(){
     if(gsNeto>0){var cuotaGs=Math.round(gsNeto/cuotasGs);for(var cg=0;cg<cuotasGs;cg++){var cag=cg===0?_pcAplicar(cuotaGs):{monto:cuotaGs,pagos:{},estado:"pendiente"};DB.ref("cob").push({id_ac:id,unidad:u,inq:n,mes:getMesN(mesInicio,cg),monto_total:cag.monto,sal_ant:0,estado:cag.estado,pagos:cag.pagos,concepto:"Gastos de gestion"+(cuotasGs>1?" cuota "+(cg+1)+"/"+cuotasGs:"")+(desc>0?" (c/desc. "+fmt(desc)+")":"")});}}
 
     // Registrar pago a cuenta en caja SOLO si NO viene de reserva Y no está marcado como "ya en caja"
-    var _pcDesdeRes=G("na-pc-fecha")&&G("na-pc-fecha").value;
-    var _pcYaCaja=G("na-pc-ya-caja")&&G("na-pc-ya-caja").checked;
     if(pc>0&&!_pcDesdeRes&&!_pcYaCaja){
       DB.ref("aj").push({fecha:pcFecha,tipo:"ingreso",sub:"Pago a cuenta ingreso",
         cuenta:pcCta,concepto:"Pago a cuenta #"+id+" - "+n+" - "+u,monto:pc,auto:true});
@@ -5802,7 +5814,8 @@ function openVerForm(fKey){
 
 function convertirForm(fKey){
   var f=(DATA.forms||{})[fKey];if(!f)return;
-  // Setear como si viniera de reserva para pre-llenar openNA
+  // Ocultar inmediatamente de la UI marcando localmente como procesando
+  if(DATA.forms&&DATA.forms[fKey]) DATA.forms[fKey].estado="procesando";
   window._resConvert={
     unidad:f.unidad||"",
     nombre:f.nombre||"",
