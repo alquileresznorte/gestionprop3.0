@@ -3864,12 +3864,15 @@ function renderCfgCats(){
   var customCats=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";});
   var hiddenCats=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="cat_oculta";}).map(function(x){return x.nombre;});
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:6px'>Categorias del sistema: <span style='color:#64748B;font-size:10px'>(podés ocultar las que no usás)</span></p>";
-  o+="<div style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px'>";
+  o+="<div style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px'>";
   Object.keys(CATC).forEach(function(cat){
     var hidden=hiddenCats.indexOf(cat)>=0;
-    var ki="cat_"+cat.replace(/\s/g,"_");
     if(hidden){
-      o+="<span style='background:#1E293B;color:#64748B;border:1px solid #334155;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;text-decoration:line-through' data-showcatsys='"+encodeURIComponent(cat)+"' title='Click para mostrar'>"+cat+" ↩</span>";
+      o+="<div style='display:flex;align-items:center;gap:3px'>";
+      o+="<span style='background:#1E293B;color:#64748B;border:1px solid #334155;border-radius:6px;padding:3px 10px;font-size:11px;text-decoration:line-through'>"+cat+"</span>";
+      o+="<button class='btn bsm' style='font-size:9px;padding:2px 5px;background:#1E293B;color:#64748B' data-showcatsys='"+encodeURIComponent(cat)+"' title='Restaurar'>↩</button>";
+      o+="<button class='btn bx bsm' style='font-size:9px;padding:2px 5px' data-recatmasivo='"+encodeURIComponent(cat)+"' title='Recategorizar todos'>⇄</button>";
+      o+="</div>";
     } else {
       o+="<span style='background:"+CATC[cat]+"22;color:"+CATC[cat]+";border:1px solid "+CATC[cat]+"44;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer' data-hidecatsys='"+encodeURIComponent(cat)+"' title='Click para ocultar'>"+cat+" ×</span>";
     }
@@ -3902,7 +3905,43 @@ function renderCfgCats(){
     if(h){var cn=decodeURIComponent(h.dataset.hidecatsys);DB.ref("cfg").push({tipo:"cat_oculta",nombre:cn});setTimeout(rConfig,300);}
     var s=e.target.closest("[data-showcatsys]");
     if(s){var cn2=decodeURIComponent(s.dataset.showcatsys);var rec=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="cat_oculta"&&x.nombre===cn2;})[0];if(rec)DB.ref("cfg/"+rec._key).remove();setTimeout(rConfig,300);}
+    var rm=e.target.closest("[data-recatmasivo]");
+    if(rm){openRecatMasivo(decodeURIComponent(rm.dataset.recatmasivo));}
   };
+}
+
+function openRecatMasivo(catOrigen){
+  var todasCats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
+  var otrosCats=todasCats.filter(function(c){return c!==catOrigen;});
+  var costosCat=oA(DATA.cst).filter(function(c){return c.cat===catOrigen;});
+  var cfgCat=oA(DATA.cfg).filter(function(c){return c.cat===catOrigen;});
+  var total=costosCat.length+cfgCat.length;
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Se van a recategorizar <b style='color:#F1F5F9'>"+total+" registros</b> que tienen categoría <b style='color:#EF4444'>"+esc(catOrigen)+"</b>.</p>";
+  o+="<div class='fld'><label class='lbl'>Nueva categoría</label><select class='inp' id='recat-dest'>";
+  otrosCats.forEach(function(c){o+="<option>"+esc(c)+"</option>";});
+  o+="</select></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:14px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bx bsm' onclick='saveRecatMasivo("+JSON.stringify(catOrigen)+")'>Recategorizar "+total+" registros</button>";
+  o+="</div>";
+  openModal("Recategorizar: "+esc(catOrigen),o);
+}
+
+function saveRecatMasivo(catOrigen){
+  var dest=G("recat-dest")?G("recat-dest").value:"";
+  if(!dest){alert("Elegí una categoría destino");return;}
+  if(!confirm("¿Cambiar todos los registros de '"+catOrigen+"' a '"+dest+"'? No se puede deshacer."))return;
+  var ups={};
+  // Costos del mes actual e históricos
+  oA(DATA.cst).filter(function(c){return c.cat===catOrigen;}).forEach(function(c){ups["cst/"+c._key+"/cat"]=dest;});
+  // Costos en cfg (costos fijos extra)
+  oA(DATA.cfg).filter(function(c){return c.cat===catOrigen;}).forEach(function(c){ups["cfg/"+c._key+"/cat"]=dest;});
+  if(Object.keys(ups).length===0){alert("No hay registros con esa categoría");closeModal();return;}
+  DB.ref("/").update(ups,function(){
+    closeModal();
+    alert("✅ "+Object.keys(ups).length+" registros recategorizados a '"+dest+"'.");
+    setTimeout(rConfig,300);
+  });
 }
 
 function saveCatPersonalizada(){
