@@ -2301,7 +2301,11 @@ function rCostos(){
     var ki=kpush(c._key);
     var row="<div class='card' style='border-left:3px solid "+(c.pagado?"#10B981":al?"#8B5CF6":"#334155")+";opacity:"+(c.pagado?0.7:1)+";padding:12px;margin-bottom:6px'>";
     row+="<div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px'><div style='flex:1'>";
-    row+="<div style='display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px'>"+bdg(c.ed,ec)+" "+bdg(c.cat,cc)+(c.pagado?bdg("Pagado","#10B981"):"")+(al?bdg("Sin Nro","#8B5CF6"):"")+"</div>";
+    row+="<div style='display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px'>"+bdg(c.ed,ec)+" "+bdg(c.cat,cc)+(c.pagado?bdg("Pagado","#10B981"):"")+(al?bdg("Sin Nro","#8B5CF6"):"");
+    // Mostrar asignacion si existe
+    if(c.unidad_pago) row+=bdg("🏠 "+c.unidad_pago,"#06B6D4");
+    else if(c.ed_pago&&c.ed_pago!=="General") row+=bdg("🏢 "+c.ed_pago,"#8B5CF6");
+    row+="</div>";
     row+="<div style='font-weight:700;font-size:13px'>"+esc(c.desc)+"</div>";
     row+="<div style='color:#64748B;font-size:10px'>"+(c.pv?c.pv+" - ":"")+(c.cta_num?"Cta:"+c.cta_num+" - ":"")+(c.nro_fact?"Fact:"+c.nro_fact+" - ":"")+(c.fec_venc?"Vence:"+c.fec_venc:c.dv?"Vence dia "+c.dv:"")+"</div></div>";
     row+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:4px'><div style='color:"+(Number(c.monto||0)>0?"#F87171":"#64748B")+";font-weight:700;font-size:14px'>"+(Number(c.monto||0)>0?fmt(c.monto):"--")+"</div>";
@@ -2337,6 +2341,15 @@ function rCostos(){
     row+=fld("ec-pm","Pagar ahora $",saldoC>0?saldoC:"","number");
     row+=sld("ec-pc","Cuenta",CTAS,c.cuenta||"Efectivo");
     row+="</div>";
+    // Asignacion: General / Edificio / Unidad
+    row+="<div class='g2' style='margin-bottom:8px'>";
+    row+="<div class='fld'><label class='lbl'>Asignado a</label><select class='inp' id='ec-asig-tipo' onchange='_updAsigCosto(this.value)'>";
+    row+="<option value='general'"+((!c.unidad&&!c.ed_pago||c.ed_pago==='General')?' selected':'')+">General</option>";
+    row+="<option value='edificio'"+(c.ed_pago&&c.ed_pago!=='General'&&!c.unidad_pago?' selected':'')+">Edificio</option>";
+    row+="<option value='unidad'"+(c.unidad_pago?' selected':'')+">Unidad específica</option>";
+    row+="</select></div>";
+    row+="<div class='fld' id='ec-asig-det' style='"+((!c.ed_pago||c.ed_pago==='General')&&!c.unidad_pago?'display:none':'')+"'></div>";
+    row+="</div>";
     row+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#94A3B8;margin-bottom:8px'><input type='checkbox' id='ec-p' "+(c.pagado?"checked":"")+" > Marcar como totalmente pagado</label>";
     row+=fld("ec-fp","Fecha de pago",c.fecha_pago||hoy(),"date");
     row+="<div class='fld'><label class='lbl'>Observaciones</label><textarea class='inp' id='ec-obs' style='min-height:48px;font-size:11px' placeholder='Ej: Pago anual enero-diciembre, 3 facturas incluidas...'>"+esc(c.obs||"")+"</textarea></div>";
@@ -2357,6 +2370,24 @@ function rCostos(){
     else if(b.dataset.savecobs){var obs=G('vp-obs');if(obs)DB.ref('cst/'+b.dataset.savecobs).update({obs:obs.value});closeModal();alert('Observaciones guardadas.');}
     else if(b.dataset.extra)addExtraFactura(kget(parseInt(b.dataset.extra)));
   };
+  // Wire asig tipo selector after render
+  setTimeout(function(){
+    var sel=G("ec-asig-tipo");
+    if(sel) _updAsigCosto(sel.value);
+  },50);
+}
+
+function _updAsigCosto(tipo){
+  var det=G("ec-asig-det");if(!det)return;
+  if(tipo==="general"){
+    det.style.display="none";det.innerHTML="";
+  } else if(tipo==="edificio"){
+    det.style.display="block";
+    det.innerHTML="<label class='lbl'>Edificio</label><select class='inp' id='ec-asig-val'><option value='General'>General</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select>";
+  } else {
+    det.style.display="block";
+    det.innerHTML="<label class='lbl'>Unidad</label><select class='inp' id='ec-asig-val'><option value=''>--</option>"+oA(DATA.iq).filter(function(i){return i.estado==='activo';}).sort(function(a,b){return(a.unidad||'').localeCompare(b.unidad||'');}).map(function(i){return "<option>"+i.unidad+"</option>";}).join("")+"</select>";
+  }
 }
 function saveCosto(ckey){
   var m=fmtInputVal(G("ec-m"));
@@ -2376,6 +2407,12 @@ function saveCosto(ckey){
   ups["cst/"+ckey+"/cuenta"]=pc;
   ups["cst/"+ckey+"/fecha_pago"]=fechaPago;
   if(G("ec-obs")) ups["cst/"+ckey+"/obs"]=G("ec-obs").value||"";
+  // Guardar asignacion (General / Edificio / Unidad)
+  var asigTipo=G("ec-asig-tipo")?G("ec-asig-tipo").value:"general";
+  var asigVal=G("ec-asig-val")?G("ec-asig-val").value:"";
+  if(asigTipo==="edificio"&&asigVal) ups["cst/"+ckey+"/ed_pago"]=asigVal;
+  else if(asigTipo==="unidad"&&asigVal) ups["cst/"+ckey+"/unidad_pago"]=asigVal;
+  else ups["cst/"+ckey+"/ed_pago"]="General";
   // Registrar pago parcial si se ingreso monto
   if(pm>0){
     var ts=Date.now();
@@ -3395,10 +3432,13 @@ function openAj(){
   openModal("Ajuste Manual",o);
 }
 function saveAj(){
-  var m=Number(G("aj-m").value),c=G("aj-con").value;
+  var m=fmtInputVal(G("aj-m")||{value:"0",dataset:{raw:"0"}});
+  var c=G("aj-con")?G("aj-con").value:"";
   if(!m||!c){alert("Monto y descripcion obligatorios");return;}
   var clasif=(G("aj-s")||{value:"otro"}).value;
-  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:c,monto:m});
+  var unidad=G("aj-unidad")?G("aj-unidad").value||"General":"General";
+  var concepto=c+(unidad&&unidad!=="General"?" ["+unidad+"]":"");
+  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
   closeModal();setTimeout(rCaja,300);
 }
 function openMov(){
@@ -3744,29 +3784,37 @@ function openAddCosto(){
   var cats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
   var o="<div class='fld'><label class='lbl'>Tipo de costo</label><div style='display:flex;gap:16px;margin-top:4px'>";
   o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-fijo' value='fijo' checked> <b>Fijo mensual</b></label>";
-  o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-eventual' value='eventual'> <b>Eventual</b></label>";
-  o+="</div><div style='color:#64748B;font-size:10px;margin-top:3px'>Fijo: aparece todos los meses automaticamente. Eventual: gasto puntual unico.</div></div>";
+  o+="<label style='display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px'><input type='radio' name='nc-tipo' id='nc-eventual' value='eventual'> <b>Gastos Varios (rubro)</b></label>";
+  o+="</div><div style='color:#64748B;font-size:10px;margin-top:3px'>Fijo: aparece todos los meses. Gastos Varios: rubro que usás para cargar gastos esporádicos (combustible, ferretería, etc).</div></div>";
   o+=fld("nc-desc","Descripcion *","")
     +fld("nc-prov","Proveedor","")
-    +sld("nc-cat","Categoria",cats)
-    +fld("nc-ed","Edificio o General","General")
-    +fld("nc-cta","Nro. cuenta / contrato","")
+    +sld("nc-cat","Categoria",cats);
+  // Asignacion
+  o+="<div class='fld'><label class='lbl'>Asignado a</label><select class='inp' id='nc-asig' onchange=\"var d=G('nc-asig-det');if(this.value==='general'){d.style.display='none';}else{d.style.display='block';d.innerHTML=this.value==='edificio'?'<select class=inp id=nc-asig-val><option>General</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select>':'<select class=inp id=nc-asig-val><option></option>"+oA(DATA.iq).filter(function(i){return i.estado==='activo';}).sort(function(a,b){return(a.unidad||'').localeCompare(b.unidad||'');}).map(function(i){return '<option>'+i.unidad+'</option>';}).join("")+"</select>'}\">";
+  o+="<option value='general'>General</option><option value='edificio'>Edificio</option><option value='unidad'>Unidad específica</option></select></div>";
+  o+="<div id='nc-asig-det' style='display:none;margin-top:4px'></div>";
+  o+=fld("nc-cta","Nro. cuenta / contrato","")
     +fld("nc-dv","Dia de vencimiento","15","money");
-  o+="<div id='nc-monto-wrap'><div style='height:8px'></div>"+fld("nc-monto","Monto $ (solo para eventuales)","","money")+"</div>";
+  o+="<div id='nc-monto-wrap'><div style='height:8px'></div>"+fld("nc-monto","Monto $ (solo para fijos)","","money")+"</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveNuevoCosto()'>Agregar</button></div>";
   openModal("Agregar Costo",o,true);
 }
 function saveNuevoCosto(){
   var desc=G("nc-desc").value; if(!desc){alert("La descripcion es obligatoria");return;}
   var fijo=G("nc-fijo")&&G("nc-fijo").checked;
-  var fijo=G("nc-fijo")&&G("nc-fijo").checked;
   var monto=fmtInputVal(G("nc-monto")||{value:"0",dataset:{raw:"0"}});
+  var asig=G("nc-asig")?G("nc-asig").value:"general";
+  var asigVal=G("nc-asig-val")?G("nc-asig-val").value:"";
+  var ed=asig==="edificio"?(asigVal||"General"):"General";
+  var unidadPago=asig==="unidad"?asigVal:"";
   var nuevo={
     tipo:fijo?"costo_fijo_extra":"otro_gasto",
-    desc:desc,pv:G("nc-prov").value,cat:G("nc-cat").value,
-    ed:G("nc-ed").value||"General",cta_num:G("nc-cta").value,
-    dv:Number(G("nc-dv").value||15),activo:true,fecha_alta:hoy()
+    desc:desc,pv:G("nc-prov")?G("nc-prov").value:"",
+    cat:G("nc-cat")?G("nc-cat").value:"Gastos Varios",
+    ed:ed,cta_num:G("nc-cta")?G("nc-cta").value:"",
+    dv:Number((G("nc-dv")?G("nc-dv").value:15)||15),activo:true,fecha_alta:hoy()
   };
+  if(unidadPago) nuevo.unidad_pago=unidadPago;
   if(!fijo&&monto>0) nuevo.monto=monto;
   DB.ref("cfg").push(nuevo);
   closeModal(); setTimeout(rConfig,300);
@@ -4594,61 +4642,31 @@ function openGastoAjuste(){
   if(subcHoy.length>0){
     if(!confirm("La caja de "+_cajaF+" ya fue cerrada. ¿Registrar de todas formas?"))return;
   }
-  var cats=Object.keys(CATC);
-  var o="<div style='display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid #334155'>";
-  o+="<button class='btn bsm' id='tab-gasto' style='border-radius:8px 8px 0 0;background:#1E40AF;color:#fff;margin-right:4px' onclick='switchGastoTab(this.dataset.t)' data-t='gasto'>Gasto / Costo</button>";
-  o+="<button class='btn bsm' id='tab-ajuste' style='border-radius:8px 8px 0 0;background:#334155;color:#94A3B8' onclick='switchGastoTab(this.dataset.t)' data-t='ajuste'>Ajuste manual</button>";
-  o+="</div>";
-
-  // Tab Gasto
-  o+="<div id='tab-gasto-body'>";
-  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Gasto puntual del dia "+_cajaF+". Si la cuenta es de socio va a Cta Socios.</p>";
+  var o="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Correcciones y movimientos de caja.</p>";
   o+="<div class='g2'>";
-  o+=fld("gc-desc","Descripcion *","");
-  o+=fld("gc-monto","Monto $","","money");
-  o+=fld("gc-fact","Nro. Factura","");
-  o+=sld("gc-cat","Categoria",cats,"Otro");
-  o+=sld("gc-cta","Cuenta",CTAS,"Efectivo");
-  o+="<div class='fld'><label class='lbl'>Edificio</label><select class='inp' id='gc-ed'><option value='General'>General</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div>";
-  o+="</div>";
-  o+="<div id='gc-socio-info' style='display:none;background:#1E293B;border-radius:8px;padding:8px;font-size:11px;color:#06B6D4;margin-top:6px'>⚡ Esta cuenta pertenece a un socio — el gasto se registrara en Cta Socios como aporte.</div>";
-  o+="</div>";
-
-  // Tab Ajuste
-  o+="<div id='tab-ajuste-body' style='display:none'>";
-  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Correcciones y movimientos varios de caja.</p>";
-  o+="<div class='g2'>"+fld("aj-f","Fecha",_cajaF,"date");
+  o+=fld("aj-f","Fecha",_cajaF,"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='aj-t'><option value='egreso'>Egreso (-)</option><option value='ingreso'>Ingreso (+)</option></select></div>";
   o+="<div class='fld'><label class='lbl'>Clasificacion</label><select class='inp' id='aj-s' onchange='switchAjClasif(this.value)'>";
-  o+="<option value='error'>Error de carga (solo admin puede borrar)</option>";
-  o+="<option value='gs_corriente'>Gasto corriente (yerba, clavo, etc.)</option>";
+  o+="<option value='gs_corriente'>Gasto corriente (repuesto, insumo, etc.)</option>";
   o+="<option value='gs_extraordinario'>Gasto extraordinario</option>";
   o+="<option value='inversion'>Inversion</option>";
   o+="<option value='ingreso_venta'>Ingreso por venta</option>";
   o+="<option value='otro'>Otro</option>";
+  o+="<option value='error'>Error de carga (solo admin puede borrar)</option>";
   o+="</select></div>";
   o+=sld("aj-c","Cuenta",CTAS)+"</div>";
-  o+=fld("aj-con","Descripcion *")+fld("aj-m","Monto $","","money");
-  o+="<div id='aj-error-info' style='background:#EF444411;border:1px solid #EF444433;border-radius:8px;padding:8px;font-size:11px;color:#EF4444;margin-top:6px'>⚠ Los errores solo los puede borrar el Admin desde Config → Limpieza.</div>";
+  o+=fld("aj-con","Descripcion *");
+  o+="<div class='g2'>";
+  o+=fld("aj-m","Monto $","","money");
+  o+="<div class='fld'><label class='lbl'>Edificio</label><select class='inp' id='aj-unidad'><option value='General'>General</option>"+Object.keys(ED).map(function(k){return "<option>"+k+"</option>";}).join("")+"</select></div>";
   o+="</div>";
-
+  o+="<div id='aj-error-info' style='display:none;background:#EF444411;border:1px solid #EF444433;border-radius:8px;padding:8px;font-size:11px;color:#EF4444;margin-top:6px'>⚠ Los errores solo los puede borrar el Admin desde Config → Limpieza.</div>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:14px'>";
   o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
-  o+="<button class='btn bok bsm' id='btn-ga-save' onclick='saveGastoAjuste()'>Registrar</button>";
+  o+="<button class='btn bok bsm' onclick='saveAj()'>Registrar</button>";
   o+="</div>";
-
-  openModal("+ Gasto / Ajuste",o);
-  window._gaTab="gasto";
-
-  setTimeout(function(){
-    // Detectar cuenta de socio
-    var ctaSel=G("gc-cta");
-    if(ctaSel) ctaSel.onchange=function(){
-      var esSocio=CTAS_SOCIOS.indexOf(this.value)>=0;
-      var info=G("gc-socio-info");
-      if(info) info.style.display=esSocio?"block":"none";
-    };
-  },100);
+  openModal("+ Ajuste de caja",o);
+  setTimeout(function(){switchAjClasif("gs_corriente");},100);
 }
 
 function switchAjClasif(val){
@@ -4656,22 +4674,7 @@ function switchAjClasif(val){
   if(info) info.style.display=val==="error"?"block":"none";
 }
 
-function switchGastoTab(tab){
-  window._gaTab=tab;
-  var gBody=G("tab-gasto-body"),aBody=G("tab-ajuste-body");
-  var gBtn=G("tab-gasto"),aBtn=G("tab-ajuste");
-  if(tab==="gasto"){
-    if(gBody)gBody.style.display="block";
-    if(aBody)aBody.style.display="none";
-    if(gBtn){gBtn.style.background="#1E40AF";gBtn.style.color="#fff";}
-    if(aBtn){aBtn.style.background="#334155";aBtn.style.color="#94A3B8";}
-  } else {
-    if(gBody)gBody.style.display="none";
-    if(aBody)aBody.style.display="block";
-    if(gBtn){gBtn.style.background="#334155";gBtn.style.color="#94A3B8";}
-    if(aBtn){aBtn.style.background="#1E40AF";aBtn.style.color="#fff";}
-  }
-}
+
 
 function saveGastoAjuste(){
   if(window._gaTab==="ajuste"){
