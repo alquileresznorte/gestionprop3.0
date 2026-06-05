@@ -1486,7 +1486,14 @@ function openNA(){
   o+=fld("na-deuda-monto","Monto adeudado $","0","money");
   o+="</div></div>";
   o+="</div></div></div>";
-  o+=fld("na-ing","Inicio del acuerdo (fecha de ingreso)","","date")+fld("na-egr","Fin del acuerdo","","date");
+  o+="<div class='g2'>";
+  o+=fld("na-ing","Inicio del acuerdo (1ro del mes)","","date");
+  o+=fld("na-egr","Fin del acuerdo (último día, 12 meses)","","date");
+  o+="</div>";
+  o+="<div style='background:#F59E0B11;border:1px solid #F59E0B33;border-radius:8px;padding:8px 12px;margin-bottom:8px'>";
+  o+=fld("na-posesion","📅 Fecha real de posesión (día que entra efectivamente)","","date");
+  o+="<div style='color:#94A3B8;font-size:10px;margin-top:2px'>Puede ser distinta al inicio del contrato. Se muestra en la ficha del inquilino.</div>";
+  o+="</div>";
   o+="<div class='fld' style='grid-column:1/-1'>"+tad("na-obs","Observaciones al ingreso")+"</div>";
   o+="</div>";
   o+="<div id='na-resumen' style='background:#0F172A;border:1px solid #334155;border-radius:6px;padding:8px;font-size:11px;color:#94A3B8;margin-top:4px'>Completa los montos para ver el resumen</div>";
@@ -1496,6 +1503,22 @@ function openNA(){
     ["na-alq","na-dep","na-gs","na-desc-gs","na-pc","na-dep-info","na-gs-info","na-deuda-monto"].forEach(function(id){
       var el=G(id);if(el)el.oninput=actualizarResumenNA;
     });
+    // Auto-calcular fin del acuerdo cuando se carga el inicio
+    var naIng=G("na-ing");
+    if(naIng){
+      naIng.onchange=function(){
+        var v=this.value;if(!v)return;
+        var yr=parseInt(v.slice(0,4)),mo=parseInt(v.slice(5,7));
+        // 12 meses después, último día del mes
+        mo+=12;if(mo>12){mo-=12;yr++;}
+        var lastDay=new Date(yr,mo,0).getDate();
+        var naEgr=G("na-egr");
+        if(naEgr&&!naEgr.value) naEgr.value=yr+"-"+String(mo).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
+        // Si no hay posesión cargada, sugerir la misma fecha de inicio
+        var naPos=G("na-posesion");
+        if(naPos&&!naPos.value) naPos.value=v;
+      };
+    }
     // Pre-llenar con datos de la reserva
     if(r){
       if(G("na-u"))G("na-u").value=r.unidad||"";
@@ -1506,6 +1529,7 @@ function openNA(){
       if(G("na-gs"))G("na-gs").value=r.gastos||"";
       if(G("na-ing"))G("na-ing").value=r.fecha_ingreso||hoy();
       if(G("na-egr"))G("na-egr").value=r.fecha_egreso||"";
+      if(G("na-posesion"))G("na-posesion").value=r.fecha_ingreso||hoy();
       if(G("na-d"))G("na-d").value=r.dni||"";
       if(G("na-t"))G("na-t").value=r.tel||"";
       if(G("na-ce"))G("na-ce").value=r.ct_emerg||"";
@@ -1687,6 +1711,7 @@ function saveNA(){
     var _te=G("na-te")?G("na-te").value:"";
     var _egr=G("na-egr")?G("na-egr").value:"";
     var _obs=G("na-obs")?G("na-obs").value:"";
+    var _posesion=G("na-posesion")?G("na-posesion").value:"";
     // Leer datos del form ANTES de limpiar la key
     var _formData=(window._formConvertKey&&DATA.forms)?(DATA.forms[window._formConvertKey]||null):null;
 
@@ -1727,8 +1752,8 @@ function saveNA(){
       firma:_formData?(_formData.firma||null):null,
       firma2:_formData?(_formData.firma2||null):null,
       fecha_firma:_formData?(_formData.fecha_firma||null):null,
-      // Fecha de posesión real
-      fecha_posesion:_formData?(_formData.posesion||null):null,
+      // Fecha de posesión real — prioridad: campo manual > datos del form
+      fecha_posesion:_posesion||(_formData?(_formData.posesion||_formData.fecha_posesion||null):null),
       // Datos económicos
       alquiler:alq,alquiler_usd:moneda==="USD"?alqUSD:0,moneda:moneda,
       deposito:dep,gastos:gs,gastos_neto:gsNeto,
