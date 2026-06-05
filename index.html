@@ -3722,6 +3722,7 @@ function venderProp(key){
 // ── TAB COSTOS ────────────────────────────────────────────────────────────────
 function renderCfgCostos(){
   var el=G("cfg-body"); if(!el) return;
+  try {
   var costosExtra=oA(DATA.cfg).filter(function(x){return x.tipo==="otro_gasto"||x.tipo==="costo_extra"||x.tipo==="costo_fijo_extra";});
   var cfActual=getCF();
   var cats=[]; cfActual.forEach(function(c){if(!cats.includes(c.c))cats.push(c.c);}); cats.push("Otro");
@@ -3732,8 +3733,8 @@ function renderCfgCostos(){
 
   var o="<div class='card' style='margin-bottom:10px'>";
   o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
-  o+="<h3 style='font-size:13px;font-weight:700'>Costos fijos del sistema ("+CF.length+" items)</h3></div>";
-  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Estos costos se generan automaticamente cada mes. Para agregar o quitar servicios usa el boton de abajo.</p>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Costos fijos del sistema ("+cfActual.length+" items)</h3></div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Estos costos se generan automaticamente cada mes.</p>";
   Object.keys(grupos).forEach(function(cat){
     var cc=CATC[cat]||"#64748B";
     o+="<div style='margin-bottom:6px'><div style='color:"+cc+";font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px'>"+cat+"</div>";
@@ -3750,37 +3751,42 @@ function renderCfgCostos(){
   });
   o+="</div>";
 
-  // Custom costs
+  // Gastos Varios y costos extras
   o+="<div class='card' style='margin-bottom:10px'>";
   o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
-  o+="<h3 style='font-size:13px;font-weight:700'>Costos variables (autos, nuevos servicios, etc.)</h3>";
+  o+="<h3 style='font-size:13px;font-weight:700'>Gastos Varios y servicios adicionales</h3>";
   o+="<button class='btn bp bsm' onclick='openAddCosto()'>+ Agregar</button></div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Rubros que cargás vos (Combustible, Ferretería, etc). Se repiten cada mes para que registres lo que gastaste.</p>";
   if(costosExtra.length){
     costosExtra.forEach(function(c){
       var ki=kpush(c._key);
-      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px'>";
-      o+="<div><b style='color:"+(c.activo?"#F1F5F9":"#64748B")+"'>"+esc(c.desc)+"</b>  <span style='color:#64748B;font-size:10px'>"+esc(c.cat||"")+"  "+esc(c.ed||"General")+(c.cta_num?"  Cta:"+esc(c.cta_num):"")+"</span></div>";
+      var asig=c.unidad_pago?("🏠 "+c.unidad_pago):c.ed&&c.ed!=="General"?("🏢 "+c.ed):"🌐 General";
+      o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #334155;font-size:12px;flex-wrap:wrap;gap:4px'>";
+      o+="<div><b style='color:"+(c.activo?"#F1F5F9":"#64748B")+"'>"+esc(c.desc)+"</b> ";
+      o+="<span style='color:#64748B;font-size:10px'>"+esc(c.cat||"")+" · "+asig+"</span></div>";
       var tipoBadge=c.tipo==="costo_fijo_extra"?"Fijo mensual":"Gastos Varios";
       var tipoColor=c.tipo==="costo_fijo_extra"?"#10B981":"#F59E0B";
       o+="<div style='display:flex;gap:4px'>"+bdg(tipoBadge,tipoColor);
-      o+="<button class='btn bw bsm' data-editcosto='"+ki+"'"+">Editar</button>";
       o+="<button class='btn "+(c.activo?"bg":"bok")+" bsm' data-togglecosto='"+ki+"'>"+(c.activo?"Desactivar":"Activar")+"</button>";
       o+="<button class='btn bx bsm' data-delcosto='"+ki+"'>Borrar</button>";
       o+="</div></div>";
     });
   } else {
-    o+="<p style='color:#64748B;font-size:12px'>Sin costos variables. Los fijos del sistema siguen activos.</p>";
+    o+="<p style='color:#64748B;font-size:12px'>Todavía no agregaste rubros. Tocá + Agregar para crear Combustible, Ferretería, etc.</p>";
   }
   o+="</div>";
 
   el.innerHTML=o;
   el.onclick=function(e){
-    var ec=e.target.closest("[data-editcosto]"); if(ec)openEditCosto(kget(parseInt(ec.dataset.editcosto)));
     var tc=e.target.closest("[data-togglecosto]"); if(tc)toggleCosto(kget(parseInt(tc.dataset.togglecosto)));
     var dc=e.target.closest("[data-delcosto]"); if(dc)borrarCosto(kget(parseInt(dc.dataset.delcosto)));
     var ecf=e.target.closest("[data-editcf]"); if(ecf)openEditCF(kget(parseInt(ecf.dataset.editcf)));
     var dcf=e.target.closest("[data-delcf]"); if(dcf)quitarCF(kget(parseInt(dcf.dataset.delcf)));
   };
+  } catch(err){
+    el.innerHTML="<p style='color:#EF4444;padding:20px'>Error al cargar costos: "+err.message+"</p>";
+    console.error("renderCfgCostos error:",err);
+  }
 }
 function openAddCosto(){
   var cats=Object.keys(CATC).concat(oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";}).map(function(x){return x.nombre;}));
@@ -3856,10 +3862,17 @@ function borrarCosto(key){
 function renderCfgCats(){
   var el=G("cfg-body");if(!el)return;
   var customCats=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="categoria";});
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:10px'>Categorias del sistema:</p>";
+  var hiddenCats=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="cat_oculta";}).map(function(x){return x.nombre;});
+  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:6px'>Categorias del sistema: <span style='color:#64748B;font-size:10px'>(podés ocultar las que no usás)</span></p>";
   o+="<div style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px'>";
   Object.keys(CATC).forEach(function(cat){
-    o+="<span style='background:"+CATC[cat]+"22;color:"+CATC[cat]+";border:1px solid "+CATC[cat]+"44;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700'>"+cat+"</span>";
+    var hidden=hiddenCats.indexOf(cat)>=0;
+    var ki="cat_"+cat.replace(/\s/g,"_");
+    if(hidden){
+      o+="<span style='background:#1E293B;color:#64748B;border:1px solid #334155;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;text-decoration:line-through' data-showcatsys='"+encodeURIComponent(cat)+"' title='Click para mostrar'>"+cat+" ↩</span>";
+    } else {
+      o+="<span style='background:"+CATC[cat]+"22;color:"+CATC[cat]+";border:1px solid "+CATC[cat]+"44;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer' data-hidecatsys='"+encodeURIComponent(cat)+"' title='Click para ocultar'>"+cat+" ×</span>";
+    }
   });
   o+="</div>";
   o+="<p style='color:#94A3B8;font-size:12px;margin-bottom:8px'>Categorias personalizadas:</p>";
@@ -3882,14 +3895,13 @@ function renderCfgCats(){
   o+="<div style='display:flex;justify-content:flex-end;margin-top:8px'><button class='btn bok bsm' onclick='saveCatPersonalizada()'>Agregar</button></div>";
   o+="</div>";
   el.innerHTML=o;
-  // Wire delete buttons
   el.onclick=function(e){
     var b=e.target.closest("[data-delcat]");
-    if(b){
-      if(!confirm("Quitar esta categoria?"))return;
-      DB.ref("cfg/"+kget(parseInt(b.dataset.delcat))).remove();
-      setTimeout(rConfig,300);
-    }
+    if(b){if(!confirm("Quitar esta categoria?"))return;DB.ref("cfg/"+kget(parseInt(b.dataset.delcat))).remove();setTimeout(rConfig,300);}
+    var h=e.target.closest("[data-hidecatsys]");
+    if(h){var cn=decodeURIComponent(h.dataset.hidecatsys);DB.ref("cfg").push({tipo:"cat_oculta",nombre:cn});setTimeout(rConfig,300);}
+    var s=e.target.closest("[data-showcatsys]");
+    if(s){var cn2=decodeURIComponent(s.dataset.showcatsys);var rec=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="cat_oculta"&&x.nombre===cn2;})[0];if(rec)DB.ref("cfg/"+rec._key).remove();setTimeout(rConfig,300);}
   };
 }
 
