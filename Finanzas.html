@@ -366,11 +366,14 @@ function loadDB(){
   DB.ref('movs').on('value',function(s){
     allMovsGP=s.exists()?Object.values(s.val()):[];
     done['movs']=true;check();
-  },function(){gpSt='error';render();});
+  },function(){gpSt='error';allMovsGP=[];done['movs']=true;check();});
 
   ['fijos','pagados','gastos','tarjetas','capital','cats','movOvs'].forEach(function(k){
     DB.ref('fin_'+k).on('value',function(s){
       FD[k]=s.exists()?s.val():{};
+      done['fin_'+k]=true;check();
+    },function(){
+      FD[k]={};
       done['fin_'+k]=true;check();
     });
   });
