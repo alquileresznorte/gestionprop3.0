@@ -656,29 +656,59 @@ function setMovOv(mvId,ov){
   DB.ref('fin_movOvs/'+KEY()+'/'+mvId).set(ov,function(){setSyncDot(false);});
 }
 function movId(mv){
-  // clave unica por movimiento
-  return btoa(unescape(encodeURIComponent((mv.fecha||'')+'__'+(mv.nota||'')+'__'+(mv.monto||'')+'__'+(mv.tipo||'')))).replace(/[^a-zA-Z0-9]/g,'').substr(0,40);
+  var str=(mv.fecha||'')+'|'+(mv.nota||'')+'|'+(mv.monto||'')+'|'+(mv.tipo||'');
+  var h=0;
+  for(var i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0;}
+  return 'mv'+(h>>>0).toString(36);
+}
+
+function handleMovCat(btn){
+  var mid=btn.dataset.mid,catId=btn.dataset.cat,quien=btn.dataset.quien;
+  var ov=getMovOv(mid);
+  ov.cat=ov.cat===catId?'':catId;
+  if(!ov.who)ov.who=quien;
+  setMovOv(mid,ov);
+  rMovs();
+}
+function handleMovWho(btn){
+  var mid=btn.dataset.mid,who=btn.dataset.who,quien=btn.dataset.quien;
+  var ov=getMovOv(mid);
+  ov.who=who;
+  if(!ov.who)ov.who=quien;
+  setMovOv(mid,ov);
+  rMovs();
+}
+function handleMovPct(inp){
+  var mid=inp.dataset.mid,quien=inp.dataset.quien;
+  var ov=getMovOv(mid);
+  ov.pct=Number(inp.value)||50;
+  setMovOv(mid,ov);
+}
+function handleMovObs(inp){
+  var mid=inp.dataset.mid;
+  var ov=getMovOv(mid);
+  ov.obs=inp.value;
+  setMovOv(mid,ov);
 }
 
 function rMovs(){
   var el=document.getElementById('t-movs');if(!el)return;
   var movs=getMovsGP();
-
-  var bannerHtml='<div class="gp-banner"><div class="dot '+(gpSt==='ok'?'ok':gpSt==='loading'?'ld':'err')+'"></div>';
-  bannerHtml+='<span>'+(gpSt==='ok'?'GestionProp conectado · '+movs.length+' movimientos este mes':gpSt==='loading'?'Conectando...':'Sin conexión')+'</span></div>';
-
-  if(!movs.length){el.innerHTML=bannerHtml+'<div class="empty">📭<br>Sin retiros ni aportes este mes en GestionProp</div>';return;}
+  var gpOk=gpSt==='ok',gpLd=gpSt==='loading';
+  var bannerHtml='<div class="gp-banner"><div class="dot '+(gpOk?'ok':gpLd?'ld':'err')+'"></div>';
+  bannerHtml+='<span>'+(gpOk?'GestionProp conectado &middot; '+movs.length+' movimientos':gpLd?'Conectando...':'Sin conexi&oacute;n')+'</span></div>';
+  if(!movs.length){el.innerHTML=bannerHtml+'<div class="empty">Sin retiros ni aportes este mes</div>';return;}
 
   var loliMovs=movs.filter(function(m){return m.cuenta==='Cuenta Loli';});
   var hugoMovs=movs.filter(function(m){return m.cuenta==='Cuenta Hugo';});
   var cats=getCats();
+  var rows='';
 
   function renderGroup(list,quien,color){
     var tot=list.reduce(function(s,m){return s+(m.tipo==='retiro'?Number(m.monto||0):-Number(m.monto||0));},0);
-    var html='<div class="row-between" style="padding:6px 0;margin-bottom:8px">';
-    html+='<span style="font-size:14px;font-weight:700;color:'+color+'">'+(quien==='loli'?'💜 Loli':'💙 Hugo')+'</span>';
-    html+='<span style="font-weight:700;color:'+color+'">'+fmtP(tot)+'</span></div>';
-
+    var h='<div class="row-between" style="padding:6px 0;margin-bottom:8px">';
+    h+='<span style="font-size:14px;font-weight:700;color:'+color+'">'+(quien==='loli'?'&#128156; Loli':'&#128153; Hugo')+'</span>';
+    h+='<span style="font-weight:700;color:'+color+'">'+fmtP(tot)+'</span></div>';
     list.forEach(function(mv){
       var monto=Number(mv.monto||0);
       var esRetiro=mv.tipo==='retiro';
@@ -687,72 +717,38 @@ function rMovs(){
       var cat=ov.cat?getCat(ov.cat):null;
       var who=ov.who||quien;
       var asignado=!!(ov.cat||ov.who);
-
-      html+='<div class="card'+(asignado?' ok':'')+'" style="margin-bottom:6px">';
-      // Header
-      html+='<div class="row-between" style="margin-bottom:6px">';
-      html+='<div style="flex:1"><div class="nombre">'+esc((esRetiro?'Retiro':'Aporte')+' — '+(mv.nota||''))+'</div>';
-      html+='<div class="meta"><span>'+esc(mv.fecha||'')+'</span>';
-      if(mv.cuenta_caja)html+='<span class="tag">'+esc(mv.cuenta_caja)+'</span>';
-      if(cat)html+='<span class="tag tag-blue">'+cat.e+' '+cat.n+'</span>';
-      html+='</div></div>';
-      html+='<span class="'+(esRetiro?'monto-pos':'monto-neg')+'" style="flex-shrink:0">'+(esRetiro?'+':'-')+fmtP(monto)+'</span>';
-      html+='</div>';
-
-      // Categoria
-      html+='<div style="margin-bottom:5px"><div style="font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:4px">Categoría</div>';
-      html+='<div class="pills">';
+      h+='<div class="card'+(asignado?' ok':'')+'" style="margin-bottom:8px">';
+      h+='<div class="row-between" style="margin-bottom:8px">';
+      h+='<div style="flex:1"><div class="nombre">'+esc((esRetiro?'Retiro':'Aporte')+' - '+(mv.nota||''))+'</div>';
+      h+='<div class="meta"><span>'+esc(mv.fecha||'')+'</span>';
+      if(mv.cuenta_caja)h+='<span class="tag">'+esc(mv.cuenta_caja)+'</span>';
+      if(cat)h+='<span class="tag tag-blue">'+cat.e+' '+cat.n+'</span>';
+      h+='</div></div>';
+      h+='<span class="'+(esRetiro?'monto-pos':'monto-neg')+'" style="flex-shrink:0;margin-left:8px">'+(esRetiro?'+':'-')+fmtP(monto)+'</span>';
+      h+='</div>';
+      h+='<div style="font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:5px">Categor&iacute;a</div>';
+      h+='<div class="pills">';
       cats.forEach(function(c){
-        html+='<button class="pill'+(ov.cat===c.id?' sel':'')+'" onclick="setMovCat(''+mid+'',''+c.id+'',''+quien+'')">'+c.e+' '+c.n+'</button>';
+        h+='<button class="pill'+(ov.cat===c.id?' sel':'')+'" data-mid="'+mid+'" data-cat="'+c.id+'" data-quien="'+quien+'" onclick="handleMovCat(this)">'+c.e+' '+c.n+'</button>';
       });
-      html+='</div></div>';
-
-      // Asignacion
-      html+='<div><div style="font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:4px">¿Para quién?</div>';
-      html+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
-      html+='<button class="wpill'+(who==='loli'?' wl':'')+'" onclick="setMovWho(''+mid+'','loli',''+quien+'')">💜 Loli</button>';
-      html+='<button class="wpill'+(who==='hugo'?' wh':'')+'" onclick="setMovWho(''+mid+'','hugo',''+quien+'')">💙 Hugo</button>';
-      html+='<button class="wpill'+(who==='shared'?' ws':'')+'" onclick="setMovWho(''+mid+'','shared',''+quien+'')">🤝 50/50</button>';
+      h+='</div>';
+      h+='<div style="font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;margin:6px 0 5px">Para qui&eacute;n</div>';
+      h+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">';
+      h+='<button class="wpill'+(who==='loli'?' wl':'')+'" data-mid="'+mid+'" data-who="loli" data-quien="'+quien+'" onclick="handleMovWho(this)">&#128156; Loli</button>';
+      h+='<button class="wpill'+(who==='hugo'?' wh':'')+'" data-mid="'+mid+'" data-who="hugo" data-quien="'+quien+'" onclick="handleMovWho(this)">&#128153; Hugo</button>';
+      h+='<button class="wpill'+(who==='shared'?' ws':'')+'" data-mid="'+mid+'" data-who="shared" data-quien="'+quien+'" onclick="handleMovWho(this)">50/50</button>';
       if(who==='shared'){
-        html+='<span style="font-size:11px;color:#64748B">% Loli:</span>';
-        html+='<input class="pct-inp" type="number" min="1" max="99" value="'+(ov.pct||50)+'" onchange="setMovPct(''+mid+'',this.value,''+quien+'')" style="width:52px"/>';
-        html+='<span style="font-size:11px;color:#64748B">Hugo: '+(100-(ov.pct||50))+'%</span>';
+        h+='<span style="font-size:11px;color:#64748B">% Loli:</span>';
+        h+='<input class="pct-inp" type="number" min="1" max="99" value="'+(ov.pct||50)+'" data-mid="'+mid+'" data-quien="'+quien+'" onchange="handleMovPct(this)" style="width:52px"/>';
       }
-      html+='</div></div>';
-
-      // Obs
-      html+='<input type="text" placeholder="Observación (opcional)..." value="'+esc(ov.obs||'')+'" onchange="setMovObs(''+mid+'',this.value,''+quien+'')" style="width:100%;margin-top:8px;padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid #334155;background:#0F172A;color:#F1F5F9"/>';
-      html+='</div>';
+      h+='</div>';
+      h+='<input type="text" placeholder="Observacion (opcional)" value="'+esc(ov.obs||'')+'" data-mid="'+mid+'" onchange="handleMovObs(this)" style="width:100%;padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid #334155;background:#0F172A;color:#F1F5F9"/>';
+      h+='</div>';
     });
-    return html;
+    return h;
   }
 
   el.innerHTML=bannerHtml+renderGroup(loliMovs,'loli','#D4537E')+'<div class="divider"></div>'+renderGroup(hugoMovs,'hugo','#60A5FA');
-}
-
-function setMovCat(mid,catId,quien){
-  var ov=getMovOv(mid);
-  ov.cat=ov.cat===catId?'':catId;
-  if(!ov.who)ov.who=quien;
-  setMovOv(mid,ov);
-  rMovs();
-}
-function setMovWho(mid,who,quien){
-  var ov=getMovOv(mid);
-  ov.who=who;
-  if(!ov.who)ov.who=quien;
-  setMovOv(mid,ov);
-  rMovs();
-}
-function setMovPct(mid,val,quien){
-  var ov=getMovOv(mid);
-  ov.pct=Number(val)||50;
-  setMovOv(mid,ov);
-}
-function setMovObs(mid,val,quien){
-  var ov=getMovOv(mid);
-  ov.obs=val;
-  setMovOv(mid,ov);
 }
 
 // ── RESUMEN ───────────────────────────────────────────────────────────────────
