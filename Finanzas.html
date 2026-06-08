@@ -370,6 +370,13 @@ function whoBadge(who,pct){
 }
 
 // Movimientos GP: SOLO retiros y aportes manuales de socios del mes
+// Regla: si el medio es MP Loli o MP Hugo, siempre es retiro (entro plata a la cuenta personal)
+var MP_PERSONAL=['MP Loli','MP Hugo'];
+function esRetiroReal(mv){
+  // Si el cuenta_caja es MP personal, siempre es ingreso (retiro) sin importar el tipo
+  if(mv.cuenta_caja&&MP_PERSONAL.indexOf(mv.cuenta_caja)>=0)return true;
+  return mv.tipo==='retiro';
+}
 function getMovsGP(){
   var mesKey=KEY();
   return allMovsGP.filter(function(mv){
@@ -464,8 +471,8 @@ function rAlertas(){
   }
   var movs=getMovsGP();
   if(movs.length){
-    var loli=movs.filter(function(m){return m.cuenta==='Cuenta Loli';}).reduce(function(s,m){return s+(m.tipo==='retiro'?Number(m.monto||0):-Number(m.monto||0));},0);
-    var hugo=movs.filter(function(m){return m.cuenta==='Cuenta Hugo';}).reduce(function(s,m){return s+(m.tipo==='retiro'?Number(m.monto||0):-Number(m.monto||0));},0);
+    var loli=movs.filter(function(m){return m.cuenta==='Cuenta Loli';}).reduce(function(s,m){return s+(esRetiroReal(m)?Number(m.monto||0):-Number(m.monto||0));},0);
+    var hugo=movs.filter(function(m){return m.cuenta==='Cuenta Hugo';}).reduce(function(s,m){return s+(esRetiroReal(m)?Number(m.monto||0):-Number(m.monto||0));},0);
     html+='<div class="divider"></div><div class="stitle">Movimientos GP este mes</div>';
     html+='<div class="res-block">';
     html+='<div class="res-row"><span class="res-lbl">Loli neto</span><span style="font-weight:700;color:'+(loli>=0?'#34D399':'#F87171')+'">'+fmtP(loli)+'</span></div>';
@@ -620,18 +627,23 @@ function rMovs(){
     h+='<span style="font-size:14px;font-weight:700;color:'+color+'">'+(quien==='loli'?'Loli':'Hugo')+'</span>';
     h+='<span style="font-weight:700;color:'+color+'">'+fmtP(tot)+'</span></div>';
     list.forEach(function(mv){
-      var monto=Number(mv.monto||0);var esRetiro=mv.tipo==='retiro';
+      var monto=Number(mv.monto||0);var esRetiro=esRetiroReal(mv);
       var mid=movId(mv);var ov=getMovOv(mid);
       var cat=ov.cat?getCat(ov.cat):null;var who=ov.who||quien;
       var asignado=!!(ov.cat||ov.who);
       h+='<div class="card'+(asignado?' ok':'')+'" style="margin-bottom:8px">';
       h+='<div class="row-between" style="margin-bottom:8px">';
-      h+='<div style="flex:1"><div class="nombre">'+esc((esRetiro?'Retiro':'Aporte')+' - '+(mv.nota||''))+'</div>';
+      // Si es MP personal, mostrar solo el concepto sin prefijo
+      var esMPPersonalLabel=mv.cuenta_caja&&MP_PERSONAL.indexOf(mv.cuenta_caja)>=0;
+      var labelConcepto=esMPPersonalLabel?(mv.nota||'Cobro en MP'):(esRetiro?'Retiro':'Aporte')+' - '+(mv.nota||'');
+      h+='<div style="flex:1"><div class="nombre">'+esc(labelConcepto)+'</div>';
       h+='<div class="meta"><span>'+esc(mv.fecha||'')+'</span>';
       if(mv.cuenta_caja)h+='<span class="tag">'+esc(mv.cuenta_caja)+'</span>';
       if(cat)h+='<span class="tag tag-blue">'+cat.e+' '+cat.n+'</span>';
-      // Mostrar badge de aporte a empresa
-      if(!esRetiro)h+='<span class="aporte-badge">devuelve a empresa</span>';
+      // Badge: solo mostrar "aporte a empresa" si NO es MP personal
+      var esMPPersonal=mv.cuenta_caja&&MP_PERSONAL.indexOf(mv.cuenta_caja)>=0;
+      if(!esRetiro&&!esMPPersonal)h+='<span class="aporte-badge">sale de tu bolsillo</span>';
+      if(!esRetiro&&esMPPersonal)h+='<span class="tag tag-green" style="font-size:10px">cobro en MP</span>';
       h+='</div></div>';
       h+='<span class="'+(esRetiro?'monto-pos':'monto-neg')+'" style="flex-shrink:0;margin-left:8px">'+(esRetiro?'+':'-')+fmtP(monto)+'</span>';
       h+='</div>';
@@ -666,10 +678,10 @@ function rResumen(){
   var movs=getMovsGP();var gastos=getGastos();var pagos=getTarjetas();
 
   // Retiros = ingresos. Aportes = devolucion a empresa (restan de ingresos, no son gasto)
-  var loliRet=movs.filter(function(m){return m.cuenta==='Cuenta Loli'&&m.tipo==='retiro';}).reduce(function(s,m){return s+Number(m.monto||0);},0);
-  var loliAp=movs.filter(function(m){return m.cuenta==='Cuenta Loli'&&m.tipo!=='retiro';}).reduce(function(s,m){return s+Number(m.monto||0);},0);
-  var hugoRet=movs.filter(function(m){return m.cuenta==='Cuenta Hugo'&&m.tipo==='retiro';}).reduce(function(s,m){return s+Number(m.monto||0);},0);
-  var hugoAp=movs.filter(function(m){return m.cuenta==='Cuenta Hugo'&&m.tipo!=='retiro';}).reduce(function(s,m){return s+Number(m.monto||0);},0);
+  var loliRet=movs.filter(function(m){return m.cuenta==='Cuenta Loli'&&esRetiroReal(m);}).reduce(function(s,m){return s+Number(m.monto||0);},0);
+  var loliAp=movs.filter(function(m){return m.cuenta==='Cuenta Loli'&&!esRetiroReal(m);}).reduce(function(s,m){return s+Number(m.monto||0);},0);
+  var hugoRet=movs.filter(function(m){return m.cuenta==='Cuenta Hugo'&&esRetiroReal(m);}).reduce(function(s,m){return s+Number(m.monto||0);},0);
+  var hugoAp=movs.filter(function(m){return m.cuenta==='Cuenta Hugo'&&!esRetiroReal(m);}).reduce(function(s,m){return s+Number(m.monto||0);},0);
 
   // Ingreso neto = retiros - aportes a empresa
   var loliNet=loliRet-loliAp;
