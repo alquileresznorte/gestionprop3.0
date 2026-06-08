@@ -2998,10 +2998,12 @@ function rCaja(){
       var ctaCaja=mv.cuenta_caja||"Efectivo_sin_cuenta";
       var monto=Number(mv.monto||0);
       var esRetiro=mv.tipo==="retiro";
+      var esMPPersonal=['MP Loli','MP Hugo'].indexOf(mv.cuenta_caja)>=0;
+      var esIngreso=esRetiro||esMPPersonal;
       var socioNombre=mv.cuenta==="Cuenta Hugo"?"Hugo":mv.cuenta==="Cuenta Loli"?"Loli":"Socio";
-      var concepto=esc((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:""));
+      var concepto=esc(esMPPersonal?(mv.nota||'Cobro MP'):((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:"")));
       // Impacto en cuenta de caja (Efectivo, Bco Hugo, etc.) + columna Socios en la misma fila
-      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,socioMov:esRetiro?monto:-monto,tipo:"movimiento"});
+      movimientosD.push({concepto:concepto,mov:esIngreso?monto:-monto,cuenta:ctaCaja,socioMov:esIngreso?monto:-monto,tipo:"movimiento"});
     });
 
     // Fix old records (incluyendo cobros viejos con cuentas de socios)
@@ -3258,9 +3260,12 @@ function rCaja(){
       o+="<div style='font-size:11px;font-weight:700;color:#8B5CF6;margin-bottom:4px'>"+cta+"</div>";
       o+="<table class='tbl'><tbody>";
       mc.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");}).forEach(function(mv){
-        o+="<tr><td style='color:#64748B;font-size:11px'>"+esc(mv.fecha||"")+"</td>";
-        o+="<td style='font-size:12px'>"+(mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" — "+esc(mv.nota):"")+"</td>";
-        o+="<td style='color:"+(mv.tipo==="retiro"?"#EF4444":"#10B981")+";font-weight:600'>"+(mv.tipo==="retiro"?"-":"+")+fmt(mv.monto)+"</td>";
+        var esMPP=['MP Loli','MP Hugo'].indexOf(mv.cuenta_caja)>=0;
+        var esIng=mv.tipo==="retiro"||esMPP;
+        var conceptoMv=esMPP?(mv.nota||'Cobro MP'):((mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" — "+esc(mv.nota):""));
+        o+="<tr><td style='color:#64748B;font-size:11px'>"+fecDisp(mv.fecha||"")+"</td>";
+        o+="<td style='font-size:12px'>"+esc(conceptoMv)+"</td>";
+        o+="<td style='color:"+(esIng?"#10B981":"#EF4444")+";font-weight:600'>"+(esIng?"+":"-")+fmt(mv.monto)+"</td>";
         o+="</tr>";
       });
       o+="</tbody></table></div>";
