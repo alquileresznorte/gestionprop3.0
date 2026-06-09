@@ -2999,11 +2999,15 @@ function rCaja(){
       var monto=Number(mv.monto||0);
       var esRetiro=mv.tipo==="retiro";
       var esMPPersonal=['MP Loli','MP Hugo'].indexOf(mv.cuenta_caja)>=0;
-      var esIngreso=esRetiro||esMPPersonal;
+      var esEspecie=!esRetiro&&CTAS_SOCIOS.indexOf(mv.cuenta_caja)>=0; // aporte en TJ/MP = en especie
       var socioNombre=mv.cuenta==="Cuenta Hugo"?"Hugo":mv.cuenta==="Cuenta Loli"?"Loli":"Socio";
       var concepto=esc(esMPPersonal?(mv.nota||'Cobro MP'):((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:"")));
-      // Impacto en cuenta de caja (Efectivo, Bco Hugo, etc.) + columna Socios en la misma fila
-      movimientosD.push({concepto:concepto,mov:esIngreso?monto:-monto,cuenta:ctaCaja,socioMov:esIngreso?monto:-monto,tipo:"movimiento"});
+      // Retiro: caja negativo, socio positivo
+      // Aporte efectivo/banco: caja positivo, socio negativo
+      // Aporte en especie (TJ/MP): caja sin impacto (0), socio negativo
+      var movCaja = esRetiro ? -monto : esEspecie ? 0 : monto;
+      var movSocio = esRetiro ? monto : -monto;
+      movimientosD.push({concepto:concepto,mov:movCaja,cuenta:ctaCaja,socioMov:movSocio,tipo:"movimiento"});
     });
 
     // Fix old records (incluyendo cobros viejos con cuentas de socios)
