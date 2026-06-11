@@ -1906,9 +1906,65 @@ function openFichaHist(key){
     });
     o+="</div>";
   }
+  // Fotos pegadas
+  var fotos=i.fotos_historial?Object.values(i.fotos_historial):[];
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
+  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+  o+="<div class='lbl'>Fotos</div>";
+  o+="<button class='btn bp bsm' style='font-size:11px' onclick='pegarFotoHistorial("+JSON.stringify(key)+")'>📋 Pegar foto (Ctrl+V)</button>";
+  o+="</div>";
+  if(fotos.length){
+    fotos.forEach(function(f,idx){
+      o+="<div style='margin-bottom:8px'>";
+      o+="<img src='"+f.data+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
+      o+="<div style='color:#64748B;font-size:10px;margin-top:3px'>"+fecDisp(f.fecha||"")+(f.nota?" — "+esc(f.nota):"")+"</div>";
+      o+="</div>";
+    });
+  } else {
+    o+="<p style='color:#64748B;font-size:11px'>Sin fotos. Copiá una imagen y tocá Pegar foto.</p>";
+  }
+  o+="</div>";
   openModal("Historial - "+esc(i.nombre),o,true);
 }
 
+
+function pegarFotoHistorial(key){
+  navigator.clipboard.read().then(function(items){
+    for(var i=0;i<items.length;i++){
+      var item=items[i];
+      var imgType=item.types.find(function(t){return t.startsWith('image/');});
+      if(imgType){
+        item.getType(imgType).then(function(blob){
+          // Comprimir antes de guardar
+          var url=URL.createObjectURL(blob);
+          var img=new Image();
+          img.onload=function(){
+            var canvas=document.createElement('canvas');
+            var maxW=1200;
+            var w=img.width,h=img.height;
+            if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            var data=canvas.toDataURL('image/jpeg',0.75);
+            URL.revokeObjectURL(url);
+            var nota=prompt('Nota para esta foto (opcional):','');
+            DB.ref('hist/'+key+'/fotos_historial').push({
+              data:data,fecha:hoy(),nota:nota||''
+            },function(err){
+              if(err){alert('Error al guardar: '+err.message);}
+              else{openHistorialEventos(key);}
+            });
+          };
+          img.src=url;
+        });
+        return;
+      }
+    }
+    alert('No hay imagen en el portapapeles. Copiá una imagen primero (Ctrl+C sobre la imagen).');
+  }).catch(function(){
+    alert('No se pudo acceder al portapapeles. Asegurate de dar permiso cuando el navegador lo pida.');
+  });
+}
 
 // COBRANZAS
 var _cobMes=mes();
