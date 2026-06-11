@@ -194,6 +194,15 @@ function fmtInputVal(el){
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
 function hoy(){return new Date().toISOString().split("T")[0];}
 function mes(){return new Date().toISOString().slice(0,7);}
+// Protección de caja cerrada
+function cajaCerrada(fecha){
+  if(!fecha)return false;
+  return oA(DATA.subc||{}).some(function(s){return s.fecha===fecha;});
+}
+function mesCerrado(m){
+  if(!m)return false;
+  return oA(DATA.cierres||{}).some(function(c){return c.mes===m;});
+}
 function fecDisp(s){
   // Convert YYYY-MM-DD to DD/MM/YY for display
   if(!s||s.length<10)return s||"--";
@@ -1228,6 +1237,7 @@ function openRecargos(ckey){
   var ki=kpush(ckey);
   var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0),saldo=tot-pg;
   var cr=getCfgRec();
+  var dia=new Date().getDate();
   var recTardio=Math.round(c.monto_total*(dia>=20?cr.rec_d20:dia>=10?cr.rec_d10:cr.rec_d5)/100);
   var recDigital=Math.round(c.monto_total*cr.rec_digital/100);
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>"+c.unidad+" - "+esc(c.inq)+" - Saldo: <b style='color:#EF4444'>"+fmt(saldo)+"</b></p>";
@@ -2171,6 +2181,9 @@ function regPago(ckey){
   var c=DATA.cob[ckey],ts=Date.now(),ups={};
   var esUSD=c.moneda==="USD";
   var fecha=G("p-f").value,cta1=G("p-c").value;
+  // Bloquear si la caja o el mes están cerrados
+  if(cajaCerrada(fecha)){alert("⛔ La caja del "+fecDisp(fecha)+" ya está cerrada. Cambiá la fecha al día de hoy.");return;}
+  if(mesCerrado(fecha.slice(0,7))){alert("⛔ El mes "+fecha.slice(0,7)+" ya fue cerrado. No se puede registrar el pago.");return;}
   var m,usd_monto=0,tc_usado=0;
 
   if(esUSD){
@@ -2451,8 +2464,10 @@ function saveCosto(ckey){
   var checkboxPagado=G("ec-p").checked;
   var pm=fmtInputVal(G("ec-pm")||{value:"0",dataset:{raw:"0"}});
   var pc=(G("ec-pc")||{value:"Efectivo"}).value;
-  // Fecha de pago: siempre usar el campo ec-fp
   var fechaPago=G("ec-fp")?(G("ec-fp").value||hoy()):hoy();
+  // Bloquear si la caja o el mes están cerrados
+  if(cajaCerrada(fechaPago)){alert("⛔ La caja del "+fecDisp(fechaPago)+" ya está cerrada. No se puede registrar el pago.");return;}
+  if(mesCerrado(fechaPago.slice(0,7))){alert("⛔ El mes "+fechaPago.slice(0,7)+" ya fue cerrado. No se puede registrar el pago.");return;}
   var c=DATA.cst[ckey];
   var pagosExist=c&&c.pagos?Object.values(c.pagos):[];
   var totalYaPagado=pagosExist.reduce(function(s,x){return s+Number(x.monto||0);},0);
@@ -3500,10 +3515,13 @@ function saveAj(){
   var m=fmtInputVal(G("aj-m")||{value:"0",dataset:{raw:"0"}});
   var c=G("aj-con")?G("aj-con").value:"";
   if(!m||!c){alert("Monto y descripcion obligatorios");return;}
+  var fecha=G("aj-f")?G("aj-f").value:hoy();
+  if(cajaCerrada(fecha)){alert("⛔ La caja del "+fecDisp(fecha)+" ya está cerrada. No se puede modificar.");return;}
+  if(mesCerrado(fecha.slice(0,7))){alert("⛔ El mes "+fecha.slice(0,7)+" ya fue cerrado. No se puede modificar.");return;}
   var clasif=(G("aj-s")||{value:"otro"}).value;
   var unidad=G("aj-unidad")?G("aj-unidad").value||"General":"General";
   var concepto=c+(unidad&&unidad!=="General"?" ["+unidad+"]":"");
-  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
+  DB.ref("aj").push({fecha:fecha,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
   closeModal();setTimeout(rCaja,300);
 }
 function openMov(){
