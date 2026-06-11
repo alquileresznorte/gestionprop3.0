@@ -864,17 +864,93 @@ function openVerDocs(key){
     {label:"Recibo sueldo 2do inquilino",key:"foto_sue2"},
   ];
   var o="";
-  var found=false;
+  // Fotos existentes
   docs.forEach(function(d){
     if(!i[d.key]) return;
-    found=true;
     o+="<div style='margin-bottom:14px'>";
-    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+d.label+"</div>";
+    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center'>";
+    o+="<span>"+d.label+"</span>";
+    o+="<button class='btn bx bsm' style='font-size:9px' onclick='borrarDocIq("+JSON.stringify(key)+","+JSON.stringify(d.key)+")'>Borrar</button>";
+    o+="</div>";
     o+="<img src='"+i[d.key]+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
     o+="</div>";
   });
-  if(!found) o="<p style='color:#64748B'>No hay documentos cargados para este inquilino.</p>";
-  openModal("📷 Documentos — "+esc(i.nombre),o,false);
+  // Fotos extras guardadas
+  var extras=i.fotos_extra?Object.entries(i.fotos_extra):[];
+  extras.forEach(function(e){
+    var fk=e[0],fv=e[1];
+    o+="<div style='margin-bottom:14px'>";
+    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center'>";
+    o+="<span>"+(fv.label||"Foto")+" <span style='color:#64748B;font-size:10px'>"+fecDisp(fv.fecha||"")+"</span></span>";
+    o+="<button class='btn bx bsm' style='font-size:9px' onclick='borrarFotoExtra("+JSON.stringify(key)+","+JSON.stringify(fk)+")'>Borrar</button>";
+    o+="</div>";
+    o+="<img src='"+fv.data+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
+    o+="</div>";
+  });
+  if(!o) o="<p style='color:#64748B;font-size:12px;margin-bottom:12px'>No hay documentos cargados todavía.</p>";
+  // Agregar foto
+  o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px dashed #334155;margin-top:8px'>";
+  o+="<div style='font-size:12px;font-weight:700;color:#94A3B8;margin-bottom:8px'>+ Agregar foto</div>";
+  o+="<input class='inp' id='doc-label' placeholder='Descripción (ej: DNI nuevo, recibo julio...)' style='margin-bottom:8px'/>";
+  o+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
+  o+="<button class='btn bp bsm' onclick='pegarFotoIq("+JSON.stringify(key)+")'>📋 Pegar (Ctrl+V)</button>";
+  o+="<label class='btn bg bsm' style='cursor:pointer'>📁 Subir archivo<input type='file' accept='image/*' style='display:none' onchange='subirFotoIq("+JSON.stringify(key)+",this)'/></label>";
+  o+="</div></div>";
+  openModal("📷 Documentos — "+esc(i.nombre),o,true);
+}
+
+function _guardarFotoExtra(key, dataUrl){
+  var label=G("doc-label")?G("doc-label").value.trim()||"Foto":"Foto";
+  DB.ref("iq/"+key+"/fotos_extra").push({data:dataUrl,label:label,fecha:hoy()},function(err){
+    if(err){alert("Error al guardar: "+err.message);}
+    else{openVerDocs(key);}
+  });
+}
+function pegarFotoIq(key){
+  navigator.clipboard.read().then(function(items){
+    for(var i=0;i<items.length;i++){
+      var imgType=items[i].types.find(function(t){return t.startsWith('image/');});
+      if(imgType){
+        items[i].getType(imgType).then(function(blob){
+          var url=URL.createObjectURL(blob);
+          var img=new Image();
+          img.onload=function(){
+            var canvas=document.createElement('canvas');
+            var maxW=1200,w=img.width,h=img.height;
+            if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+            canvas.width=w;canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            URL.revokeObjectURL(url);
+            _guardarFotoExtra(key,canvas.toDataURL('image/jpeg',0.75));
+          };img.src=url;
+        });return;
+      }
+    }
+    alert('No hay imagen en el portapapeles.');
+  }).catch(function(){alert('Permiso de portapapeles denegado. Usá "Subir archivo".');});
+}
+function subirFotoIq(key,input){
+  if(!input.files[0])return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var maxW=1200,w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      _guardarFotoExtra(key,canvas.toDataURL('image/jpeg',0.75));
+    };img.src=e.target.result;
+  };reader.readAsDataURL(input.files[0]);
+}
+function borrarDocIq(key,docKey){
+  if(!confirm("¿Borrar este documento?"))return;
+  DB.ref("iq/"+key+"/"+docKey).remove(function(){openVerDocs(key);});
+}
+function borrarFotoExtra(key,fotoKey){
+  if(!confirm("¿Borrar esta foto?"))return;
+  DB.ref("iq/"+key+"/fotos_extra/"+fotoKey).remove(function(){openVerDocs(key);});
 }
 function openEditDatos(key){
   var i=DATA.iq[key]; if(!i)return;
@@ -1029,7 +1105,9 @@ function openFicha(key){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
     o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";
-    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";if(i.doc_dni_f||i.doc_dni_d||i.doc_sueldo) o+="<button class='btn bsm' style='background:#0F172A;color:#06B6D4;border:1px solid #06B6D4' data-verdocs='"+ki+"'>📷 Ver docs</button>";o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
+    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";
+    o+="<button class='btn bsm' style='background:#0F172A;color:#06B6D4;border:1px solid #06B6D4' data-verdocs='"+ki+"'>📷 Ver docs</button>";
+    o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
     if((i.deposito||0)>0)o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";
   }
   o+="</div>";
