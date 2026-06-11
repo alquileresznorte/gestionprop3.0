@@ -287,7 +287,7 @@ var BASE_CATS=[
   {id:'otro',e:'📦',n:'Otro'}
 ];
 
-var FD={fijos:{},pagados:{},gastos:{},tarjetas:{},capital:{},cats:{},movOvs:{}};
+var FD={fijos:{},pagados:{},gastos:{},tarjetas:{},capital:{},cats:{},movOvs:{},aho:{},inv:{}};
 
 firebase.initializeApp({
   apiKey:"AIzaSyDhuSP_WTWI3hqf5GqgFExkptFfpqJUn50",
@@ -328,13 +328,17 @@ function setSyncDot(on){var d=document.getElementById('sync');if(d)d.className='
 
 function loadDB(){
   var done={};
-  var keys=['movs','fin_fijos','fin_pagados','fin_gastos','fin_tarjetas','fin_capital','fin_cats','fin_movOvs'];
+  var keys=['movs','aho','inv','fin_fijos','fin_pagados','fin_gastos','fin_tarjetas','fin_capital','fin_cats','fin_movOvs'];
   keys.forEach(function(k){done[k]=false;});
   function check(){if(Object.values(done).every(Boolean)){gpSt='ok';render();}}
   DB.ref('movs').on('value',function(s){
     allMovsGP=s.exists()?Object.values(s.val()):[];
     done['movs']=true;check();
   },function(){gpSt='error';allMovsGP=[];done['movs']=true;check();});
+  // Leer aho e inv directamente (son de GestionProp, no tienen prefijo fin_)
+  DB.ref('aho').on('value',function(s){FD.aho=s.exists()?s.val():{};done['aho']=true;check();},function(){FD.aho={};done['aho']=true;check();});
+  DB.ref('cfg_aho').on('value',function(s){FD.cfg_aho=s.exists()?s.val():{};},function(){FD.cfg_aho={};});
+  DB.ref('inv').on('value',function(s){FD.inv=s.exists()?s.val():{};done['inv']=true;check();},function(){FD.inv={};done['inv']=true;check();});
   ['fijos','pagados','gastos','tarjetas','capital','cats','movOvs'].forEach(function(k){
     DB.ref('fin_'+k).on('value',function(s){
       FD[k]=s.exists()?s.val():{};
