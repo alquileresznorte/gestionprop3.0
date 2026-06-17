@@ -1800,7 +1800,10 @@ function saveNA(){
     var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcFechaGuardada=G("na-pc-fecha")&&G("na-pc-fecha").value?G("na-pc-fecha").value:"";
-    var pcFecha=pcFechaGuardada||ing||hoy();
+    var _posesionFecha=G("na-posesion")?G("na-posesion").value:"";
+    // La fecha del pago a cuenta es: fecha de reserva (si viene de reserva) > fecha de posesión > hoy
+    // NUNCA la fecha de inicio del contrato
+    var pcFecha=pcFechaGuardada||_posesionFecha||hoy();
     var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
     var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
     var pcRestante=pc;
