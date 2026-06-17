@@ -767,69 +767,95 @@ function rResumen(){
   el.innerHTML=html;
 }
 
-// CAPITAL - acumulado historico de TODOS los meses
+// CAPITAL - lee aho e inv de GestionProp + activos manuales
 function rCapital(){
   var el=document.getElementById('t-capital');if(!el)return;
+
+  // Dolares de GestionProp (nodo aho)
+  var ahoItems=FD.aho?Object.values(FD.aho):[];
+  var totalUSDgp=ahoItems.reduce(function(s,a){return s+Number(a.usd||0);},0);
+  var stockDeclarado=(FD.cfg_aho&&FD.cfg_aho.stock_usd)?Number(FD.cfg_aho.stock_usd):0;
+  var usdGP=stockDeclarado>0?stockDeclarado:totalUSDgp;
+
+  // Inversiones de GestionProp (nodo inv)
+  var invGP=FD.inv?Object.values(FD.inv):[];
+  var invActivas=invGP.filter(function(i){return !i.vendido;});
+  var totalInvGP=invActivas.reduce(function(s,i){return s+Number(i.usd||0);},0);
+
+  // Activos manuales de Finanzas
   var items=getCapital();
-  // Solo activos no vendidos para el total
   var activos=items.filter(function(i){return !i.vendido;});
-  var totalUSD=activos.reduce(function(s,i){return s+Number(i.usd||0);},0);
+  var totalManual=activos.reduce(function(s,i){return s+Number(i.usd||0);},0);
   var totalARS=activos.reduce(function(s,i){return s+Number(i.ars||0);},0);
+  var totalUSD=usdGP+totalInvGP+totalManual;
 
   var html='<div class="big-card">';
-  html+='<div class="big-sub">Capital personal total (acumulado)</div>';
+  html+='<div class="big-sub">Capital personal total</div>';
   html+='<div class="big-num" style="color:#06B6D4">U$S '+Math.round(totalUSD).toLocaleString('es-AR')+'</div>';
   if(totalARS>0)html+='<div class="big-sub" style="margin-top:4px">+ '+fmtP(totalARS)+' en pesos</div>';
   html+='</div>';
-  html+='<div class="row-between" style="margin-bottom:10px">';
-  html+='<div class="stitle" style="margin:0">Activos</div>';
+
+  // Dolares GP
+  html+='<div class="stitle">Dolares desde GestionProp</div>';
+  html+='<div class="card" style="margin-bottom:10px">';
+  html+='<div class="row-between" style="margin-bottom:6px"><span style="font-weight:700">Fondo de ahorro USD</span>';
+  html+='<span style="font-weight:700;color:#06B6D4">U$S '+Math.round(usdGP).toLocaleString('es-AR')+'</span></div>';
+  if(ahoItems.length){
+    ahoItems.sort(function(a,b){return(a.fecha||'').localeCompare(b.fecha||'');}).forEach(function(a){
+      html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #334155;font-size:12px">';
+      html+='<span style="color:#64748B">'+esc(a.fecha||'')+'</span>';
+      html+='<span style="color:#06B6D4;font-weight:600">U$S '+Number(a.usd||0).toLocaleString('es-AR')+'</span>';
+      if(a.tc)html+='<span style="color:#64748B">TC $'+Number(a.tc||0).toLocaleString('es-AR')+'</span>';
+      html+='<span style="color:#94A3B8">'+fmtP(a.pesos||0)+'</span>';
+      html+='</div>';
+    });
+  } else { html+='<div style="font-size:12px;color:#64748B">Sin compras en GestionProp</div>'; }
+  html+='</div>';
+
+  // Inversiones GP
+  if(invActivas.length){
+    html+='<div class="stitle">Inversiones desde GestionProp (U$S '+Math.round(totalInvGP).toLocaleString('es-AR')+')</div>';
+    invActivas.forEach(function(inv){
+      html+='<div class="card" style="margin-bottom:6px"><div class="row-between">';
+      html+='<div><div class="nombre">'+esc(inv.desc||'')+'</div>';
+      if(inv.fecha)html+='<div class="meta"><span>'+esc(inv.fecha)+'</span></div>';
+      html+='</div>';
+      html+='<span style="font-weight:700;color:#F59E0B">U$S '+Number(inv.usd||0).toLocaleString('es-AR')+'</span>';
+      html+='</div></div>';
+    });
+  }
+
+  // Activos manuales
+  html+='<div class="row-between" style="margin-top:16px;margin-bottom:8px">';
+  html+='<div class="stitle" style="margin:0">Activos adicionales</div>';
   html+='<button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="openCapital()">+ Agregar</button></div>';
-
-  if(!items.length){html+='<div class="empty">Sin activos registrados.<br>Agrega tus dolares, inversiones y bienes.</div>';el.innerHTML=html;return;}
-
-  var vendidos=items.filter(function(i){return i.vendido;});
 
   function renderItem(item){
     var tipo=item.tipo==='usd'?'Dolares':item.tipo==='inversion'?'Inversion':'Otro';
-    var r='<div class="card'+(item.vendido?' pagado':'')+'">';
+    var r='<div class="card'+(item.vendido?' pagado':'')+'" style="margin-bottom:6px">';
     r+='<div class="row-between"><div><div class="nombre">'+esc(item.desc)+'</div>';
     r+='<div class="meta"><span>'+tipo+'</span>';
     if(item.fecha)r+='<span>'+esc(item.fecha)+'</span>';
     if(item.obs)r+='<span>'+esc(item.obs)+'</span>';
-    r+='</div></div>';
-    r+='<div style="text-align:right">';
+    r+='</div></div><div style="text-align:right">';
     r+='<div style="font-weight:700;color:#06B6D4">U$S '+Number(item.usd||0).toLocaleString('es-AR')+'</div>';
     if(item.ars)r+='<div style="font-size:11px;color:#64748B">'+fmtP(item.ars)+'</div>';
-    if(!item.vendido)r+='<button class="btn-icon" onclick="delCapital(\''+item._key+'\')">x</button>';
+    if(!item.vendido)r+='<button class="btn-icon" onclick="delCapital(''+item._key+'')">x</button>';
     r+='</div></div></div>';
     return r;
   }
 
-  // Agrupar por tipo
-  var dols=activos.filter(function(i){return i.tipo==='usd';});
-  var invs=activos.filter(function(i){return i.tipo==='inversion';});
-  var otros=activos.filter(function(i){return i.tipo!=='usd'&&i.tipo!=='inversion';});
+  if(activos.length){activos.forEach(function(i){html+=renderItem(i);});}
+  else{html+='<div style="font-size:12px;color:#64748B;padding:8px 0">Sin activos adicionales manuales.</div>';}
 
-  if(dols.length){
-    var totDols=dols.reduce(function(s,i){return s+Number(i.usd||0);},0);
-    html+='<div class="stitle">Dolares (U$S '+Math.round(totDols).toLocaleString('es-AR')+')</div>';
-    dols.forEach(function(i){html+=renderItem(i);});
-  }
-  if(invs.length){
-    var totInvs=invs.reduce(function(s,i){return s+Number(i.usd||0);},0);
-    html+='<div class="stitle">Inversiones (U$S '+Math.round(totInvs).toLocaleString('es-AR')+')</div>';
-    invs.forEach(function(i){html+=renderItem(i);});
-  }
-  if(otros.length){
-    html+='<div class="stitle">Otros</div>';
-    otros.forEach(function(i){html+=renderItem(i);});
-  }
+  var vendidos=items.filter(function(i){return i.vendido;});
   if(vendidos.length){
     html+='<div class="stitle" style="margin-top:14px">Vendidos / baja</div>';
     vendidos.forEach(function(i){html+=renderItem(i);});
   }
   el.innerHTML=html;
 }
+
 
 // CONFIG
 function rConfig(){
