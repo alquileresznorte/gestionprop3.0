@@ -194,15 +194,6 @@ function fmtInputVal(el){
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
 function hoy(){return new Date().toISOString().split("T")[0];}
 function mes(){return new Date().toISOString().slice(0,7);}
-// Protección de caja cerrada
-function cajaCerrada(fecha){
-  if(!fecha)return false;
-  return oA(DATA.subc||{}).some(function(s){return s.fecha===fecha;});
-}
-function mesCerrado(m){
-  if(!m)return false;
-  return oA(DATA.cierres||{}).some(function(c){return c.mes===m;});
-}
 function fecDisp(s){
   // Convert YYYY-MM-DD to DD/MM/YY for display
   if(!s||s.length<10)return s||"--";
@@ -864,93 +855,17 @@ function openVerDocs(key){
     {label:"Recibo sueldo 2do inquilino",key:"foto_sue2"},
   ];
   var o="";
-  // Fotos existentes
+  var found=false;
   docs.forEach(function(d){
     if(!i[d.key]) return;
+    found=true;
     o+="<div style='margin-bottom:14px'>";
-    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center'>";
-    o+="<span>"+d.label+"</span>";
-    o+="<button class='btn bx bsm' style='font-size:9px' onclick='borrarDocIq("+JSON.stringify(key)+","+JSON.stringify(d.key)+")'>Borrar</button>";
-    o+="</div>";
+    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+d.label+"</div>";
     o+="<img src='"+i[d.key]+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
     o+="</div>";
   });
-  // Fotos extras guardadas
-  var extras=i.fotos_extra?Object.entries(i.fotos_extra):[];
-  extras.forEach(function(e){
-    var fk=e[0],fv=e[1];
-    o+="<div style='margin-bottom:14px'>";
-    o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center'>";
-    o+="<span>"+(fv.label||"Foto")+" <span style='color:#64748B;font-size:10px'>"+fecDisp(fv.fecha||"")+"</span></span>";
-    o+="<button class='btn bx bsm' style='font-size:9px' onclick='borrarFotoExtra("+JSON.stringify(key)+","+JSON.stringify(fk)+")'>Borrar</button>";
-    o+="</div>";
-    o+="<img src='"+fv.data+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
-    o+="</div>";
-  });
-  if(!o) o="<p style='color:#64748B;font-size:12px;margin-bottom:12px'>No hay documentos cargados todavía.</p>";
-  // Agregar foto
-  o+="<div style='background:#0F172A;border-radius:8px;padding:12px;border:1px dashed #334155;margin-top:8px'>";
-  o+="<div style='font-size:12px;font-weight:700;color:#94A3B8;margin-bottom:8px'>+ Agregar foto</div>";
-  o+="<input class='inp' id='doc-label' placeholder='Descripción (ej: DNI nuevo, recibo julio...)' style='margin-bottom:8px'/>";
-  o+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
-  o+="<button class='btn bp bsm' onclick='pegarFotoIq("+JSON.stringify(key)+")'>📋 Pegar (Ctrl+V)</button>";
-  o+="<label class='btn bg bsm' style='cursor:pointer'>📁 Subir archivo<input type='file' accept='image/*' style='display:none' onchange='subirFotoIq("+JSON.stringify(key)+",this)'/></label>";
-  o+="</div></div>";
-  openModal("📷 Documentos — "+esc(i.nombre),o,true);
-}
-
-function _guardarFotoExtra(key, dataUrl){
-  var label=G("doc-label")?G("doc-label").value.trim()||"Foto":"Foto";
-  DB.ref("iq/"+key+"/fotos_extra").push({data:dataUrl,label:label,fecha:hoy()},function(err){
-    if(err){alert("Error al guardar: "+err.message);}
-    else{openVerDocs(key);}
-  });
-}
-function pegarFotoIq(key){
-  navigator.clipboard.read().then(function(items){
-    for(var i=0;i<items.length;i++){
-      var imgType=items[i].types.find(function(t){return t.startsWith('image/');});
-      if(imgType){
-        items[i].getType(imgType).then(function(blob){
-          var url=URL.createObjectURL(blob);
-          var img=new Image();
-          img.onload=function(){
-            var canvas=document.createElement('canvas');
-            var maxW=1200,w=img.width,h=img.height;
-            if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
-            canvas.width=w;canvas.height=h;
-            canvas.getContext('2d').drawImage(img,0,0,w,h);
-            URL.revokeObjectURL(url);
-            _guardarFotoExtra(key,canvas.toDataURL('image/jpeg',0.75));
-          };img.src=url;
-        });return;
-      }
-    }
-    alert('No hay imagen en el portapapeles.');
-  }).catch(function(){alert('Permiso de portapapeles denegado. Usá "Subir archivo".');});
-}
-function subirFotoIq(key,input){
-  if(!input.files[0])return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var img=new Image();
-    img.onload=function(){
-      var canvas=document.createElement('canvas');
-      var maxW=1200,w=img.width,h=img.height;
-      if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      _guardarFotoExtra(key,canvas.toDataURL('image/jpeg',0.75));
-    };img.src=e.target.result;
-  };reader.readAsDataURL(input.files[0]);
-}
-function borrarDocIq(key,docKey){
-  if(!confirm("¿Borrar este documento?"))return;
-  DB.ref("iq/"+key+"/"+docKey).remove(function(){openVerDocs(key);});
-}
-function borrarFotoExtra(key,fotoKey){
-  if(!confirm("¿Borrar esta foto?"))return;
-  DB.ref("iq/"+key+"/fotos_extra/"+fotoKey).remove(function(){openVerDocs(key);});
+  if(!found) o="<p style='color:#64748B'>No hay documentos cargados para este inquilino.</p>";
+  openModal("📷 Documentos — "+esc(i.nombre),o,false);
 }
 function openEditDatos(key){
   var i=DATA.iq[key]; if(!i)return;
@@ -1105,9 +1020,7 @@ function openFicha(key){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
     o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";
-    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";
-    o+="<button class='btn bsm' style='background:#0F172A;color:#06B6D4;border:1px solid #06B6D4' data-verdocs='"+ki+"'>📷 Ver docs</button>";
-    o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
+    o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";if(i.doc_dni_f||i.doc_dni_d||i.doc_sueldo) o+="<button class='btn bsm' style='background:#0F172A;color:#06B6D4;border:1px solid #06B6D4' data-verdocs='"+ki+"'>📷 Ver docs</button>";o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
     if((i.deposito||0)>0)o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";
   }
   o+="</div>";
@@ -1242,41 +1155,136 @@ function cerrarAc(key){
 }
 // ── RENOVACION ───────────────────────────────────────────────────────────────
 function openRenovar(key){
-  var i=DATA.iq[key];
+  var i=DATA.iq[key]; if(!i) return;
   var ki=kpush(key);
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Al renovar se registra un nuevo pago de gastos de gestion. Se puede pagar en cuotas.</p>";
-  o+="<div class='g2'>"+fld("rv-alq","Nuevo alquiler $",i.alquiler,"money")+fld("rv-gs","Gastos renovacion $","","money")+"</div>";
-  o+="<div class='g2'>"+fld("rv-ing","Nuevo inicio","","date")+fld("rv-egr","Nuevo fin","","date")+"</div>";
+  var hoyStr=hoy();
+  var yr=parseInt(hoyStr.slice(0,4)),mo=parseInt(hoyStr.slice(5,7));
+  mo+=12; if(mo>12){mo-=12;yr++;}
+  var lastDay=new Date(yr,mo,0).getDate();
+  var sugerFin=yr+"-"+String(mo).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
+  var sugerIni=hoyStr.slice(0,7)+"-01";
+  var o="";
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'>";
+  o+="<div style='color:#94A3B8;font-size:10px;font-weight:700;margin-bottom:6px'>CONTRATO ORIGINAL</div>";
+  o+="<div class='g2'>";
+  o+="<div><div class='lbl'>Inquilino desde</div><div style='color:#F59E0B;font-weight:700'>"+fecDisp(i.ingreso||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Alquiler actual</div><div style='color:#10B981;font-weight:700'>"+fmt(i.alquiler)+"</div></div>";
+  o+="<div><div class='lbl'>Vencimiento actual</div><div>"+fecDisp(i.egreso||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Deposito original</div><div>"+fmt(i.deposito||0)+"</div></div>";
+  o+="</div></div>";
+  o+="<div class='g2'>";
+  o+=fld("rv-alq","Nuevo alquiler $",i.alquiler,"money");
+  o+=fld("rv-dep","Deposito a actualizar $ (0 si no cambia)","0","money");
+  o+=fld("rv-gs","Gastos de renovacion $","","money");
+  o+="</div>";
+  o+=sld("rv-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
   o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
-  openModal("Renovar Acuerdo - "+esc(i.unidad),o);
+  o+="<div class='g2'>";
+  o+=fld("rv-ini","Nueva vigencia desde",sugerIni,"date");
+  o+=fld("rv-egr","Nueva vigencia hasta",sugerFin,"date");
+  o+="</div>";
+  o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-top:8px'>";
+  o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:6px'>Firma del acuerdo de renovacion</div>";
+  if(i.firma&&i.firma.startsWith("data:image")){
+    o+="<div style='color:#64748B;font-size:11px;margin-bottom:6px'>Ya tiene firma previa:</div>";
+    o+="<img src='"+i.firma+"' style='max-height:50px;border-radius:4px;background:#1E293B;padding:4px;margin-bottom:6px'/><br>";
+  } else {
+    o+="<div style='color:#64748B;font-size:11px;margin-bottom:6px'>Sin firma digital. Podes agregarla ahora.</div>";
+  }
+  o+="<label style='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:#94A3B8;margin-bottom:6px'>";
+  o+="<input type='checkbox' id='rv-firmar' onchange='var b=G(\"rv-firma-block\");if(b)b.style.display=this.checked?\"block\":\"none\";if(this.checked)initRvFirma();'> Agregar/actualizar firma ahora</label>";
+  o+="<div id='rv-firma-block' style='display:none'>";
+  o+="<canvas id='rv-firma-canvas' width='400' height='120' style='background:#fff;border-radius:6px;border:1px solid #334155;cursor:crosshair;max-width:100%;display:block;margin-bottom:6px'></canvas>";
+  o+="<button class='btn bg bsm' onclick='clearRvFirma()'>Borrar firma</button>";
+  o+="</div></div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
+  openModal("Renovar - "+esc(i.unidad)+" - "+esc(i.nombre),o,true);
   var md=MODS[MODS.length-1];
-  md.onclick=function(e){if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));else if(e.target.classList.contains("ov"))closeModal();};
+  md.onclick=function(e){
+    if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+
+function initRvFirma(){
+  var canvas=G("rv-firma-canvas"); if(!canvas)return;
+  var ctx=canvas.getContext("2d");
+  ctx.strokeStyle="#000";ctx.lineWidth=2;ctx.lineCap="round";
+  var drawing=false;
+  function pos(e){var r=canvas.getBoundingClientRect(),touch=e.touches?e.touches[0]:e;return{x:(touch.clientX-r.left)*(canvas.width/r.width),y:(touch.clientY-r.top)*(canvas.height/r.height)};}
+  canvas.onmousedown=canvas.ontouchstart=function(e){e.preventDefault();drawing=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);};
+  canvas.onmousemove=canvas.ontouchmove=function(e){e.preventDefault();if(!drawing)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();};
+  canvas.onmouseup=canvas.ontouchend=function(){drawing=false;};
+}
+function clearRvFirma(){
+  var canvas=G("rv-firma-canvas"); if(!canvas)return;
+  canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);
 }
 function saveRenovar(key){
+  var i=DATA.iq[key]; if(!i) return;
   var alq=fmtInputVal(G("rv-alq"));
-  var gs=fmtInputVal(G("rv-gs"));
-  var ing=G("rv-ing").value;
-  var egr=G("rv-egr").value;
-  var cuotas=parseInt(G("rv-cuotas").value)||1;
+  var dep=fmtInputVal(G("rv-dep")||{value:"0",dataset:{raw:"0"}});
+  var gs=fmtInputVal(G("rv-gs")||{value:"0",dataset:{raw:"0"}});
+  var ini=G("rv-ini")?G("rv-ini").value:"";
+  var egr=G("rv-egr")?G("rv-egr").value:"";
+  var cuotasDep=parseInt((G("rv-cuotas-dep")||{value:"1"}).value.charAt(0))||1;
+  var cuotas=parseInt((G("rv-cuotas")||{value:"1"}).value.charAt(0))||1;
   if(!alq){alert("El alquiler es obligatorio");return;}
-  // Update inquilino
-  var upd={alquiler:alq,ingreso:ing||DATA.iq[key].ingreso,egreso:egr||DATA.iq[key].egreso,ultimo_aj:ing||hoy()};
-  DB.ref("iq/"+key).update(upd);
-  // Register gastos as partial payments in cobranzas if > 0
-  if(gs>0){
-    var montoCuota=Math.round(gs/cuotas);
-    var m=mes();
-    for(var c=0;c<cuotas;c++){
-      var yr=parseInt(m.split("-")[0]),mo=parseInt(m.split("-")[1])+c;
-      if(mo>12){mo=mo-12;yr++;}
-      var mesC=yr+"-"+String(mo).padStart(2,"0");
-      var cobReg={id_ac:DATA.iq[key].id_ac||"",unidad:DATA.iq[key].unidad,inq:DATA.iq[key].nombre,mes:mesC,monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas};
-      DB.ref("cob").push(cobReg);
+
+  // Capturar firma si existe
+  var firmarCb=G("rv-firmar");
+  var firmaData=null;
+  if(firmarCb&&firmarCb.checked){
+    var canvas=G("rv-firma-canvas");
+    if(canvas){
+      var ctx=canvas.getContext("2d");
+      var blank=document.createElement("canvas");blank.width=canvas.width;blank.height=canvas.height;
+      if(canvas.toDataURL()!==blank.toDataURL()) firmaData=canvas.toDataURL("image/png");
     }
   }
+
+  // Actualizar inquilino — mantener ingreso ORIGINAL, solo actualizar egreso y alquiler
+  var upd={alquiler:alq,egreso:egr||i.egreso,ultimo_aj:hoy()};
+  if(dep>0) upd.deposito=(i.deposito||0)+dep; // acumular depósito
+  if(firmaData){upd.firma=firmaData;upd.fecha_firma=hoy();}
+  DB.ref("iq/"+key).update(upd);
+
+  // Registrar depósito adicional como cobro si > 0
+  if(dep>0){
+    var montoCuotaDep=Math.round(dep/cuotasDep);
+    var mBase=ini?ini.slice(0,7):mes();
+    for(var cd=0;cd<cuotasDep;cd++){
+      var yrD=parseInt(mBase.split("-")[0]),moD=parseInt(mBase.split("-")[1])+cd;
+      if(moD>12){moD-=12;yrD++;}
+      var mesD=yrD+"-"+String(moD).padStart(2,"0");
+      DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:mesD,
+        monto_total:montoCuotaDep,sal_ant:0,estado:"pendiente",pagos:{},
+        concepto:"Depósito renovación cuota "+(cd+1)+"/"+cuotasDep});
+    }
+  }
+
+  // Registrar gastos de renovación como cobro si > 0
+  if(gs>0){
+    var montoCuota=Math.round(gs/cuotas);
+    var m=ini?ini.slice(0,7):mes();
+    for(var c=0;c<cuotas;c++){
+      var yr=parseInt(m.split("-")[0]),mo=parseInt(m.split("-")[1])+c;
+      if(mo>12){mo-=12;yr++;}
+      var mesC=yr+"-"+String(mo).padStart(2,"0");
+      DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:mesC,
+        monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},
+        concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas});
+    }
+  }
+
   closeModal();closeModal();
-  alert("Renovacion registrada. Nuevo alquiler: "+fmt(alq)+(gs>0?" - Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):""));
+  var msg="Renovacion registrada! Alquiler: "+fmt(alq)+".";
+  if(dep>0) msg+=" Depósito: "+fmt(dep)+" en "+cuotasDep+" cuota"+(cuotasDep>1?"s":"")+"."  ;
+  if(gs>0) msg+=" Gastos: "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":"")+".";
+  if(firmaData) msg+=" Firma guardada.";
+  alert(msg);
 }
 
 // ── AJUSTE CUATRIMESTRAL ──────────────────────────────────────────────────────
@@ -1315,7 +1323,6 @@ function openRecargos(ckey){
   var ki=kpush(ckey);
   var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0),saldo=tot-pg;
   var cr=getCfgRec();
-  var dia=new Date().getDate();
   var recTardio=Math.round(c.monto_total*(dia>=20?cr.rec_d20:dia>=10?cr.rec_d10:cr.rec_d5)/100);
   var recDigital=Math.round(c.monto_total*cr.rec_digital/100);
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>"+c.unidad+" - "+esc(c.inq)+" - Saldo: <b style='color:#EF4444'>"+fmt(saldo)+"</b></p>";
@@ -1800,10 +1807,7 @@ function saveNA(){
     var posCta=(G("na-pos-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcCta=(G("na-pc-cta")||{value:"Efectivo"}).value||"Efectivo";
     var pcFechaGuardada=G("na-pc-fecha")&&G("na-pc-fecha").value?G("na-pc-fecha").value:"";
-    var _posesionFecha=G("na-posesion")?G("na-posesion").value:"";
-    // La fecha del pago a cuenta es: fecha de reserva (si viene de reserva) > fecha de posesión > hoy
-    // NUNCA la fecha de inicio del contrato
-    var pcFecha=pcFechaGuardada||_posesionFecha||hoy();
+    var pcFecha=pcFechaGuardada||ing||hoy();
     var cuotasDep=parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1;
     var cuotasGs=parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1;
     var pcRestante=pc;
@@ -1997,65 +2001,9 @@ function openFichaHist(key){
     });
     o+="</div>";
   }
-  // Fotos pegadas
-  var fotos=i.fotos_historial?Object.values(i.fotos_historial):[];
-  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
-  o+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
-  o+="<div class='lbl'>Fotos</div>";
-  o+="<button class='btn bp bsm' style='font-size:11px' onclick='pegarFotoHistorial("+JSON.stringify(key)+")'>📋 Pegar foto (Ctrl+V)</button>";
-  o+="</div>";
-  if(fotos.length){
-    fotos.forEach(function(f,idx){
-      o+="<div style='margin-bottom:8px'>";
-      o+="<img src='"+f.data+"' style='max-width:100%;border-radius:8px;border:1px solid #334155'/>";
-      o+="<div style='color:#64748B;font-size:10px;margin-top:3px'>"+fecDisp(f.fecha||"")+(f.nota?" — "+esc(f.nota):"")+"</div>";
-      o+="</div>";
-    });
-  } else {
-    o+="<p style='color:#64748B;font-size:11px'>Sin fotos. Copiá una imagen y tocá Pegar foto.</p>";
-  }
-  o+="</div>";
   openModal("Historial - "+esc(i.nombre),o,true);
 }
 
-
-function pegarFotoHistorial(key){
-  navigator.clipboard.read().then(function(items){
-    for(var i=0;i<items.length;i++){
-      var item=items[i];
-      var imgType=item.types.find(function(t){return t.startsWith('image/');});
-      if(imgType){
-        item.getType(imgType).then(function(blob){
-          // Comprimir antes de guardar
-          var url=URL.createObjectURL(blob);
-          var img=new Image();
-          img.onload=function(){
-            var canvas=document.createElement('canvas');
-            var maxW=1200;
-            var w=img.width,h=img.height;
-            if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
-            canvas.width=w;canvas.height=h;
-            canvas.getContext('2d').drawImage(img,0,0,w,h);
-            var data=canvas.toDataURL('image/jpeg',0.75);
-            URL.revokeObjectURL(url);
-            var nota=prompt('Nota para esta foto (opcional):','');
-            DB.ref('hist/'+key+'/fotos_historial').push({
-              data:data,fecha:hoy(),nota:nota||''
-            },function(err){
-              if(err){alert('Error al guardar: '+err.message);}
-              else{openHistorialEventos(key);}
-            });
-          };
-          img.src=url;
-        });
-        return;
-      }
-    }
-    alert('No hay imagen en el portapapeles. Copiá una imagen primero (Ctrl+C sobre la imagen).');
-  }).catch(function(){
-    alert('No se pudo acceder al portapapeles. Asegurate de dar permiso cuando el navegador lo pida.');
-  });
-}
 
 // COBRANZAS
 var _cobMes=mes();
@@ -2262,9 +2210,6 @@ function regPago(ckey){
   var c=DATA.cob[ckey],ts=Date.now(),ups={};
   var esUSD=c.moneda==="USD";
   var fecha=G("p-f").value,cta1=G("p-c").value;
-  // Bloquear si la caja o el mes están cerrados
-  if(cajaCerrada(fecha)){alert("⛔ La caja del "+fecDisp(fecha)+" ya está cerrada. Cambiá la fecha al día de hoy.");return;}
-  if(mesCerrado(fecha.slice(0,7))){alert("⛔ El mes "+fecha.slice(0,7)+" ya fue cerrado. No se puede registrar el pago.");return;}
   var m,usd_monto=0,tc_usado=0;
 
   if(esUSD){
@@ -2545,10 +2490,8 @@ function saveCosto(ckey){
   var checkboxPagado=G("ec-p").checked;
   var pm=fmtInputVal(G("ec-pm")||{value:"0",dataset:{raw:"0"}});
   var pc=(G("ec-pc")||{value:"Efectivo"}).value;
+  // Fecha de pago: siempre usar el campo ec-fp
   var fechaPago=G("ec-fp")?(G("ec-fp").value||hoy()):hoy();
-  // Bloquear si la caja o el mes están cerrados
-  if(cajaCerrada(fechaPago)){alert("⛔ La caja del "+fecDisp(fechaPago)+" ya está cerrada. No se puede registrar el pago.");return;}
-  if(mesCerrado(fechaPago.slice(0,7))){alert("⛔ El mes "+fechaPago.slice(0,7)+" ya fue cerrado. No se puede registrar el pago.");return;}
   var c=DATA.cst[ckey];
   var pagosExist=c&&c.pagos?Object.values(c.pagos):[];
   var totalYaPagado=pagosExist.reduce(function(s,x){return s+Number(x.monto||0);},0);
@@ -3112,11 +3055,12 @@ function rCaja(){
         Object.keys(porCuenta).forEach(function(ct){
           if(porCuenta[ct]>0){
             var esSocioCt=CTAS_SOCIOS.indexOf(ct)>=0;
+            // Si pagó con TJ/MP propia: es aporte del socio (sale de su bolsillo, no de caja)
             movimientosD.push({
               concepto:esc(c.desc||""),
-              mov: esSocioCt ? 0 : -porCuenta[ct],
+              mov: esSocioCt ? 0 : -porCuenta[ct], // no impacta caja si lo pagó el socio
               cuenta: esSocioCt ? "_socios_costo" : ct,
-              socioMov: esSocioCt ? -porCuenta[ct] : undefined, // aporte: negativo en socios (salió de su bolsillo)
+              socioMov: esSocioCt ? porCuenta[ct] : undefined, // aparece como aporte en columna Socios
               tipo:"costo"
             });
           }
@@ -3130,7 +3074,7 @@ function rCaja(){
             concepto:esc(c.desc||""),
             mov: esSocioC ? 0 : -Number(c.monto||0),
             cuenta: esSocioC ? "_socios_costo" : ctC,
-            socioMov: esSocioC ? -Number(c.monto||0) : undefined, // aporte: negativo en socios
+            socioMov: esSocioC ? Number(c.monto||0) : undefined,
             tipo:"costo"
           });
         }
@@ -3149,16 +3093,10 @@ function rCaja(){
       var ctaCaja=mv.cuenta_caja||"Efectivo_sin_cuenta";
       var monto=Number(mv.monto||0);
       var esRetiro=mv.tipo==="retiro";
-      var esMPPersonal=['MP Loli','MP Hugo'].indexOf(mv.cuenta_caja)>=0;
-      var esEspecie=!esRetiro&&CTAS_SOCIOS.indexOf(mv.cuenta_caja)>=0; // aporte en TJ/MP = en especie
       var socioNombre=mv.cuenta==="Cuenta Hugo"?"Hugo":mv.cuenta==="Cuenta Loli"?"Loli":"Socio";
-      var concepto=esc(esMPPersonal?(mv.nota||'Cobro MP'):((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:"")));
-      // Retiro: caja negativo, socio positivo
-      // Aporte efectivo/banco: caja positivo, socio negativo
-      // Aporte en especie (TJ/MP): caja sin impacto (0), socio negativo
-      var movCaja = esRetiro ? -monto : esEspecie ? 0 : monto;
-      var movSocio = esRetiro ? monto : -monto;
-      movimientosD.push({concepto:concepto,mov:movCaja,cuenta:ctaCaja,socioMov:movSocio,tipo:"movimiento"});
+      var concepto=esc((esRetiro?"Retiro":"Aporte")+" "+socioNombre+(mv.nota?" - "+mv.nota:""));
+      // Impacto en cuenta de caja (Efectivo, Bco Hugo, etc.) + columna Socios en la misma fila
+      movimientosD.push({concepto:concepto,mov:esRetiro?-monto:monto,cuenta:ctaCaja,socioMov:esRetiro?monto:-monto,tipo:"movimiento"});
     });
 
     // Fix old records (incluyendo cobros viejos con cuentas de socios)
@@ -3230,7 +3168,7 @@ function rCaja(){
       var colorMov=mv.mov>=0?"#10B981":"#EF4444";
       // Para costos pagados con TJ socio: marcar como aporte
       var conceptoLabel=mv.concepto;
-      if(mv.cuenta==="_socios_costo") conceptoLabel+=" <span style='background:#F59E0B22;color:#F59E0B;border-radius:3px;padding:1px 4px;font-size:9px'>pago socio</span>";
+      if(mv.cuenta==="_socios_costo") conceptoLabel+=" <span style='background:#10B98122;color:#10B981;border-radius:3px;padding:1px 4px;font-size:9px'>aporte socio</span>";
       o+="<tr style='background:"+bg+";border-bottom:1px solid #334155'>";
       o+="<td style='padding:6px 10px;color:#F1F5F9'>"+conceptoLabel+"</td>";
       cuentasTabla.forEach(function(cta){
@@ -3415,12 +3353,9 @@ function rCaja(){
       o+="<div style='font-size:11px;font-weight:700;color:#8B5CF6;margin-bottom:4px'>"+cta+"</div>";
       o+="<table class='tbl'><tbody>";
       mc.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");}).forEach(function(mv){
-        var esMPP=['MP Loli','MP Hugo'].indexOf(mv.cuenta_caja)>=0;
-        var esIng=mv.tipo==="retiro"||esMPP;
-        var conceptoMv=esMPP?(mv.nota||'Cobro MP'):((mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" — "+esc(mv.nota):""));
-        o+="<tr><td style='color:#64748B;font-size:11px'>"+fecDisp(mv.fecha||"")+"</td>";
-        o+="<td style='font-size:12px'>"+esc(conceptoMv)+"</td>";
-        o+="<td style='color:"+(esIng?"#10B981":"#EF4444")+";font-weight:600'>"+(esIng?"+":"-")+fmt(mv.monto)+"</td>";
+        o+="<tr><td style='color:#64748B;font-size:11px'>"+esc(mv.fecha||"")+"</td>";
+        o+="<td style='font-size:12px'>"+(mv.tipo==="retiro"?"Retiro":"Aporte")+(mv.nota?" — "+esc(mv.nota):"")+"</td>";
+        o+="<td style='color:"+(mv.tipo==="retiro"?"#EF4444":"#10B981")+";font-weight:600'>"+(mv.tipo==="retiro"?"-":"+")+fmt(mv.monto)+"</td>";
         o+="</tr>";
       });
       o+="</tbody></table></div>";
@@ -3595,13 +3530,10 @@ function saveAj(){
   var m=fmtInputVal(G("aj-m")||{value:"0",dataset:{raw:"0"}});
   var c=G("aj-con")?G("aj-con").value:"";
   if(!m||!c){alert("Monto y descripcion obligatorios");return;}
-  var fecha=G("aj-f")?G("aj-f").value:hoy();
-  if(cajaCerrada(fecha)){alert("⛔ La caja del "+fecDisp(fecha)+" ya está cerrada. No se puede modificar.");return;}
-  if(mesCerrado(fecha.slice(0,7))){alert("⛔ El mes "+fecha.slice(0,7)+" ya fue cerrado. No se puede modificar.");return;}
   var clasif=(G("aj-s")||{value:"otro"}).value;
   var unidad=G("aj-unidad")?G("aj-unidad").value||"General":"General";
   var concepto=c+(unidad&&unidad!=="General"?" ["+unidad+"]":"");
-  DB.ref("aj").push({fecha:fecha,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
+  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
   closeModal();setTimeout(rCaja,300);
 }
 function openMov(){
