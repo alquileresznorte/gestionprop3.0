@@ -376,7 +376,7 @@ function getMovs(){
 function getPending(){
   return getMovs().filter(function(mv){
     var ov=getOv(mvId(mv));
-    return !ov.done;
+    return !ov.done&&!ov.deleted;
   });
 }
 
@@ -434,8 +434,9 @@ function rPend(){
   var html='<div class="banner"><div class="bdot '+(ok?'ok':'ld')+'"></div>';
   html+='<span>'+(ok?'GestionProp — '+movs.length+' movimientos en '+MNL[cM]:'Conectando...')+'</span></div>';
 
-  var pend=movs.filter(function(mv){return !getOv(mvId(mv)).done;});
-  var done=movs.filter(function(mv){return getOv(mvId(mv)).done;});
+  var pend=movs.filter(function(mv){var ov=getOv(mvId(mv));return !ov.done&&!ov.deleted;});
+  var done=movs.filter(function(mv){var ov=getOv(mvId(mv));return ov.done&&!ov.deleted;});
+  var deleted=movs.filter(function(mv){return getOv(mvId(mv)).deleted;});
 
   if(!pend.length&&!done.length){
     el.innerHTML=html+'<div class="empty">Sin movimientos de socios en '+MNL[cM]+'.</div>';
@@ -453,7 +454,24 @@ function rPend(){
     done.forEach(function(mv){html+=renderMov(mv,true);});
   }
 
+  if(deleted.length){
+    html+='<div class="sec">Descartados ('+deleted.length+')</div>';
+    deleted.forEach(function(mv){
+      var mid=mvId(mv);
+      html+='<div class="card dim" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+      html+='<div class="col"><div class="tit" style="font-size:12px">'+esc(gpLabel(mv))+'</div>';
+      html+='<div class="sub"><span class="tag">'+esc(mv.fecha||'')+'</span></div></div>';
+      html+='<button class="btn-sm" onclick="restoreMov(\"'+mid+'\")">Restaurar</button>';
+      html+='</div>';
+    });
+  }
+
   el.innerHTML=html;
+}
+
+function restoreMov(mid){
+  var ov=getOv(mid);ov.deleted=false;ov.done=false;ov.cat='';ov.who='';
+  saveOv(mid,ov);updateBadge();rPend();
 }
 
 function renderMov(mv,isDone){
