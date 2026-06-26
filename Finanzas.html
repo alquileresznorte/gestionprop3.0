@@ -524,14 +524,22 @@ function renderMov(mv,isDone){
     // Obs
     h+='<input type="text" placeholder="Observacion..." value="'+esc(ov.obs||'')+'" data-mid="'+mid+'" onchange="setObs(this)" style="width:100%;padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid #334155;background:#0F172A;color:#F1F5F9;margin-bottom:8px"/>';
 
-    // Confirm button
+    // Botones de accion
+    h+='<div style="display:flex;gap:8px;margin-top:4px">';
     if(ov.cat){
-      h+='<button class="btn" style="width:100%" onclick="confirmMov(\''+mid+'\',\''+quien+'\')">✓ Clasificar y mover al Resumen</button>';
+      h+='<button class="btn" style="flex:2" onclick="confirmMov(\''+mid+'\',\''+quien+'\')">&#10003; Clasificar y mover al Resumen</button>';
     }
+    h+='<button style="flex:1;padding:8px;border-radius:8px;border:none;background:#EF444420;color:#F87171;cursor:pointer;font-size:11px;font-weight:600" onclick="deleteMov(\''+mid+'\')">&#x1F5D1; No corresponde</button>';
+    h+="</div>";
   }
 
   h+='</div>';
   return h;
+}
+
+function deleteMov(mid){
+  if(!confirm('Descartar? No se borra de GestionProp.'))return;
+  var ov=getOv(mid);ov.deleted=true;ov.done=true;saveOv(mid,ov);updateBadge();rPend();
 }
 
 function setCat(btn){
