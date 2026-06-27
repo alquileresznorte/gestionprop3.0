@@ -1164,7 +1164,9 @@ function openRenovar(key){
   var sugerFin=yr+"-"+String(mo).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
   var sugerIni=hoyStr.slice(0,7)+"-01";
   var o="";
-  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'>";
+
+  // ── RESUMEN CONTRATO ORIGINAL ──
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px'>";
   o+="<div style='color:#94A3B8;font-size:10px;font-weight:700;margin-bottom:6px'>CONTRATO ORIGINAL</div>";
   o+="<div class='g2'>";
   o+="<div><div class='lbl'>Inquilino desde</div><div style='color:#F59E0B;font-weight:700'>"+fecDisp(i.ingreso||"--")+"</div></div>";
@@ -1173,6 +1175,8 @@ function openRenovar(key){
   o+="<div><div class='lbl'>Deposito original (no cambia)</div><div style='color:#10B981'>"+fmt(i.deposito||0)+"</div></div>";
   o+="</div></div>";
   o+="<div class='ibox' style='background:#10B98111;border-color:#10B981;color:#6EE7B7;margin-bottom:10px'>La fecha de ingreso original se mantiene. Solo se extiende la vigencia por 12 meses mas.</div>";
+
+  // ── MONTOS ──
   o+="<div class='g2'>";
   o+=fld("rv-alq","Nuevo alquiler mensual $",i.alquiler,"money");
   o+=fld("rv-dep","Deposito a actualizar $ (0 si no cambia)","0","money");
@@ -1184,29 +1188,67 @@ function openRenovar(key){
   o+=fld("rv-ini","Nueva vigencia desde",sugerIni,"date");
   o+=fld("rv-egr","Nueva vigencia hasta",sugerFin,"date");
   o+="</div>";
-  // Seccion datos del inquilino
-  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-top:10px;margin-bottom:8px'>";
-  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:8px'>Actualizar datos del inquilino (opcional)</div>";
+
+  // ── DATOS INQUILINO 1 ──
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-top:10px;border:1px solid #334155'>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:8px'>👤 Datos del inquilino (actualizar si cambió algo)</div>";
   o+="<div class='g2'>";
-  o+=fld("rv-trabajo","Trabajo / empleador",i.trabajo1||i.trabajo||"");
   o+=fld("rv-tel","Telefono",i.tel||i.telefono||"");
+  o+=fld("rv-trabajo","Trabajo / empleador",i.trabajo1||i.trabajo||"");
+  o+="</div>";
+  // Recibo de sueldo
+  o+="<div style='margin-top:8px'>";
+  o+="<div class='lbl' style='margin-bottom:4px'>Recibo de sueldo actualizado (foto)</div>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'>";
+  o+="<label style='background:#334155;color:#CBD5E1;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;display:inline-block'>📎 Seleccionar foto<input type='file' id='rv-sueldo-file' accept='image/*' style='display:none' onchange='prevRvDoc(this,\"rv-sueldo-prev\")'></label>";
+  if(i.doc_sueldo) o+="<span style='color:#10B981;font-size:10px'>Ya tiene recibo cargado</span>";
+  o+="</div>";
+  o+="<div id='rv-sueldo-prev' style='margin-top:6px'>";
+  if(i.doc_sueldo) o+="<img src='"+i.doc_sueldo+"' style='max-height:80px;border-radius:6px;border:1px solid #334155'/>";
+  o+="</div></div></div>";
+
+  // ── DATOS 2DO INQUILINO ──
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-top:8px;border:1px solid #334155'>";
+  o+="<div style='color:#8B5CF6;font-size:11px;font-weight:700;margin-bottom:8px'>👤 2do inquilino (actualizar si cambió)</div>";
+  o+="<div class='g2'>";
+  o+=fld("rv-nom2","Nombre 2do inquilino",i.nom2||"");
+  o+=fld("rv-dni2","DNI 2do",i.dni2||"");
+  o+=fld("rv-tel2","Telefono 2do",i.tel2||"");
+  o+=fld("rv-trabajo2","Trabajo 2do",i.trabajo2||"");
+  o+="</div>";
+  o+="<div style='margin-top:8px'>";
+  o+="<div class='lbl' style='margin-bottom:4px'>Recibo de sueldo 2do inquilino (foto)</div>";
+  o+="<label style='background:#334155;color:#CBD5E1;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;display:inline-block'>📎 Seleccionar foto<input type='file' id='rv-sueldo2-file' accept='image/*' style='display:none' onchange='prevRvDoc(this,\"rv-sueldo2-prev\")'></label>";
+  o+="<div id='rv-sueldo2-prev' style='margin-top:6px'>";
+  if(i.foto_sue2) o+="<img src='"+i.foto_sue2+"' style='max-height:80px;border-radius:6px;border:1px solid #334155'/>";
+  o+="</div></div></div>";
+
+  // ── CONTACTO DE EMERGENCIA ──
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-top:8px;border:1px solid #334155'>";
+  o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:8px'>🚨 Contacto de emergencia</div>";
+  o+="<div class='g2'>";
+  o+=fld("rv-emnom","Nombre",i.ct_emerg||i.emergencia_nombre||"");
+  o+=fld("rv-emtel","Telefono",i.tel_emerg||i.emergencia_tel||"");
   o+="</div></div>";
+
+  // ── ACUERDO ──
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-top:8px;border:1px solid #334155'>";
+  o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:6px'>📄 Acuerdo de convivencia</div>";
+  o+="<div style='max-height:180px;overflow-y:auto;font-size:10px;color:#94A3B8;line-height:1.7;white-space:pre-wrap;background:#1E293B;border-radius:6px;padding:8px;margin-bottom:8px'>"+esc(getAcuerdo())+"</div>";
   // Firma
-  o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-top:8px'>";
-  o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:6px'>Firma del acuerdo de renovacion</div>";
+  o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:6px'>✍ Firma del acuerdo</div>";
   if(i.firma&&i.firma.startsWith("data:image")){
-    o+="<div style='color:#64748B;font-size:11px;margin-bottom:6px'>Ya tiene firma previa:</div>";
-    o+="<img src='"+i.firma+"' style='max-height:50px;border-radius:4px;background:#1E293B;padding:4px;margin-bottom:6px'/><br>";
-  } else {
-    o+="<div style='color:#64748B;font-size:11px;margin-bottom:6px'>Sin firma digital. Podes agregarla ahora.</div>";
+    o+="<div style='color:#64748B;font-size:10px;margin-bottom:4px'>Firma anterior:</div>";
+    o+="<img src='"+i.firma+"' style='max-height:50px;border-radius:4px;background:#fff;padding:4px;margin-bottom:6px'/><br>";
   }
   o+="<label style='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:#94A3B8;margin-bottom:6px'>";
-  o+="<input type='checkbox' id='rv-firmar' onchange='var b=G(\"rv-firma-block\");if(b)b.style.display=this.checked?\"block\":\"none\";if(this.checked)initRvFirma();'> Agregar/actualizar firma ahora</label>";
+  o+="<input type='checkbox' id='rv-firmar' onchange='var b=G(\"rv-firma-block\");if(b)b.style.display=this.checked?\"block\":\"none\";if(this.checked)initRvFirma();'> Firmar acuerdo ahora</label>";
   o+="<div id='rv-firma-block' style='display:none'>";
   o+="<canvas id='rv-firma-canvas' width='400' height='120' style='background:#fff;border-radius:6px;border:1px solid #334155;cursor:crosshair;max-width:100%;display:block;margin-bottom:6px'></canvas>";
-  o+="<button class='btn bg bsm' onclick='clearRvFirma()'>Borrar firma</button>";
+  o+="<button class='btn bg bsm' onclick='clearRvFirma()'>Borrar</button>";
   o+="</div></div>";
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:14px'>";
   o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
   o+="<button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
   openModal("Renovar — "+esc(i.unidad)+" — "+esc(i.nombre),o,true);
@@ -1215,6 +1257,14 @@ function openRenovar(key){
     if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));
     else if(e.target.classList.contains("ov"))closeModal();
   };
+}
+
+function prevRvDoc(input,prevId){
+  var file=input.files[0]; if(!file)return;
+  var el=G(prevId); if(!el)return;
+  var reader=new FileReader();
+  reader.onload=function(e){el.innerHTML="<img src='"+e.target.result+"' style='max-height:80px;border-radius:6px;border:1px solid #334155'/>";};
+  reader.readAsDataURL(file);
 }
 
 function initRvFirma(){
@@ -1242,7 +1292,7 @@ function saveRenovar(key){
   var cuotas=parseInt((G("rv-cuotas")||{value:"1"}).value.charAt(0))||1;
   if(!alq){alert("El alquiler es obligatorio");return;}
 
-  // Capturar firma si existe
+  // Capturar firma
   var firmarCb=G("rv-firmar");
   var firmaData=null;
   if(firmarCb&&firmarCb.checked){
@@ -1253,50 +1303,94 @@ function saveRenovar(key){
     }
   }
 
-  // Actualizar inquilino — mantener ingreso ORIGINAL, solo actualizar egreso, alquiler y datos opcionales
-  var upd={alquiler:alq,egreso:egr||i.egreso,ultimo_aj:hoy()};
-  if(dep>0) upd.deposito=(i.deposito||0)+dep;
-  if(firmaData){upd.firma=firmaData;upd.fecha_firma=hoy();}
-  var trabajoNuevo=G("rv-trabajo")?G("rv-trabajo").value.trim():"";
+  // Leer datos del formulario
   var telNuevo=G("rv-tel")?G("rv-tel").value.trim():"";
-  if(trabajoNuevo) upd.trabajo=trabajoNuevo;
-  if(telNuevo) upd.tel=telNuevo;
-  DB.ref("iq/"+key).update(upd);
+  var trabajoNuevo=G("rv-trabajo")?G("rv-trabajo").value.trim():"";
+  var nom2=G("rv-nom2")?G("rv-nom2").value.trim():"";
+  var dni2=G("rv-dni2")?G("rv-dni2").value.trim():"";
+  var tel2=G("rv-tel2")?G("rv-tel2").value.trim():"";
+  var trabajo2=G("rv-trabajo2")?G("rv-trabajo2").value.trim():"";
+  var emnom=G("rv-emnom")?G("rv-emnom").value.trim():"";
+  var emtel=G("rv-emtel")?G("rv-emtel").value.trim():"";
 
-  // Registrar deposito adicional como cobro si > 0
-  if(dep>0){
-    var montoCuotaDep=Math.round(dep/cuotasDep);
-    var mBase=ini?ini.slice(0,7):mes();
-    for(var cd=0;cd<cuotasDep;cd++){
-      var yrD=parseInt(mBase.split("-")[0]),moD=parseInt(mBase.split("-")[1])+cd;
-      if(moD>12){moD-=12;yrD++;}
-      var mesD=yrD+"-"+String(moD).padStart(2,"0");
-      DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:mesD,
-        monto_total:montoCuotaDep,sal_ant:0,estado:"pendiente",pagos:{},
-        concepto:"Deposito renovacion cuota "+(cd+1)+"/"+cuotasDep});
-    }
+  // Funcion para comprimir y guardar imagen, luego ejecutar el save final
+  function comprimirImagen(file, maxW, quality, callback){
+    if(!file){callback(null);return;}
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var canvas=document.createElement("canvas");
+        var scale=Math.min(1,maxW/img.width);
+        canvas.width=img.width*scale;
+        canvas.height=img.height*scale;
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        callback(canvas.toDataURL("image/jpeg",quality));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
   }
 
-  // Registrar gastos de renovacion como cobro si > 0
-  if(gs>0){
-    var montoCuota=Math.round(gs/cuotas);
-    var mGs=ini?ini.slice(0,7):mes();
-    for(var c=0;c<cuotas;c++){
-      var yrG=parseInt(mGs.split("-")[0]),moG=parseInt(mGs.split("-")[1])+c;
-      if(moG>12){moG-=12;yrG++;}
-      var mesC=yrG+"-"+String(moG).padStart(2,"0");
-      DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:mesC,
-        monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},
-        concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas});
-    }
-  }
+  var fileSueldo=G("rv-sueldo-file")?G("rv-sueldo-file").files[0]:null;
+  var fileSueldo2=G("rv-sueldo2-file")?G("rv-sueldo2-file").files[0]:null;
 
-  closeModal();closeModal();
-  var msg="Renovacion registrada! Alquiler: "+fmt(alq)+".";
-  if(dep>0) msg+=" Deposito: "+fmt(dep)+" en "+cuotasDep+" cuota"+(cuotasDep>1?"s":".")+".";
-  if(gs>0) msg+=" Gastos: "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":".")+".";
-  if(firmaData) msg+=" Firma guardada.";
-  alert(msg);
+  // Comprimir ambos y luego guardar
+  comprimirImagen(fileSueldo,800,0.7,function(sueldo64){
+    comprimirImagen(fileSueldo2,800,0.7,function(sueldo264){
+      // Armar update de inquilino
+      var upd={alquiler:alq,egreso:egr||i.egreso,ultimo_aj:hoy()};
+      if(dep>0) upd.deposito=(i.deposito||0)+dep;
+      if(firmaData){upd.firma=firmaData;upd.fecha_firma=hoy();}
+      if(telNuevo) upd.tel=telNuevo;
+      if(trabajoNuevo){upd.trabajo=trabajoNuevo;upd.trabajo1=trabajoNuevo;}
+      if(nom2) upd.nom2=nom2;
+      if(dni2) upd.dni2=dni2;
+      if(tel2) upd.tel2=tel2;
+      if(trabajo2) upd.trabajo2=trabajo2;
+      if(emnom){upd.ct_emerg=emnom;upd.emergencia_nombre=emnom;}
+      if(emtel){upd.tel_emerg=emtel;upd.emergencia_tel=emtel;}
+      if(sueldo64) upd.doc_sueldo=sueldo64;
+      if(sueldo264) upd.foto_sue2=sueldo264;
+      DB.ref("iq/"+key).update(upd);
+
+      // Registrar deposito adicional
+      if(dep>0){
+        var montoCuotaDep=Math.round(dep/cuotasDep);
+        var mBase=ini?ini.slice(0,7):mes();
+        for(var cd=0;cd<cuotasDep;cd++){
+          var yrD=parseInt(mBase.split("-")[0]),moD=parseInt(mBase.split("-")[1])+cd;
+          if(moD>12){moD-=12;yrD++;}
+          var mesD=yrD+"-"+String(moD).padStart(2,"0");
+          DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:mesD,
+            monto_total:montoCuotaDep,sal_ant:0,estado:"pendiente",pagos:{},
+            concepto:"Deposito renovacion cuota "+(cd+1)+"/"+cuotasDep});
+        }
+      }
+
+      // Registrar gastos
+      if(gs>0){
+        var montoCuota=Math.round(gs/cuotas);
+        var mGs=ini?ini.slice(0,7):mes();
+        for(var c=0;c<cuotas;c++){
+          var yrG=parseInt(mGs.split("-")[0]),moG=parseInt(mGs.split("-")[1])+c;
+          if(moG>12){moG-=12;yrG++;}
+          var mesC=yrG+"-"+String(moG).padStart(2,"0");
+          DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,mes:mesC,
+            monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},
+            concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas});
+        }
+      }
+
+      closeModal();closeModal();
+      var msg="Renovacion registrada! Alquiler: "+fmt(alq)+".";
+      if(dep>0) msg+=" Deposito: "+fmt(dep)+" en "+cuotasDep+" cuota"+(cuotasDep>1?"s":"")+ ".";
+      if(gs>0) msg+=" Gastos: "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":".")+".";
+      if(firmaData) msg+=" Firma guardada.";
+      if(sueldo64) msg+=" Recibo actualizado.";
+      alert(msg);
+    });
+  });
 }
 
 // ── AJUSTE CUATRIMESTRAL ──────────────────────────────────────────────────────
