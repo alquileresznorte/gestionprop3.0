@@ -2810,7 +2810,8 @@ function rAlertas(){
   
   var cr=getCfgRec();
   iqA.forEach(function(inq){
-    var c=cobA.filter(function(x){return x.unidad===inq.unidad;})[0];
+    var cobsU=cobA.filter(function(x){return x.unidad===inq.unidad;});
+    var c=cobsU.filter(function(x){return !x.concepto||x.concepto.indexOf("Gasto")===-1&&x.concepto.indexOf("gasto")===-1;})[0]||cobsU[0];
     var pg=c?pT(c):0,alq=inq.alquiler,ok=pg>=alq,nom=inq.nombre.split(",")[0].trim();
     var descPct=cr.desc_pronto;
     var descMonto=Math.round(alq*(1-descPct/100));
