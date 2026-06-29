@@ -255,7 +255,7 @@ function closeModal(){var d=MODS.pop();if(d)d.remove();}
 var USER=null,SEC="login";
 var DATA={iq:{},cob:{},cst:{},ev:{},movs:{},cierres:{},aj:{},hist:{},subc:{},cfg:{},forms:{}};
 var _formsConvertidosLocal={};
-var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo","hist_cst","forms"];
+var DKEYS=["iq","cob","cst","ev","movs","cierres","aj","hist","subc","cfg","aho","cfg_aho","inv","cfg_rec","res","cfg_acuerdo","hist_cst","forms","cfg_alertas_ok"];
 
 // Base CF - never modified directly, overrides stored separately
 var CF_BASE = CF.map(function(c){return Object.assign({},c);});
@@ -1155,41 +1155,240 @@ function cerrarAc(key){
 }
 // ── RENOVACION ───────────────────────────────────────────────────────────────
 function openRenovar(key){
-  var i=DATA.iq[key];
+  var i=DATA.iq[key]; if(!i) return;
   var ki=kpush(key);
-  var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:12px'>Al renovar se registra un nuevo pago de gastos de gestion. Se puede pagar en cuotas.</p>";
-  o+="<div class='g2'>"+fld("rv-alq","Nuevo alquiler $",i.alquiler,"money")+fld("rv-gs","Gastos renovacion $","","money")+"</div>";
-  o+="<div class='g2'>"+fld("rv-ing","Nuevo inicio","","date")+fld("rv-egr","Nuevo fin","","date")+"</div>";
+
+  // Fechas sugeridas (12 meses desde hoy)
+  var hoyStr=hoy();
+  var yr=parseInt(hoyStr.slice(0,4)),mo=parseInt(hoyStr.slice(5,7));
+  mo+=12; if(mo>12){mo-=12;yr++;}
+  var lastDay=new Date(yr,mo,0).getDate();
+  var sugerFin=yr+"-"+String(mo).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
+  var sugerIni=hoyStr.slice(0,7)+"-01";
+
+  var o="";
+  // Info del contrato original
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px'>";
+  o+="<div style='color:#94A3B8;font-size:10px;margin-bottom:4px'>CONTRATO ORIGINAL</div>";
+  o+="<div class='g2'>";
+  o+="<div><div class='lbl'>Inquilino desde</div><div style='color:#F59E0B;font-weight:700'>"+fecDisp(i.ingreso||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Alquiler actual</div><div style='color:#10B981;font-weight:700'>"+fmt(i.alquiler)+"</div></div>";
+  o+="<div><div class='lbl'>Vencimiento actual</div><div>"+fecDisp(i.egreso||"--")+"</div></div>";
+  o+="<div><div class='lbl'>Deposito original</div><div>"+fmt(i.deposito||0)+"</div></div>";
+  o+="</div></div>";
+
+  // ── Montos renovacion
+  o+="<div class='g2'>";
+  o+=fld("rv-alq","Nuevo alquiler $",i.alquiler,"money");
+  o+=fld("rv-dep","Deposito a actualizar $ (0 si no cambia)","0","money");
+  o+=fld("rv-gs","Gastos de renovacion $","","money");
+  o+="</div>";
+  o+=sld("rv-cuotas-dep","Deposito en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
   o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas","3 cuotas"]);
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
-  openModal("Renovar Acuerdo - "+esc(i.unidad),o);
+  o+="<div class='g2'>";
+  o+=fld("rv-ini","Nueva vigencia desde",sugerIni,"date");
+  o+=fld("rv-egr","Nueva vigencia hasta",sugerFin,"date");
+  o+="</div>";
+
+  // ── Recibo de sueldo actualizado
+  o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
+  o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:8px'>Recibo de sueldo actualizado</div>";
+  o+="<div class='g2'>";
+  o+="<div class='fld'><label class='lbl'>Recibo inquilino principal</label><input type='file' id='rv-sueldo' accept='image/*' class='inp' style='padding:4px'/></div>";
+  o+="<div id='rv-sueldo-prev' style='display:none'><img id='rv-sueldo-img' style='max-height:80px;border-radius:6px;border:1px solid #334155'/></div>";
+  o+="</div></div>";
+
+  // ── 2do inquilino
+  o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:8px'>2do Inquilino</div>";
+  if(i.nom2){
+    o+="<div style='background:#0F172A;border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px;color:#94A3B8'>";
+    o+="Actual: <b style='color:#F1F5F9'>"+esc(i.nom2)+"</b> — DNI: "+esc(i.dni2||"--")+" — Tel: "+esc(i.tel2||"--")+"</div>";
+  }
+  o+="<label style='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94A3B8;margin-bottom:8px'>";
+  o+="<input type='checkbox' id='rv-mismo2'"+(i.nom2?" checked":"")+" onchange='_rvToggle2(this.checked)'> El 2do inquilino sigue siendo el mismo</label>";
+  o+="<div id='rv-bloque2' style='display:"+(i.nom2?"none":"block")+"'>";
+  o+="<div class='g2'>";
+  o+=fld("rv-nom2","Nombre 2do inquilino",i.nom2||"");
+  o+=fld("rv-dni2","DNI",i.dni2||"");
+  o+=fld("rv-tel2","Telefono",i.tel2||"");
+  o+=fld("rv-trabajo2","Trabajo",i.trabajo2||"");
+  o+="</div>";
+  o+="<div class='fld'><label class='lbl'>Recibo de sueldo 2do inquilino</label><input type='file' id='rv-sue2' accept='image/*' class='inp' style='padding:4px'/></div>";
+  o+="</div></div>";
+
+  // ── Contacto de emergencia
+  o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
+  o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:8px'>Contacto de emergencia</div>";
+  o+="<div class='g2'>";
+  o+=fld("rv-emnom","Nombre",i.ct_emerg||i.emergencia_nombre||"");
+  o+=fld("rv-emtel","Telefono",i.tel_emerg||i.emergencia_tel||"");
+  o+="</div></div>";
+
+  // ── Acuerdo y firma
+  o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-top:10px'>";
+  o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:6px'>Acuerdo de convivencia y firma</div>";
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;max-height:160px;overflow-y:auto;font-size:10px;color:#CBD5E1;line-height:1.7;white-space:pre-wrap;margin-bottom:8px'>"+esc(getAcuerdo())+"</div>";
+  if(i.firma&&i.firma.startsWith("data:image")){
+    o+="<div style='color:#64748B;font-size:11px;margin-bottom:6px'>Firma anterior: <img src='"+i.firma+"' style='max-height:40px;border-radius:4px;background:#1E293B;padding:3px;vertical-align:middle'/></div>";
+  }
+  o+="<div style='color:#94A3B8;font-size:11px;margin-bottom:6px'>Firma renovacion:</div>";
+  o+="<canvas id='rv-firma-canvas' width='400' height='100' style='background:#fff;border-radius:6px;border:1px solid #334155;cursor:crosshair;max-width:100%;display:block;margin-bottom:6px'></canvas>";
+  o+="<button class='btn bg bsm' onclick='clearRvFirma()'>Borrar firma</button>";
+  o+="</div>";
+
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
+  openModal("Renovar — "+esc(i.unidad)+" — "+esc(i.nombre),o,true);
+
+  setTimeout(function(){
+    initRvFirma();
+    // Preview recibo sueldo principal
+    var rs=G("rv-sueldo");
+    if(rs) rs.onchange=function(){
+      var file=this.files[0]; if(!file)return;
+      var reader=new FileReader();
+      reader.onload=function(e){
+        var prev=G("rv-sueldo-prev"),img=G("rv-sueldo-img");
+        if(prev) prev.style.display="block";
+        if(img) img.src=e.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+  },150);
+
   var md=MODS[MODS.length-1];
-  md.onclick=function(e){if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));else if(e.target.classList.contains("ov"))closeModal();};
+  md.onclick=function(e){
+    if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function initRvFirma(){
+  var canvas=G("rv-firma-canvas"); if(!canvas)return;
+  var ctx=canvas.getContext("2d");
+  ctx.strokeStyle="#000";ctx.lineWidth=2;ctx.lineCap="round";
+  var drawing=false;
+  function pos(e){
+    var r=canvas.getBoundingClientRect(),touch=e.touches?e.touches[0]:e;
+    return{x:(touch.clientX-r.left)*(canvas.width/r.width),y:(touch.clientY-r.top)*(canvas.height/r.height)};
+  }
+  canvas.onmousedown=canvas.ontouchstart=function(e){e.preventDefault();drawing=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);};
+  canvas.onmousemove=canvas.ontouchmove=function(e){e.preventDefault();if(!drawing)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();};
+  canvas.onmouseup=canvas.ontouchend=function(){drawing=false;};
+}
+function clearRvFirma(){
+  var canvas=G("rv-firma-canvas"); if(!canvas)return;
+  canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);
+}
+function _rvToggle2(mismo){
+  var bloque=G("rv-bloque2");
+  if(bloque) bloque.style.display=mismo?"none":"block";
 }
 function saveRenovar(key){
+  var i=DATA.iq[key]; if(!i)return;
   var alq=fmtInputVal(G("rv-alq"));
-  var gs=fmtInputVal(G("rv-gs"));
-  var ing=G("rv-ing").value;
-  var egr=G("rv-egr").value;
-  var cuotas=parseInt(G("rv-cuotas").value)||1;
+  var dep=fmtInputVal(G("rv-dep")||{value:"0",dataset:{raw:"0"}});
+  var gs=fmtInputVal(G("rv-gs")||{value:"0",dataset:{raw:"0"}});
+  var cuotasDep=G("rv-cuotas-dep")?parseInt(G("rv-cuotas-dep").value.charAt(0))||1:1;
+  var cuotas=G("rv-cuotas")?parseInt(G("rv-cuotas").value.charAt(0))||1:1;
+  var ini=G("rv-ini")?G("rv-ini").value:"";
+  var egr=G("rv-egr")?G("rv-egr").value:"";
   if(!alq){alert("El alquiler es obligatorio");return;}
-  // Update inquilino
-  var upd={alquiler:alq,ingreso:ing||DATA.iq[key].ingreso,egreso:egr||DATA.iq[key].egreso,ultimo_aj:ing||hoy()};
-  DB.ref("iq/"+key).update(upd);
-  // Register gastos as partial payments in cobranzas if > 0
-  if(gs>0){
-    var montoCuota=Math.round(gs/cuotas);
-    var m=mes();
-    for(var c=0;c<cuotas;c++){
-      var yr=parseInt(m.split("-")[0]),mo=parseInt(m.split("-")[1])+c;
-      if(mo>12){mo=mo-12;yr++;}
-      var mesC=yr+"-"+String(mo).padStart(2,"0");
-      var cobReg={id_ac:DATA.iq[key].id_ac||"",unidad:DATA.iq[key].unidad,inq:DATA.iq[key].nombre,mes:mesC,monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas};
-      DB.ref("cob").push(cobReg);
-    }
+
+  // Firma nueva
+  var canvas=G("rv-firma-canvas");
+  var firmaData=canvas?canvas.toDataURL("image/png"):null;
+  // Si el canvas está en blanco (solo píxeles blancos), no guardar
+  if(firmaData){
+    var tmpCanvas=document.createElement("canvas");
+    tmpCanvas.width=canvas.width;tmpCanvas.height=canvas.height;
+    var tmpCtx=tmpCanvas.getContext("2d");
+    tmpCtx.fillStyle="#fff";tmpCtx.fillRect(0,0,canvas.width,canvas.height);
+    if(canvas.toDataURL()===tmpCanvas.toDataURL()) firmaData=null;
   }
-  closeModal();closeModal();
-  alert("Renovacion registrada. Nuevo alquiler: "+fmt(alq)+(gs>0?" - Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):""));
+
+  // Leer recibo sueldo principal (comprimido)
+  var _sueldoFile=G("rv-sueldo")&&G("rv-sueldo").files[0]?G("rv-sueldo").files[0]:null;
+
+  // 2do inquilino
+  var mismo2=G("rv-mismo2")&&G("rv-mismo2").checked;
+  var nom2=mismo2?(i.nom2||""):(G("rv-nom2")?G("rv-nom2").value.trim():"");
+  var dni2=mismo2?(i.dni2||""):(G("rv-dni2")?G("rv-dni2").value.trim():"");
+  var tel2=mismo2?(i.tel2||""):(G("rv-tel2")?G("rv-tel2").value.trim():"");
+  var trabajo2=mismo2?(i.trabajo2||""):(G("rv-trabajo2")?G("rv-trabajo2").value.trim():"");
+  var _sue2File=(!mismo2&&G("rv-sue2")&&G("rv-sue2").files[0])?G("rv-sue2").files[0]:null;
+
+  // Contacto emergencia
+  var emnom=G("rv-emnom")?G("rv-emnom").value.trim():"";
+  var emtel=G("rv-emtel")?G("rv-emtel").value.trim():"";
+
+  var getMesN=function(start,n){
+    var yr2=parseInt(start.slice(0,4)),mo2=parseInt(start.slice(5,7))+n;
+    while(mo2>12){mo2-=12;yr2++;}return yr2+"-"+String(mo2).padStart(2,"0");
+  };
+  var mesBase=ini?ini.slice(0,7):mes();
+
+  function _compress(file, cb){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var MAX=800,scale=Math.min(1,MAX/Math.max(img.width,img.height));
+        var c=document.createElement("canvas");
+        c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        cb(c.toDataURL("image/jpeg",0.7));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function _doSave(sueldoB64, sue2B64){
+    var upd={alquiler:alq,egreso:egr||i.egreso};
+    if(dep>0) upd.deposito=(i.deposito||0)+dep;
+    if(firmaData) upd.firma=firmaData;
+    if(sueldoB64) upd.doc_sueldo=sueldoB64;
+    if(nom2!==undefined) upd.nom2=nom2;
+    if(dni2!==undefined) upd.dni2=dni2;
+    if(tel2!==undefined) upd.tel2=tel2;
+    if(trabajo2!==undefined) upd.trabajo2=trabajo2;
+    if(sue2B64) upd.foto_sue2=sue2B64;
+    if(emnom) upd.ct_emerg=emnom;
+    if(emtel) upd.tel_emerg=emtel;
+    DB.ref("iq/"+key).update(upd);
+
+    if(dep>0){
+      var cuotaDep=Math.round(dep/cuotasDep);
+      for(var cd=0;cd<cuotasDep;cd++){
+        DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,
+          mes:getMesN(mesBase,cd),monto_total:cuotaDep,sal_ant:0,estado:"pendiente",pagos:{},
+          concepto:"Deposito renovacion cuota "+(cd+1)+"/"+cuotasDep});
+      }
+    }
+    if(gs>0){
+      var cuotaGs=Math.round(gs/cuotas);
+      for(var cg=0;cg<cuotas;cg++){
+        DB.ref("cob").push({id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,
+          mes:getMesN(mesBase,cg),monto_total:cuotaGs,sal_ant:0,estado:"pendiente",pagos:{},
+          concepto:"Gastos renovacion cuota "+(cg+1)+"/"+cuotas});
+      }
+    }
+    closeModal();closeModal();
+    alert("Renovacion registrada. Nuevo alquiler: "+fmt(alq)+(dep>0?". Deposito +"+fmt(dep)+" en "+cuotasDep+" cuota"+(cuotasDep>1?"s":""):"")+(gs>0?". Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):"")+". Fecha de ingreso original sin cambios.");
+  }
+
+  // Comprimir imágenes si las hay
+  if(_sueldoFile&&_sue2File){
+    _compress(_sueldoFile,function(s1){_compress(_sue2File,function(s2){_doSave(s1,s2);});});
+  } else if(_sueldoFile){
+    _compress(_sueldoFile,function(s1){_doSave(s1,null);});
+  } else if(_sue2File){
+    _compress(_sue2File,function(s2){_doSave(null,s2);});
+  } else {
+    _doSave(null,null);
+  }
 }
 
 // ── AJUSTE CUATRIMESTRAL ──────────────────────────────────────────────────────
@@ -2581,8 +2780,8 @@ function rAlertas(){
   var cobA=oA(DATA.cob).filter(function(c){return c.mes===m;});
   var evA=oA(DATA.ev); // agenda events
   
-  // Load sent status from localStorage
-  var sent=JSON.parse(localStorage.getItem("gp_als_sent_"+m)||"{}");
+  // Load sent status from Firebase (compartido entre usuarios)
+  var sent={}; try{sent=JSON.parse((DATA.cfg_alertas_ok||{})[m]||"{}");} catch(e){sent={};}
   
   var grupos={mora:[],pronto:[],ajuste:[],renovacion:[],agenda:[],morosos:[],servicios:[]};
   
@@ -2748,7 +2947,7 @@ function rAlertas(){
     var ok=e.target.closest("[data-ok]");
     if(ok){
       sent[ok.dataset.ok]=true;
-      localStorage.setItem("gp_als_sent_"+m,JSON.stringify(sent));
+      DB.ref("cfg_alertas_ok/"+m).set(JSON.stringify(sent));
       rAlertas();return;
     }
     // OK group
@@ -2756,14 +2955,14 @@ function rAlertas(){
     if(og){
       var g=grupos[og.dataset.okgroup]||[];
       g.forEach(function(a){sent[a.key]=true;});
-      localStorage.setItem("gp_als_sent_"+m,JSON.stringify(sent));
+      DB.ref("cfg_alertas_ok/"+m).set(JSON.stringify(sent));
       rAlertas();return;
     }
   };
 }
 function limpiarOk(){
   if(!confirm("Limpiar todas las alertas marcadas como OK?"))return;
-  localStorage.removeItem("gp_als_sent_"+mes());
+  DB.ref("cfg_alertas_ok/"+mes()).remove();
   rAlertas();
 }
 
@@ -2932,14 +3131,13 @@ function rCaja(){
     // Build all movements for this day
     var movimientosD=[];
 
-    // Cobros de CUALQUIER mes que tengan pagos con fecha de hoy (adelantos, atrasos, etc.)
-    oA(DATA.cob).forEach(function(c){
+    // Cobros (del mes actual + adelantos de meses futuros pagados hoy)
+    cobM.forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
         // Si el pago fue en cuenta de socio (MP Loli, MP Hugo, etc), va a columna Socios
         var esCuentaSocio=CTAS_SOCIOS.indexOf(p.cuenta)>=0;
-        var mesLabel=(c.mes&&c.mes!==m)?" ["+c.mes+"]":"";
         movimientosD.push({
-          concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0]+mesLabel,
+          concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0],
           mov:p.monto,
           cuenta:esCuentaSocio?"_socios_cobro":p.cuenta,
           socioMov:esCuentaSocio?p.monto:undefined,
@@ -4171,75 +4369,6 @@ function saveAjusteCuat(){
   alert("Ajuste guardado en "+cambios+" unidades. Desde Alertas podes enviar el aviso a cada inquilino 15 dias antes.");
 }
 
-// ── RENOVACION ────────────────────────────────────────────────────────────────
-function openRenovar(key){
-  var i=DATA.iq[key]; if(!i) return;
-  var ki=kpush(key);
-  // Calculate next anniversary date
-  var ing=new Date(i.ingreso||hoy());
-  var anivNext=new Date(ing);
-  anivNext.setFullYear(new Date().getFullYear());
-  if(anivNext <= new Date()) anivNext.setFullYear(new Date().getFullYear()+1);
-  var anivStr=anivNext.toISOString().split("T")[0];
-  var anivEgr=new Date(anivNext);
-  anivEgr.setFullYear(anivEgr.getFullYear()+1);
-  anivEgr.setDate(anivEgr.getDate()-1);
-  var anivEgrStr=anivEgr.toISOString().split("T")[0];
-
-  var o="<div class='card' style='margin-bottom:10px;background:#0F172A'>";
-  o+="<div class='g2'>";
-  o+="<div><div class='lbl'>Inquilino</div><div style='font-size:13px;font-weight:700'>"+esc(i.nombre)+"</div></div>";
-  o+="<div><div class='lbl'>Unidad</div><div style='font-size:13px;font-weight:700'>"+i.unidad+"</div></div>";
-  o+="<div><div class='lbl'>Ingreso original</div><div style='font-size:12px'>"+( i.ingreso||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Deposito (no cambia)</div><div style='font-size:12px;color:#10B981'>"+fmt(i.deposito||0)+"</div></div>";
-  o+="</div></div>";
-  o+="<div class='ibox' style='background:#10B98111;border-color:#10B981;color:#6EE7B7;margin-bottom:10px'>La fecha de ingreso original se mantiene. Solo se extiende la vigencia por 12 meses mas.</div>";
-  o+="<div class='g2'>";
-  o+=fld("rv-alq","Nuevo alquiler mensual $",i.alquiler,"money");
-  o+=fld("rv-gs","Gastos de gestion y mant. $","","money");
-  o+="</div>";
-  o+=sld("rv-cuotas","Gastos en cuotas",["1 cuota (contado)","2 cuotas"]);
-  o+="<div class='g2'>";
-  o+=fld("rv-ini","Nueva vigencia desde",anivStr,"date");
-  o+=fld("rv-egr","Nueva vigencia hasta",anivEgrStr,"date");
-  o+="</div>";
-  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
-  openModal("Renovar — "+esc(i.unidad)+" — "+esc(i.nombre),o,true);
-  var md=MODS[MODS.length-1];
-  md.onclick=function(e){if(e.target.dataset.rv)saveRenovar(kget(parseInt(e.target.dataset.rv)));else if(e.target.classList.contains("ov"))closeModal();};
-}
-function saveRenovar(key){
-  var i=DATA.iq[key];
-  var alq=fmtInputVal(G("rv-alq"));
-  var gs=fmtInputVal(G("rv-gs"));
-  var cuotas=G("rv-cuotas").value.includes("2")?2:1;
-  var ini=G("rv-ini").value;
-  var egr=G("rv-egr").value;
-  if(!alq){alert("El alquiler es obligatorio");return;}
-  // Keep ingreso original, only update egreso and alquiler
-  var upd={alquiler:alq,egreso:egr||i.egreso};
-  // Do NOT change i.ingreso - it stays as original entry date
-  DB.ref("iq/"+key).update(upd);
-  // Register gastos as cobranza entries
-  if(gs>0){
-    var montoCuota=Math.round(gs/cuotas);
-    var yr=parseInt(mes().split("-")[0]),mo=parseInt(mes().split("-")[1]);
-    for(var c=0;c<cuotas;c++){
-      var moc=mo+c; var yrc=yr;
-      if(moc>12){moc=moc-12;yrc++;}
-      var mesC=yrc+"-"+String(moc).padStart(2,"0");
-      DB.ref("cob").push({
-        id_ac:i.id_ac||"",unidad:i.unidad,inq:i.nombre,
-        mes:mesC,monto_total:montoCuota,sal_ant:0,estado:"pendiente",pagos:{},
-        concepto:"Gastos renovacion cuota "+(c+1)+"/"+cuotas
-      });
-    }
-  }
-  closeModal();closeModal();
-  alert("Renovacion registrada! Nuevo alquiler: "+fmt(alq)+(gs>0?". Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):".")+". Fecha de ingreso original sin cambios.");
-}
-
-
 // Edit/quitar built-in CF costs (stored as overrides in Firebase)
 var _cfOverrides = {}; // cached from DATA.cfg
 function openEditCF(cfid){
@@ -4868,14 +4997,14 @@ function toggleSubcDet(id){
 function enviarCajaWA(){
   // Build message like the Excel sheet
   var m=_cajaMes;
-  // Todos los cobros con pagos de hoy (cualquier mes - adelantos incluidos)
+  var cobM2=oA(DATA.cob).filter(function(c){return c.mes===m;});
   var cstM2=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
   var ajM2=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
 
   var lines=["Caja del dia "+_cajaF];
   var totIng=0,totEgr=0;
 
-  oA(DATA.cob).forEach(function(c){
+  cobM2.forEach(function(c){
     pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
       lines.push((c.unidad||"")+" "+c.inq.split(",")[0]+": +"+fmt(p.monto)+" ("+p.cuenta+")");
       totIng+=p.monto;
