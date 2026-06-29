@@ -79,7 +79,7 @@ body{background:#0F172A;color:#F1F5F9;font-family:'Segoe UI',system-ui,sans-seri
 <div class="header">
   <div class="header-logo">🏢</div>
   <div class="header-title">GestiónProp</div>
-  <div class="header-sub">Formulario de ingreso de inquilinos</div>
+  <div class="header-sub" id="header-sub">Formulario de ingreso de inquilinos</div>
 </div>
 
 <div class="container" id="app">
@@ -121,7 +121,19 @@ const PRE = {
   senia:    params.get("senia") || "0",
   saldo:    params.get("saldo") || "0",
   id_res:   params.get("id") || "",
+  // Modo renovacion
+  modo:       params.get("modo") || "",
+  iq_key:     params.get("iq_key") || "",
+  id_ac:      params.get("id_ac") || "",
+  nom2:       params.get("nom2") || "",
+  dni2:       params.get("dni2") || "",
+  tel2:       params.get("tel2") || "",
+  trabajo2:   params.get("trabajo2") || "",
+  ct_emerg:   params.get("ct_emerg") || "",
+  tel_emerg:  params.get("tel_emerg") || "",
 };
+
+const ES_RENOVAR = PRE.modo === "renovar";
 
 const PASOS = 5;
 let paso = 1;
@@ -215,7 +227,13 @@ function nc(){
 // ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 function render(){
   const app=document.getElementById("app");
+  // Modo renovar: flujo simplificado
+  if(ES_RENOVAR){renderRenovar();return;}
   if(paso===6){renderExito();return;}
+  
+  // Ajustar header
+  var hsub=document.getElementById("header-sub");
+  if(hsub) hsub.textContent="Formulario de ingreso de inquilinos";
   
   const labels=["Acuerdo","Titular","2do Inquilino","Acuerdo","Confirmación"];
   const dots=Array.from({length:PASOS},(_,i)=>`<div class="step-dot ${i+1<paso?"done":i+1===paso?"active":""}"></div>`).join("");
@@ -658,6 +676,221 @@ function bindUploads(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+
+// ── MODO RENOVACION ─────────────────────────────────────────────────────────
+var _pasoRenovar = 1;  // 1=trabajo+sueldo, 2=2do inquilino, 3=emergencia, 4=acuerdo+firma, 5=exito
+
+function renderRenovar(){
+  const app=document.getElementById("app");
+  var hsub=document.getElementById("header-sub");
+  if(hsub) hsub.textContent="Renovación de contrato";
+  
+  if(_pasoRenovar===5){renderExitoRenovar();return;}
+
+  const labels=["Trabajo","2do Inquilino","Emergencia","Acuerdo y Firma"];
+  const dots=Array.from({length:4},(_,i)=>`<div class="step-dot ${i+1<_pasoRenovar?"done":i+1===_pasoRenovar?"active":""}"></div>`).join("");
+  
+  app.innerHTML=`
+    <div style="background:#06B6D411;border-left:3px solid #06B6D4;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#06B6D4">
+      <b>Renovacion de contrato</b> — ${PRE.unidad} — ${PRE.nom}<br>
+      <span style="color:#64748B;font-size:11px">Alquiler renovado: <b>${fmt(PRE.alquiler)}</b></span>
+    </div>
+    <div class="progress">${dots}</div>
+    <div class="step-label">Paso ${_pasoRenovar} de 4 — ${labels[_pasoRenovar-1]}</div>
+    <div id="step-content"></div>
+  `;
+  
+  if(_pasoRenovar===1) renderRenovarPaso1();
+  else if(_pasoRenovar===2) renderRenovarPaso2();
+  else if(_pasoRenovar===3) renderRenovarPaso3();
+  else if(_pasoRenovar===4) renderRenovarPaso4();
+}
+
+function renderRenovarPaso1(){
+  // Datos laborales + recibo de sueldo
+  var c=document.getElementById("step-content");
+  var o="<div class='card'>";
+  o+="<div class='card-title'>💼 Datos laborales actualizados</div>";
+  o+="<div class='field'><label class='lbl'>Empresa / Actividad</label><input class='inp' id='f-trabajo1' value='"+esc(DATA.trabajo1||"")+"' placeholder='Empresa, profesión...'/></div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  o+="<div class='field'><label class='lbl'>Dirección del trabajo</label><input class='inp' id='f-trabajo_dir' value='"+esc(DATA.trabajo_dir||"")+"'/></div>";
+  o+="<div class='field'><label class='lbl'>Teléfono del trabajo</label><input class='inp' id='f-trabajo_tel' value='"+esc(DATA.trabajo_tel||"")+"'/></div>";
+  o+="<div class='field'><label class='lbl'>Jefe / Persona a cargo</label><input class='inp' id='f-trabajo_jefe' value='"+esc(DATA.trabajo_jefe||"")+"'/></div>";
+  o+="</div></div>";
+  o+="<div class='card'>";
+  o+="<div class='card-title'>📸 Recibo de sueldo actualizado</div>";
+  o+=uploadField("doc_sueldo","💼 Recibo de sueldo actual","doc-sueldo-ren",false);
+  o+="</div>";
+  o+="<div class='btn-nav'><button class='btn btn-p' onclick='_nextRen1()'>Siguiente →</button></div>";
+  c.innerHTML=o;
+  initUploads(["doc-sueldo-ren"]);
+}
+
+function _nextRen1(){
+  var el=document.getElementById("f-trabajo1");if(el)DATA.trabajo1=el.value;
+  var el2=document.getElementById("f-trabajo_dir");if(el2)DATA.trabajo_dir=el2.value;
+  var el3=document.getElementById("f-trabajo_tel");if(el3)DATA.trabajo_tel=el3.value;
+  var el4=document.getElementById("f-trabajo_jefe");if(el4)DATA.trabajo_jefe=el4.value;
+  _pasoRenovar=2;renderRenovar();
+}
+
+function renderRenovarPaso2(){
+  var c=document.getElementById("step-content");
+  var tieneDos=PRE.nom2&&PRE.nom2.trim();
+  var o="<div class='card'>";
+  o+="<div class='card-title'>👥 2do Inquilino</div>";
+  if(tieneDos){
+    o+="<div class='info'>Segundo inquilino registrado: <b>"+esc(PRE.nom2)+"</b></div>";
+  }
+  o+="<div style='display:flex;gap:12px;background:#0F172A;padding:10px;border-radius:8px;border:1px solid #334155;flex-wrap:wrap;margin-bottom:10px'>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'>";
+  o+="<input type='radio' name='r2-opt' id='r2-mismo' "+(tieneDos?"checked":"")+" onchange='_togRen2()'> ";
+  o+=(tieneDos?"<b>Sigue siendo el mismo</b>":"<b>No hay 2do inquilino</b>");
+  o+="</label>";
+  o+="<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px'>";
+  o+="<input type='radio' name='r2-opt' id='r2-nuevo' "+(tieneDos?"":"checked")+" onchange='_togRen2()'> ";
+  o+=(tieneDos?"<b>Es una persona diferente</b>":"<b>Hay un nuevo 2do inquilino</b>");
+  o+="</label></div>";
+  o+="<div id='r2-bloque' style='display:"+(tieneDos?"none":"block")+"'>";
+  o+="<div class='field'><label class='lbl'>Nombre completo</label><input class='inp' id='f-nom2' value='"+esc(DATA.nom2||"")+"'/></div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  o+="<div class='field'><label class='lbl'>DNI</label><input class='inp' id='f-dni2' value='"+esc(DATA.dni2||"")+"'/></div>";
+  o+="<div class='field'><label class='lbl'>Teléfono</label><input class='inp' type='tel' id='f-tel2' value='"+esc(DATA.tel2||"")+"'/></div>";
+  o+="<div class='field'><label class='lbl'>Trabajo</label><input class='inp' id='f-trabajo2' value='"+esc(DATA.trabajo2||"")+"'/></div>";
+  o+="</div>";
+  o+=uploadField("foto_sue2","📸 Recibo sueldo 2do inquilino","sue2-ren",false);
+  o+="</div></div>";
+  o+="<div class='btn-nav'>";
+  o+="<button class='btn btn-g' onclick='_pasoRenovar=1;renderRenovar()'>← Atrás</button>";
+  o+="<button class='btn btn-p' onclick='_nextRen2()'>Siguiente →</button>";
+  o+="</div>";
+  c.innerHTML=o;
+  initUploads(["sue2-ren"]);
+}
+
+function _togRen2(){
+  var mismo=document.getElementById("r2-mismo")&&document.getElementById("r2-mismo").checked;
+  var bloque=document.getElementById("r2-bloque");
+  if(bloque) bloque.style.display=mismo?"none":"block";
+}
+
+function _nextRen2(){
+  var mismo=document.getElementById("r2-mismo")&&document.getElementById("r2-mismo").checked;
+  if(mismo){
+    // Mantener datos existentes
+    DATA.nom2=PRE.nom2||"";DATA.dni2=PRE.dni2||"";DATA.tel2=PRE.tel2||"";DATA.trabajo2=PRE.trabajo2||"";
+  } else {
+    var n=document.getElementById("f-nom2");if(n)DATA.nom2=n.value.trim();
+    var d=document.getElementById("f-dni2");if(d)DATA.dni2=d.value.trim();
+    var t=document.getElementById("f-tel2");if(t)DATA.tel2=t.value.trim();
+    var tr=document.getElementById("f-trabajo2");if(tr)DATA.trabajo2=tr.value.trim();
+  }
+  _pasoRenovar=3;renderRenovar();
+}
+
+function renderRenovarPaso3(){
+  var c=document.getElementById("step-content");
+  var o="<div class='card'>";
+  o+="<div class='card-title'>🆘 Contacto de emergencia</div>";
+  o+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  o+="<div class='field'><label class='lbl'>Nombre</label><input class='inp' id='f-ct_emerg' value='"+esc(DATA.ct_emerg||PRE.ct_emerg||"")+"' placeholder='Nombre y apellido'/></div>";
+  o+="<div class='field'><label class='lbl'>Teléfono</label><input class='inp' id='f-tel_emerg' value='"+esc(DATA.tel_emerg||PRE.tel_emerg||"")+"' placeholder='11...'/></div>";
+  o+="<div class='field'><label class='lbl'>Relación</label><input class='inp' id='f-rel_emerg' value='"+esc(DATA.rel_emerg||"")+"' placeholder='Madre, Padre, Pareja...'/></div>";
+  o+="</div></div>";
+  o+="<div class='btn-nav'>";
+  o+="<button class='btn btn-g' onclick='_pasoRenovar=2;renderRenovar()'>← Atrás</button>";
+  o+="<button class='btn btn-p' onclick='_nextRen3()'>Siguiente →</button>";
+  o+="</div>";
+  c.innerHTML=o;
+}
+
+function _nextRen3(){
+  var ct=document.getElementById("f-ct_emerg");if(ct)DATA.ct_emerg=ct.value.trim();
+  var tel=document.getElementById("f-tel_emerg");if(tel)DATA.tel_emerg=tel.value.trim();
+  var rel=document.getElementById("f-rel_emerg");if(rel)DATA.rel_emerg=rel.value.trim();
+  _pasoRenovar=4;renderRenovar();
+}
+
+function renderRenovarPaso4(){
+  var c=document.getElementById("step-content");
+  var o="<div class='card'>";
+  o+="<div class='card-title'>📜 Acuerdo de Convivencia y Renovación</div>";
+  o+="<div class='acuerdo-box'>"+esc(getAcuerdoForm())+"</div>";
+  o+="<div class='acepta-check' id='acepta-row' onclick='toggleAcepta()'>";
+  o+="<div class='check-box' id='acepta-box'></div>";
+  o+="<span style='color:#94A3B8;font-size:13px;font-weight:600'>Leí y acepto los términos del acuerdo de convivencia y renovación</span>";
+  o+="</div>";
+  o+="<div class='field' style='margin-top:12px'>";
+  o+="<label class='lbl'>Firma del titular — "+esc(PRE.nom)+"</label>";
+  o+="<div style='background:#0F172A;border-radius:8px;border:1px solid #334155;margin-bottom:6px'>";
+  o+="<canvas id='canvas-firma1' width='600' height='140' style='width:100%;height:140px;border-radius:8px;touch-action:none;cursor:crosshair;display:block'></canvas>";
+  o+="</div>";
+  o+="<div style='display:flex;gap:8px;margin-bottom:12px'>";
+  o+="<button class='btn btn-g' style='font-size:11px;padding:4px 10px' onclick='clearCanvas("canvas-firma1")'>🗑 Borrar firma</button>";
+  o+="<span style='color:#64748B;font-size:11px;align-self:center'>Firmá con el dedo o el mouse</span>";
+  o+="</div></div></div>";
+  o+="<div class='btn-nav'>";
+  o+="<button class='btn btn-g' onclick='_pasoRenovar=3;renderRenovar()'>← Atrás</button>";
+  o+="<button class='btn btn-p' onclick='_nextRen4()'>Siguiente →</button>";
+  o+="</div>";
+  c.innerHTML=o;
+  setTimeout(function(){initCanvas('canvas-firma1',1);},50);
+}
+
+function _nextRen4(){
+  if(!acepta){alert("Debés aceptar el acuerdo para continuar");return;}
+  if(getCanvasEmpty('canvas-firma1')){alert("La firma es obligatoria");return;}
+  DATA.firma=_canvasData[1]||"";
+  guardarRenovar();
+}
+
+function guardarRenovar(){
+  var registro={
+    estado:"renovar_pendiente",
+    fecha_envio:hoy(),
+    modo:"renovar",
+    iq_key:PRE.iq_key,
+    id_ac:PRE.id_ac,
+    unidad:PRE.unidad,
+    nombre:PRE.nom,
+    // Datos actualizados
+    trabajo1:DATA.trabajo1||"",
+    trabajo_dir:DATA.trabajo_dir||"",
+    trabajo_tel:DATA.trabajo_tel||"",
+    trabajo_jefe:DATA.trabajo_jefe||"",
+    nom2:DATA.nom2||"",
+    dni2:DATA.dni2||"",
+    tel2:DATA.tel2||"",
+    trabajo2:DATA.trabajo2||"",
+    ct_emerg:DATA.ct_emerg||"",
+    tel_emerg:DATA.tel_emerg||"",
+    rel_emerg:DATA.rel_emerg||"",
+    doc_sueldo:DATA.doc_sueldo||null,
+    foto_sue2:DATA.foto_sue2||null,
+    firma:DATA.firma||"",
+    fecha_firma:hoy(),
+  };
+  DB.ref("forms").push(registro,function(err){
+    if(!err) console.log("Renovar guardado OK");
+  });
+  _pasoRenovar=5;renderRenovar();
+}
+
+function renderExitoRenovar(){
+  const app=document.getElementById("app");
+  app.innerHTML=`
+  <div class='card'>
+    <div class='success-screen'>
+      <div class='success-icon'>✅</div>
+      <div class='success-title'>¡Renovación registrada!</div>
+      <div class='success-sub'>Tus datos y firma fueron enviados a la administración.<br>La renovación quedará confirmada a la brevedad.</div>
+      <div style='background:#06B6D422;border:1px solid #06B6D444;border-radius:10px;padding:16px;margin:16px 0;font-size:14px;color:#06B6D4;font-weight:700'>
+        ${PRE.unidad} — Renovación enviada
+      </div>
+    </div>
+  </div>`;
+}
+
 render();
 </script>
 </body>

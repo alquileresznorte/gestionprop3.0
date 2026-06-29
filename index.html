@@ -477,7 +477,7 @@ function fAc(){
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
 
   // ── FORMULARIOS PENDIENTES (enviados por el inquilino, sin acuerdo) ────────
-  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente"&&!_formsConvertidosLocal[f._key];});
+  var formsPend=oA(DATA.forms||{}).filter(function(f){return (f.estado==="pendiente"||f.estado==="renovar_pendiente")&&!_formsConvertidosLocal[f._key];});
   var formsEl=G("iq-forms");
   if(!formsEl){
     var formsDiv=document.createElement("div");formsDiv.id="iq-forms";
@@ -495,7 +495,7 @@ function fAc(){
       fHtml+="<div style='color:#94A3B8;font-size:10px'>Alq: "+fmt(f.alquiler||0)+" · Dep: "+fmt(f.deposito||0)+"</div></div>";
       fHtml+="<div style='display:flex;gap:6px;flex-wrap:wrap'>";
       fHtml+="<button class='btn bp bsm' style='font-size:10px' data-verform='"+fki+"'>Ver datos</button>";
-      fHtml+="<button class='btn bok bsm' style='font-size:10px' data-convertform='"+fki+"'>Crear acuerdo</button>";
+      fHtml+="<button class='btn bok bsm' style='font-size:10px' data-convertform='"+fki+"'>"+(f.modo==="renovar"?"Aplicar renovacion":"Crear acuerdo")+"</button>";
       if(USER.r==="admin") fHtml+="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-descartarform='"+fki+"'>Descartar</button>";
       fHtml+="</div></div>";
     });
@@ -1177,7 +1177,7 @@ function openRenovar(key){
   o+="<div><div class='lbl'>Deposito original</div><div>"+fmt(i.deposito||0)+"</div></div>";
   o+="</div></div>";
 
-  // ── Montos renovacion
+  // Montos renovacion
   o+="<div class='g2'>";
   o+=fld("rv-alq","Nuevo alquiler $",i.alquiler,"money");
   o+=fld("rv-dep","Deposito a actualizar $ (0 si no cambia)","0","money");
@@ -1190,15 +1190,14 @@ function openRenovar(key){
   o+=fld("rv-egr","Nueva vigencia hasta",sugerFin,"date");
   o+="</div>";
 
-  // ── Recibo de sueldo actualizado
+  // Recibo de sueldo actualizado
   o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
   o+="<div style='color:#3B82F6;font-size:11px;font-weight:700;margin-bottom:8px'>Recibo de sueldo actualizado</div>";
-  o+="<div class='g2'>";
   o+="<div class='fld'><label class='lbl'>Recibo inquilino principal</label><input type='file' id='rv-sueldo' accept='image/*' class='inp' style='padding:4px'/></div>";
-  o+="<div id='rv-sueldo-prev' style='display:none'><img id='rv-sueldo-img' style='max-height:80px;border-radius:6px;border:1px solid #334155'/></div>";
-  o+="</div></div>";
+  o+="<div id='rv-sueldo-prev' style='display:none;margin-top:6px'><img id='rv-sueldo-img' style='max-height:80px;border-radius:6px;border:1px solid #334155'/></div>";
+  o+="</div>";
 
-  // ── 2do inquilino
+  // 2do inquilino
   o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
   o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:8px'>2do Inquilino</div>";
   if(i.nom2){
@@ -1217,7 +1216,7 @@ function openRenovar(key){
   o+="<div class='fld'><label class='lbl'>Recibo de sueldo 2do inquilino</label><input type='file' id='rv-sue2' accept='image/*' class='inp' style='padding:4px'/></div>";
   o+="</div></div>";
 
-  // ── Contacto de emergencia
+  // Contacto de emergencia
   o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
   o+="<div style='color:#F59E0B;font-size:11px;font-weight:700;margin-bottom:8px'>Contacto de emergencia</div>";
   o+="<div class='g2'>";
@@ -1225,7 +1224,7 @@ function openRenovar(key){
   o+=fld("rv-emtel","Telefono",i.tel_emerg||i.emergencia_tel||"");
   o+="</div></div>";
 
-  // ── Acuerdo y firma
+  // Acuerdo y firma
   o+="<div style='background:#10B98111;border:1px solid #10B98133;border-radius:8px;padding:10px;margin-top:10px'>";
   o+="<div style='color:#10B981;font-size:11px;font-weight:700;margin-bottom:6px'>Acuerdo de convivencia y firma</div>";
   o+="<div style='background:#0F172A;border-radius:8px;padding:10px;max-height:160px;overflow-y:auto;font-size:10px;color:#CBD5E1;line-height:1.7;white-space:pre-wrap;margin-bottom:8px'>"+esc(getAcuerdo())+"</div>";
@@ -1237,14 +1236,22 @@ function openRenovar(key){
   o+="<button class='btn bg bsm' onclick='clearRvFirma()'>Borrar firma</button>";
   o+="</div>";
 
+  // Botón enviar form al inquilino
+  o+="<div style='background:#06B6D411;border:1px solid #06B6D433;border-radius:8px;padding:10px;margin-top:10px'>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Enviar formulario al inquilino</div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>El inquilino recibe un link para actualizar sus datos laborales, 2do inquilino y firmar el acuerdo de renovacion.</p>";
+  o+="<button class='btn bsm' style='background:#06B6D4;color:#000' onclick='enviarFormRenovar("+JSON.stringify(key)+")'>Generar link y enviar por WA</button>";
+  o+="<div id='rv-form-link' style='display:none;margin-top:8px;background:#0F172A;border-radius:6px;padding:8px;font-size:10px;color:#06B6D4;word-break:break-all'></div>";
+  o+="<div id='rv-form-wa' style='display:none;margin-top:6px'></div>";
+  o+="</div>";
+
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
   o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
   o+="<button class='btn bok bsm' data-rv='"+ki+"'>Confirmar Renovacion</button></div>";
-  openModal("Renovar — "+esc(i.unidad)+" — "+esc(i.nombre),o,true);
+  openModal("Renovar \u2014 "+esc(i.unidad)+" \u2014 "+esc(i.nombre),o,true);
 
   setTimeout(function(){
     initRvFirma();
-    // Preview recibo sueldo principal
     var rs=G("rv-sueldo");
     if(rs) rs.onchange=function(){
       var file=this.files[0]; if(!file)return;
@@ -1264,6 +1271,36 @@ function openRenovar(key){
     else if(e.target.classList.contains("ov"))closeModal();
   };
 }
+
+function enviarFormRenovar(key){
+  var i=DATA.iq[key]; if(!i)return;
+  var base=location.href.split("/").slice(0,-1).join("/")+"/form.html";
+  var link=base
+    +"?modo=renovar"
+    +"&iq_key="+encodeURIComponent(key)
+    +"&id_ac="+encodeURIComponent(i.id_ac||"")
+    +"&u="+encodeURIComponent(i.unidad||"")
+    +"&nom="+encodeURIComponent(i.nombre||"")
+    +"&dni="+encodeURIComponent(i.dni||"")
+    +"&tel="+encodeURIComponent(i.tel||i.telefono||"")
+    +"&alq="+encodeURIComponent(i.alquiler||"")
+    +"&nom2="+encodeURIComponent(i.nom2||"")
+    +"&dni2="+encodeURIComponent(i.dni2||"")
+    +"&tel2="+encodeURIComponent(i.tel2||"")
+    +"&trabajo2="+encodeURIComponent(i.trabajo2||"")
+    +"&ct_emerg="+encodeURIComponent(i.ct_emerg||i.emergencia_nombre||"")
+    +"&tel_emerg="+encodeURIComponent(i.tel_emerg||i.emergencia_tel||"")
+    +"&egreso="+encodeURIComponent(i.egreso||"");
+  var nom=(i.nombre||"").split(",")[0].trim();
+  var msg="Hola "+nom+"! Para renovar tu contrato del depto "+i.unidad+" necesitamos que actualices tus datos y firmes el nuevo acuerdo: "+link+" Adm: 1555787641";
+  var el=G("rv-form-link"); if(el){el.textContent=link;el.style.display="block";}
+  var wa=G("rv-form-wa");
+  if(wa){
+    wa.innerHTML="<a class='wa' href='https://wa.me/"+i.tel.replace(/\D/g,"")+"?text="+encodeURIComponent(msg)+"' target='_blank'>💬 Enviar por WhatsApp</a>";
+    wa.style.display="block";
+  }
+}
+
 function initRvFirma(){
   var canvas=G("rv-firma-canvas"); if(!canvas)return;
   var ctx=canvas.getContext("2d");
@@ -1299,27 +1336,19 @@ function saveRenovar(key){
   // Firma nueva
   var canvas=G("rv-firma-canvas");
   var firmaData=canvas?canvas.toDataURL("image/png"):null;
-  // Si el canvas está en blanco (solo píxeles blancos), no guardar
   if(firmaData){
-    var tmpCanvas=document.createElement("canvas");
-    tmpCanvas.width=canvas.width;tmpCanvas.height=canvas.height;
-    var tmpCtx=tmpCanvas.getContext("2d");
-    tmpCtx.fillStyle="#fff";tmpCtx.fillRect(0,0,canvas.width,canvas.height);
-    if(canvas.toDataURL()===tmpCanvas.toDataURL()) firmaData=null;
+    var tmpC=document.createElement("canvas");tmpC.width=canvas.width;tmpC.height=canvas.height;
+    var tmpCtx=tmpC.getContext("2d");tmpCtx.fillStyle="#fff";tmpCtx.fillRect(0,0,tmpC.width,tmpC.height);
+    if(canvas.toDataURL()===tmpC.toDataURL()) firmaData=null;
   }
 
-  // Leer recibo sueldo principal (comprimido)
   var _sueldoFile=G("rv-sueldo")&&G("rv-sueldo").files[0]?G("rv-sueldo").files[0]:null;
-
-  // 2do inquilino
   var mismo2=G("rv-mismo2")&&G("rv-mismo2").checked;
   var nom2=mismo2?(i.nom2||""):(G("rv-nom2")?G("rv-nom2").value.trim():"");
   var dni2=mismo2?(i.dni2||""):(G("rv-dni2")?G("rv-dni2").value.trim():"");
   var tel2=mismo2?(i.tel2||""):(G("rv-tel2")?G("rv-tel2").value.trim():"");
   var trabajo2=mismo2?(i.trabajo2||""):(G("rv-trabajo2")?G("rv-trabajo2").value.trim():"");
   var _sue2File=(!mismo2&&G("rv-sue2")&&G("rv-sue2").files[0])?G("rv-sue2").files[0]:null;
-
-  // Contacto emergencia
   var emnom=G("rv-emnom")?G("rv-emnom").value.trim():"";
   var emtel=G("rv-emtel")?G("rv-emtel").value.trim():"";
 
@@ -1329,7 +1358,7 @@ function saveRenovar(key){
   };
   var mesBase=ini?ini.slice(0,7):mes();
 
-  function _compress(file, cb){
+  function _compress(file,cb){
     var reader=new FileReader();
     reader.onload=function(e){
       var img=new Image();
@@ -1345,20 +1374,16 @@ function saveRenovar(key){
     reader.readAsDataURL(file);
   }
 
-  function _doSave(sueldoB64, sue2B64){
+  function _doSave(sueldoB64,sue2B64){
     var upd={alquiler:alq,egreso:egr||i.egreso};
     if(dep>0) upd.deposito=(i.deposito||0)+dep;
     if(firmaData) upd.firma=firmaData;
     if(sueldoB64) upd.doc_sueldo=sueldoB64;
-    if(nom2!==undefined) upd.nom2=nom2;
-    if(dni2!==undefined) upd.dni2=dni2;
-    if(tel2!==undefined) upd.tel2=tel2;
-    if(trabajo2!==undefined) upd.trabajo2=trabajo2;
+    upd.nom2=nom2; upd.dni2=dni2; upd.tel2=tel2; upd.trabajo2=trabajo2;
     if(sue2B64) upd.foto_sue2=sue2B64;
     if(emnom) upd.ct_emerg=emnom;
     if(emtel) upd.tel_emerg=emtel;
     DB.ref("iq/"+key).update(upd);
-
     if(dep>0){
       var cuotaDep=Math.round(dep/cuotasDep);
       for(var cd=0;cd<cuotasDep;cd++){
@@ -1379,7 +1404,6 @@ function saveRenovar(key){
     alert("Renovacion registrada. Nuevo alquiler: "+fmt(alq)+(dep>0?". Deposito +"+fmt(dep)+" en "+cuotasDep+" cuota"+(cuotasDep>1?"s":""):"")+(gs>0?". Gastos "+fmt(gs)+" en "+cuotas+" cuota"+(cuotas>1?"s":""):"")+". Fecha de ingreso original sin cambios.");
   }
 
-  // Comprimir imágenes si las hay
   if(_sueldoFile&&_sue2File){
     _compress(_sueldoFile,function(s1){_compress(_sue2File,function(s2){_doSave(s1,s2);});});
   } else if(_sueldoFile){
@@ -1390,7 +1414,6 @@ function saveRenovar(key){
     _doSave(null,null);
   }
 }
-
 // ── AJUSTE CUATRIMESTRAL ──────────────────────────────────────────────────────
 function openAjusteCuat(){
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
@@ -2781,7 +2804,7 @@ function rAlertas(){
   var evA=oA(DATA.ev); // agenda events
   
   // Load sent status from Firebase (compartido entre usuarios)
-  var sent={}; try{sent=JSON.parse((DATA.cfg_alertas_ok||{})[m]||"{}");} catch(e){sent={};}
+  var sent={}; try{sent=JSON.parse((DATA.cfg_alertas_ok||{})[m]||"{}");} catch(e){sent={}; }
   
   var grupos={mora:[],pronto:[],ajuste:[],renovacion:[],agenda:[],morosos:[],servicios:[]};
   
@@ -6032,6 +6055,31 @@ function openVerForm(fKey){
 
 function convertirForm(fKey){
   var f=(DATA.forms||{})[fKey];if(!f)return;
+  // Si es un form de RENOVACIÓN, actualizar el inquilino directamente
+  if(f.modo==="renovar"&&f.iq_key){
+    if(!confirm("Aplicar datos de renovación a "+esc(f.nombre||f.unidad||"")+"?"))return;
+    var upd={};
+    if(f.trabajo1) upd.trabajo1=f.trabajo1;
+    if(f.trabajo_dir) upd.trabajo_dir=f.trabajo_dir;
+    if(f.trabajo_tel) upd.trabajo_tel=f.trabajo_tel;
+    if(f.trabajo_jefe) upd.trabajo_jefe=f.trabajo_jefe;
+    upd.nom2=f.nom2||""; upd.dni2=f.dni2||""; upd.tel2=f.tel2||""; upd.trabajo2=f.trabajo2||"";
+    if(f.ct_emerg) upd.ct_emerg=f.ct_emerg;
+    if(f.tel_emerg) upd.tel_emerg=f.tel_emerg;
+    if(f.rel_emerg) upd.rel_emerg=f.rel_emerg;
+    if(f.doc_sueldo) upd.doc_sueldo=f.doc_sueldo;
+    if(f.foto_sue2) upd.foto_sue2=f.foto_sue2;
+    if(f.firma) upd.firma=f.firma;
+    if(f.fecha_firma) upd.fecha_firma=f.fecha_firma;
+    DB.ref("iq/"+f.iq_key).update(upd,function(err){
+      if(err){alert("Error al actualizar: "+err.message);return;}
+      DB.ref("forms/"+fKey).update({estado:"convertido",fecha_conversion:hoy()});
+      _formsConvertidosLocal[fKey]=true;
+      alert("Datos de renovación aplicados correctamente a "+esc(f.nombre||"")+".");
+      setTimeout(rAcuerdos,300);
+    });
+    return;
+  }
   _formsConvertidosLocal[fKey]=true;
   if(DATA.forms&&DATA.forms[fKey]) DATA.forms[fKey].estado="procesando";
   rShell();
