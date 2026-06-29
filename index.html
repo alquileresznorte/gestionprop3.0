@@ -3154,13 +3154,14 @@ function rCaja(){
     // Build all movements for this day
     var movimientosD=[];
 
-    // Cobros (del mes actual + adelantos de meses futuros pagados hoy)
-    cobM.forEach(function(c){
+    // Cobros de CUALQUIER mes que tengan pagos con fecha de hoy (adelantos, atrasos, etc.)
+    oA(DATA.cob).forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
         // Si el pago fue en cuenta de socio (MP Loli, MP Hugo, etc), va a columna Socios
         var esCuentaSocio=CTAS_SOCIOS.indexOf(p.cuenta)>=0;
+        var mesLabel=(c.mes&&c.mes!==m)?" ["+c.mes+"]":"";
         movimientosD.push({
-          concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0],
+          concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0]+mesLabel,
           mov:p.monto,
           cuenta:esCuentaSocio?"_socios_cobro":p.cuenta,
           socioMov:esCuentaSocio?p.monto:undefined,
