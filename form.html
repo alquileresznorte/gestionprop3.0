@@ -202,7 +202,7 @@ Administración funciona de lunes a viernes de 8 a 13 hs y de 14 a 18 hs, sábad
 Si su departamento sufre algún desperfecto deberá comunicarse con administración al 1555787641 a fin de coordinar su reparación, el personal de mantenimiento no hará ningún trabajo sin la previa directiva de administración o fuera del horario antes mencionado.`;
 
 function fmt(n){return n?("$"+Number(n).toLocaleString("es-AR")):"—";}
-function hoy(){return new Date().toISOString().split("T")[0];}
+function hoy(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function saveField(k){
   const el=document.getElementById("f-"+k);
@@ -826,7 +826,7 @@ function renderRenovarPaso4(){
   o+="<canvas id='canvas-firma1' width='600' height='140' style='width:100%;height:140px;border-radius:8px;touch-action:none;cursor:crosshair;display:block'></canvas>";
   o+="</div>";
   o+="<div style='display:flex;gap:8px;margin-bottom:12px'>";
-  o+="<button class='btn btn-g' style='font-size:11px;padding:4px 10px' onclick='clearCanvas("canvas-firma1")'>🗑 Borrar firma</button>";
+  o+="<button class='btn btn-g' style='font-size:11px;padding:4px 10px' onclick='clearCanvas(\"canvas-firma1\")'>🗑 Borrar firma</button>";
   o+="<span style='color:#64748B;font-size:11px;align-self:center'>Firmá con el dedo o el mouse</span>";
   o+="</div></div></div>";
   o+="<div class='btn-nav'>";

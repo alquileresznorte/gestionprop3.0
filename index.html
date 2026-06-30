@@ -71,14 +71,14 @@ var ED={
   OT:{n:"Autos/Otros",d:"Alquiler vehiculos",u:1}
 };
 var COL={R1:"#3B82F6",R2:"#8B5CF6",BN:"#F59E0B",LT:"#84CC16",SC:"#06B6D4",WT:"#10B981",RC:"#EF4444",LP:"#F97316",OT:"#6B7280"};
-var CTAS=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+var CTAS=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
 var CTAS_CAJA=["Efectivo","Bco Hugo","Bco Loli"];
-var CTAS_SOCIOS=["MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
-var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
+var CTAS_SOCIOS=["MP Loli","MP Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
 var CTAS_MPTJ="MP/TJ";
 var CTAS_CAJA=["Efectivo","Bco Hugo","Bco Loli"]; // show with balance
-var CTAS_SOCIOS=["MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"]; // movements only, map to socio
-var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
+var CTAS_SOCIOS=["MP Loli","MP Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"]; // movements only, map to socio
+var CTAS_SOCIO_MAP={"MP Loli":"Cuenta Loli","MP Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli"};
 var CTAP=["Cuenta Loli","Cuenta Hugo"];
 var CATC={Tarjetas:"#8B5CF6",Sueldos:"#10B981",ARBA:"#EF4444",ARCA:"#F43F5E",Municipal:"#FB923C",Electricidad:"#F59E0B",Gas:"#F97316",Agua:"#06B6D4",Administrativo:"#64748B",Salud:"#EC4899",Personal:"#84CC16",Seguros:"#14B8A6","Gastos bancarios":"#6366F1",Cable:"#3B82F6",Internet:"#3B82F6",Mantenimiento:"#F59E0B",Inversion:"#06B6D4","Gastos varios":"#94A3B8"};
 var CF=[
@@ -194,6 +194,13 @@ function fmtInputVal(el){
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
 function hoy(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function mes(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+function diaAnterior(fechaStr){
+  // Resta 1 dia a una fecha YYYY-MM-DD sin pasar por toISOString (evita corrimiento por UTC)
+  var p=fechaStr.split("-");
+  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  d.setDate(d.getDate()-1);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
 function fecDisp(s){
   // Convert YYYY-MM-DD to DD/MM/YY for display
   if(!s||s.length<10)return s||"--";
@@ -1134,23 +1141,32 @@ function cerrarAc(key){
   // Get eventos history for this inquilino
   var eventos=oA(DATA.cfg).filter(function(x){return x.tipo==="evento_iq"&&x.id_ac===i.id_ac;})
     .sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");});
+  // Calcular deuda pendiente del inquilino que se va (cobros de su id_ac con saldo > 0)
+  var cobsDeuda=oA(DATA.cob).filter(function(c){return c.id_ac===i.id_ac&&pT(c)<(c.monto_total+Number(c.sal_ant||0));});
+  var deudaTotal=cobsDeuda.reduce(function(s,c){return s+((c.monto_total+Number(c.sal_ant||0))-pT(c));},0);
   var reg=Object.assign({},i,{
     estado:"baja",
     fecha_egreso_real:G("egr-f").value,
     motivo_egreso:G("egr-m").value,
     obs_egreso:G("egr-o").value,
     fecha_cierre:hoy(),
+    deuda_pendiente:deudaTotal,
     historial_eventos:eventos.map(function(ev){return ev.fecha+": "+ev.texto;}).join(" | ")
   });
   DB.ref("hist").push(reg);
   DB.ref("iq/"+key).remove();
+  // Archivar los cobros pendientes de este id_ac: dejan de aparecer en Cobranzas/Caja/Alertas
+  // de la unidad activa, pero siguen existiendo en la base (visibles desde Historial si se necesita reclamar).
+  var upsCob={};
+  cobsDeuda.forEach(function(c){upsCob["cob/"+c._key+"/archivado_hist"]=true;});
+  if(Object.keys(upsCob).length) DB.ref("/").update(upsCob);
   // Clean up eventos from cfg
   eventos.forEach(function(ev){DB.ref("cfg/"+ev._key).remove();});
   // Desactivar adicionales de la unidad al cerrar contrato
   var adicionales=oA(DATA.cfg).filter(function(x){return x.tipo==="adicional_iq"&&x.unidad===i.unidad&&x.activo!==false;});
   adicionales.forEach(function(a){DB.ref("cfg/"+a._key).update({activo:false,hasta:hoy(),baja_por_cierre:true});});
   closeModal();closeModal();
-  alert("Acuerdo cerrado. "+i.unidad+" quedo libre. Historial de "+eventos.length+" eventos guardado.");
+  alert("Acuerdo cerrado. "+i.unidad+" quedo libre. Historial de "+eventos.length+" eventos guardado."+(deudaTotal>0?" Deuda pendiente de "+fmt(deudaTotal)+" archivada en el historial.":""));
   go("acuerdos");
 }
 // ── RENOVACION ───────────────────────────────────────────────────────────────
@@ -1559,7 +1575,7 @@ function saveReserva(){
     var esSocio=CTAS_SOCIOS.indexOf(cta)>=0;
     if(esSocio){
       var socioMap={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
-        "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+        "MP Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
       DB.ref("movs").push({fecha:fecha,mes:fecha.slice(0,7),tipo:"aporte",
         cuenta:socioMap[cta]||"Cuenta Loli",cuenta_caja:cta,monto:senia,
         nota:"Seña reserva "+u+" - "+nom});
@@ -1666,7 +1682,7 @@ function openNA(){
     return !activo||esResConvert;
   });
   var mesActual=mes();
-  var mesAnterior=(function(){var d=new Date();d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);})();
+  var mesAnterior=(function(){var d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");})();
 
   var o="<div class='fld' style='grid-column:1/-1;margin-bottom:4px'>";
   o+="<div style='display:flex;gap:12px;background:#0F172A;padding:10px;border-radius:8px;border:1px solid #334155;flex-wrap:wrap'>";
@@ -1950,7 +1966,8 @@ function saveNA(){
     var _pcDesdeRes=G("na-pc-fecha")&&G("na-pc-fecha").value;
     var _pcYaCaja=G("na-pc-ya-caja")&&G("na-pc-ya-caja").checked;
     // Leer datos del form ANTES de limpiar la key
-    var _formData=(window._formConvertKey&&DATA.forms)?(DATA.forms[window._formConvertKey]||null):null;
+    var _formConvertKeyLocal=window._formConvertKey||null;
+    var _formData=(_formConvertKeyLocal&&DATA.forms)?(DATA.forms[_formConvertKeyLocal]||null):null;
 
     // Cerrar modal antes de Firebase para evitar que el listener lo destruya
     closeModal();
@@ -2025,7 +2042,7 @@ function saveNA(){
     // Registrar pago al tomar posesion — fecha = HOY, SOLO si la caja no está cerrada
     if(posMonto>0){
       var _socioMapP={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
-        "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+        "MP Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
       var fechaPosesion=hoy();
       var _cajaCerradaHoy=oA(DATA.subc||{}).filter(function(s){return s.fecha===fechaPosesion;})[0];
       if(_cajaCerradaHoy){
@@ -2056,10 +2073,8 @@ function saveNA(){
       });
     }
     // Marcar formulario como convertido
-    var _formCK=window._formConvertKey||null;
-    window._formConvertKey=null;
-    if(_formCK){
-      DB.ref("forms/"+_formCK).update({estado:"convertido",id_acuerdo:id,fecha_conversion:hoy()});
+    if(_formConvertKeyLocal){
+      DB.ref("forms/"+_formConvertKeyLocal).update({estado:"convertido",id_acuerdo:id,fecha_conversion:hoy()});
     }
     setTimeout(rAcuerdos,600);
   }
@@ -2118,6 +2133,7 @@ function openFichaHist(key){
   ];
   rows.forEach(function(r){o+="<div><div class='lbl'>"+r[0]+"</div><div style='font-size:12px'>"+esc(r[1])+"</div></div>";});
   o+="</div>";
+  if(i.deuda_pendiente>0) o+="<div style='background:#EF444411;border:1px solid #EF444444;border-radius:8px;padding:10px;margin-bottom:8px'><b style='color:#EF4444'>⚠ Deuda pendiente al momento de irse:</b> <span style='color:#EF4444;font-weight:700;font-size:14px'>"+fmt(i.deuda_pendiente)+"</span><div style='color:#64748B;font-size:11px;margin-top:3px'>Si esta persona vuelve a contactarse, este monto sigue impago.</div></div>";
   if(i.obs_egreso) o+="<div style='background:#EF444411;border-left:3px solid #EF4444;border-radius:0 8px 8px 0;padding:10px;margin-bottom:8px;font-size:12px'><b style='color:#EF4444'>Obs. egreso:</b> "+esc(i.obs_egreso)+"</div>";
   if(i.obs_ingreso) o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px'><b class='lbl'>Obs. ingreso:</b> "+esc(i.obs_ingreso)+"</div>";
   if(i.historial_eventos){
@@ -2135,7 +2151,7 @@ function openFichaHist(key){
 // COBRANZAS
 var _cobMes=mes();
 function rCob(){
-  var allCob=oA(DATA.cob).filter(function(c){return c.mes===_cobMes;});
+  var allCob=oA(DATA.cob).filter(function(c){return c.mes===_cobMes&&!c.archivado_hist;});
   var esp=allCob.reduce(function(s,c){return s+c.monto_total+Number(c.sal_ant||0);},0);
   var cob=allCob.reduce(function(s,c){return s+pT(c);},0);
 
@@ -2589,7 +2605,6 @@ function rCostos(){
     else if(b.dataset.sc)saveCosto(kget(parseInt(b.dataset.sc)));
     else if(b.dataset.rev)revCosto(kget(parseInt(b.dataset.rev)));
     else if(b.dataset.vpagos)verPagosCosto(kget(parseInt(b.dataset.vpagos)));
-    else if(b.dataset.savecobs){var obs=G('vp-obs');if(obs)DB.ref('cst/'+b.dataset.savecobs).update({obs:obs.value});closeModal();alert('Observaciones guardadas.');}
     else if(b.dataset.extra)addExtraFactura(kget(parseInt(b.dataset.extra)));
   };
   // Wire asig tipo selector after render
@@ -2722,10 +2737,31 @@ function verPagosCosto(ckey){
   o+="<button class='btn bok bsm' data-savecobs='"+ckey+"'>Guardar obs.</button>";
   o+="</div>";
   openModal("Detalle de pagos",o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    if(e.target.dataset.savecobs){
+      var obs=G('vp-obs');
+      if(obs)DB.ref('cst/'+e.target.dataset.savecobs).update({obs:obs.value});
+      closeModal();
+      alert('Observaciones guardadas.');
+    } else if(e.target.classList.contains("ov")) closeModal();
+  };
 }
 
 
-function revCosto(ckey){if(!confirm("Revertir pago? Se borraran todos los pagos registrados."))return;DB.ref("cst/"+ckey).update({pagado:false,fecha_pago:null});DB.ref("cst/"+ckey+"/pagos").remove();setTimeout(rCostos,400);}
+function revCosto(ckey){
+  var c=DATA.cst[ckey];if(!c)return;
+  var pagos=c.pagos?Object.values(c.pagos):[];
+  var fechaPagoUnica=c.fecha_pago;
+  var fechasAfectadas=pagos.length?pagos.map(function(p){return p.fecha;}):(fechaPagoUnica?[fechaPagoUnica]:[]);
+  var cajaCerrada=fechasAfectadas.find(function(f){return f&&oA(DATA.subc).filter(function(s){return s.fecha===f;}).length>0;});
+  if(cajaCerrada){
+    alert("La caja del "+fecDisp(cajaCerrada)+" ya fue cerrada. No se puede revertir este pago porque dejaría el monto registrado en la caja sin respaldo en Costos. Contactá al admin si hay un error real.");
+    return;
+  }
+  if(!confirm("Revertir pago? Se borraran todos los pagos registrados."))return;
+  DB.ref("cst/"+ckey).update({pagado:false,fecha_pago:null});DB.ref("cst/"+ckey+"/pagos").remove();setTimeout(rCostos,400);
+}
 
 // ALERTAS
 // Helper: obtener config de recargos con defaults
@@ -2800,7 +2836,7 @@ function verRenovacionesMes(){
 function rAlertas(){
   var h=new Date(),dia=h.getDate(),m=mes();
   var iqA=oA(DATA.iq).filter(function(i){return i.estado==="activo";});
-  var cobA=oA(DATA.cob).filter(function(c){return c.mes===m;});
+  var cobA=oA(DATA.cob).filter(function(c){return c.mes===m&&!c.archivado_hist;});
   var evA=oA(DATA.ev); // agenda events
   
   // Load sent status from Firebase (compartido entre usuarios)
@@ -2896,7 +2932,8 @@ function rAlertas(){
   // Agenda events for today and next 7 days
   var hoy7=new Date(h); hoy7.setDate(hoy7.getDate()+7);
   var hoyStr=hoy();
-  evA.filter(function(ev){return ev.fecha>=hoyStr&&ev.fecha<=hoy7.toISOString().split("T")[0];})
+  var hoy7Str=hoy7.getFullYear()+"-"+String(hoy7.getMonth()+1).padStart(2,"0")+"-"+String(hoy7.getDate()).padStart(2,"0");
+  evA.filter(function(ev){return ev.fecha>=hoyStr&&ev.fecha<=hoy7Str;})
     .sort(function(a,b){return a.fecha.localeCompare(b.fecha);})
     .forEach(function(ev){
       grupos.agenda.push({key:"ev_"+ev._key,u:ev.unidad||"",nom:ev.nombre||ev.titulo,tel:ev.tel||"",
@@ -3153,8 +3190,7 @@ function rCaja(){
   if(_cajaV==="dia"){
     var subcDia=subcM.filter(function(s){return s.fecha===_cajaF;})[0];
 
-    var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);
-    var ayerStr=ayer.toISOString().split("T")[0];
+    var ayerStr=diaAnterior(_cajaF);
 
     // Build all movements for this day
     var movimientosD=[];
@@ -3162,14 +3198,15 @@ function rCaja(){
     // Cobros de CUALQUIER mes que tengan pagos con fecha de hoy (adelantos, atrasos, etc.)
     oA(DATA.cob).forEach(function(c){
       pA(c).filter(function(p){return p.fecha===_cajaF;}).forEach(function(p){
-        // Si el pago fue en cuenta de socio (MP Loli, MP Hugo, etc), va a columna Socios
+        // Si el pago fue en billetera/tarjeta PERSONAL del socio (MP Loli, MP Hugo, Visa/Master),
+        // el socio SE QUEDA con esa plata -> es un RETIRO (resta de su posicion), no un aporte.
         var esCuentaSocio=CTAS_SOCIOS.indexOf(p.cuenta)>=0;
         var mesLabel=(c.mes&&c.mes!==m)?" ["+c.mes+"]":"";
         movimientosD.push({
           concepto:(c.unidad||"")+" - "+(c.inq||"").split(",")[0]+mesLabel,
           mov:p.monto,
           cuenta:esCuentaSocio?"_socios_cobro":p.cuenta,
-          socioMov:esCuentaSocio?p.monto:undefined,
+          socioMov:esCuentaSocio?-p.monto:undefined,
           tipo:"cobro"
         });
       });
@@ -3254,7 +3291,7 @@ function rCaja(){
 
     var totMov=movimientosD.reduce(function(s,mv){return s+mv.mov;},0);
     // fondoTotal = sum of ALL accounts at start of day
-    var fondoTotal=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Visa Galicia Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"].reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
+    var fondoTotal=["Efectivo","Bco Loli","Bco Hugo","MP Loli","MP Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"].reduce(function(s,cta){return s+saldoAcumulado(cta,ayerStr,m);},0);
 
     o+="<div style='display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap'>";
     o+="<input type='date' class='inp' value='"+_cajaF+"' style='max-width:160px' id='caja-fecha'/>";
@@ -3569,8 +3606,7 @@ function cerrarMes(){
 
 function openSubc(){
   var m=_cajaMes;
-  var ayer=new Date(_cajaF);ayer.setDate(ayer.getDate()-1);
-  var ayerStr=ayer.toISOString().split("T")[0];
+  var ayerStr=diaAnterior(_cajaF);
   var cobM2=oA(DATA.cob).filter(function(c){return c.mes===m;});
   var cstM2=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
   var ajM2=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
@@ -3663,31 +3699,42 @@ function saveAj(){
   var m=fmtInputVal(G("aj-m")||{value:"0",dataset:{raw:"0"}});
   var c=G("aj-con")?G("aj-con").value:"";
   if(!m||!c){alert("Monto y descripcion obligatorios");return;}
+  var fechaFinal=_cajaF;
+  var subcCheck=oA(DATA.subc).filter(function(s){return s.fecha===fechaFinal;});
+  if(subcCheck.length>0){alert("La caja del "+fecDisp(fechaFinal)+" ya fue cerrada. No se puede registrar.");return;}
   var clasif=(G("aj-s")||{value:"otro"}).value;
   var unidad=G("aj-unidad")?G("aj-unidad").value||"General":"General";
   var concepto=c+(unidad&&unidad!=="General"?" ["+unidad+"]":"");
-  DB.ref("aj").push({fecha:G("aj-f").value,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
+  DB.ref("aj").push({fecha:fechaFinal,tipo:G("aj-t").value,sub:clasif,clasificacion:clasif,cuenta:G("aj-c").value,concepto:concepto,monto:m,edificio:unidad});
   closeModal();setTimeout(rCaja,300);
 }
 function openMov(){
   // Solo cuentas de caja reales (sin MP Hugo/Loli que son cuentas de socios)
   var ctasCaja=CTAS.filter(function(c){return CTAS_SOCIOS.indexOf(c)<0;});
-  var o="<div class='g2'>"+fld("mv-f","Fecha",hoy(),"date");
+  var subcHoy=oA(DATA.subc).filter(function(s){return s.fecha===_cajaF;});
+  if(subcHoy.length>0){alert("La caja del "+fecDisp(_cajaF)+" ya fue cerrada. No se pueden registrar aportes/retiros.");return;}
+  var o="<div class='ibox' style='margin-bottom:10px'>Este movimiento se registra en la caja del dia <b>"+fecDisp(_cajaF)+"</b> (la caja actualmente abierta). No se puede elegir otra fecha.</div>";
+  o+="<div class='g2'>"+fld("mv-f","Fecha",_cajaF,"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='mv-t'><option value='retiro'>Retiro (saca de caja)</option><option value='aporte'>Aporte (pone en caja)</option></select></div>";
   o+="<div class='fld'><label class='lbl'>Socio</label><select class='inp' id='mv-c'><option value='Cuenta Loli'>Loli</option><option value='Cuenta Hugo'>Hugo</option></select></div>";
   o+=sld("mv-caja","Cuenta de donde sale/entra el dinero",ctasCaja,"Efectivo");
   o+=fld("mv-m","Monto $","","money")+"</div>";
   o+=fld("mv-n","Concepto (ej: medicamentos, viaje, compra estufa)");
-  o+="<p style='color:#64748B;font-size:10px;margin-top:4px'>Retiro = el socio se lleva plata de caja. Aporte = el socio pone plata en caja o paga algo de su bolsillo.</p>";
+  o+="<p style='color:#64748B;font-size:10px;margin-top:4px'>Retiro = el socio se queda con esa plata (saca de caja o la deja en su billetera/tarjeta personal). Aporte = el socio pone plata propia para la empresa (paga algo de su bolsillo, o le da plata a otra persona en nombre de la empresa).</p>";
   o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' onclick='saveMov()'>Registrar</button></div>";
   openModal("Retiro / Aporte de Socio",o);
+  setTimeout(function(){var fi=G("mv-f");if(fi){fi.readOnly=true;fi.style.opacity="0.6";fi.style.pointerEvents="none";}},50);
 }
 function saveMov(){
   var m=Number(G("mv-m").value);if(!m){alert("Ingresa el monto");return;}
   var caja=(G("mv-caja")||{value:"Efectivo"}).value;
-  var mes=G("mv-f").value.slice(0,7);
+  // Forzar fecha a la caja actualmente abierta, ignorando cualquier manipulacion del campo
+  var fechaFinal=_cajaF;
+  var subcCheck=oA(DATA.subc).filter(function(s){return s.fecha===fechaFinal;});
+  if(subcCheck.length>0){alert("La caja del "+fecDisp(fechaFinal)+" ya fue cerrada. No se puede registrar.");return;}
+  var mes=fechaFinal.slice(0,7);
   var socio=(G("mv-c")||{value:""}).value;
-  DB.ref("movs").push({fecha:G("mv-f").value,mes:mes,tipo:G("mv-t").value,cuenta:socio,cuenta_caja:caja,monto:m,nota:G("mv-n").value});
+  DB.ref("movs").push({fecha:fechaFinal,mes:mes,tipo:G("mv-t").value,cuenta:socio,cuenta_caja:caja,monto:m,nota:G("mv-n").value});
   closeModal();setTimeout(rCaja,300);
 }
 
@@ -4834,6 +4881,14 @@ function openEditPagos(ckey){
 }
 function deletePago(ckey,pagoKey){
   var c=DATA.cob[ckey]; if(!c) return;
+  var pago=(c.pagos||{})[pagoKey];
+  if(pago&&pago.fecha){
+    var subcCheck=oA(DATA.subc).filter(function(s){return s.fecha===pago.fecha;});
+    if(subcCheck.length>0){
+      alert("La caja del "+fecDisp(pago.fecha)+" ya fue cerrada por "+esc(subcCheck[0].cerradoPor||"")+". No se puede borrar este pago porque dejaría el monto registrado en la caja sin respaldo en Cobros. Si hay un error, contactá al admin para revertirlo desde Config.");
+      return;
+    }
+  }
   var ups={};
   ups["cob/"+ckey+"/pagos/"+pagoKey]=null;
   // Recalculate state
@@ -4851,10 +4906,8 @@ function deletePago(ckey,pagoKey){
 
 function openGastoAjuste(){
   var subcHoy=oA(DATA.subc).filter(function(s){return s.fecha===_cajaF;});
-  if(subcHoy.length>0){
-    if(!confirm("La caja de "+_cajaF+" ya fue cerrada. ¿Registrar de todas formas?"))return;
-  }
-  var o="<p style='color:#94A3B8;font-size:11px;margin-bottom:10px'>Correcciones y movimientos de caja.</p>";
+  if(subcHoy.length>0){alert("La caja del "+fecDisp(_cajaF)+" ya fue cerrada. No se pueden registrar nuevos movimientos.");return;}
+  var o="<div class='ibox' style='margin-bottom:10px'>Este ajuste se registra en la caja del dia <b>"+fecDisp(_cajaF)+"</b>. No se puede elegir otra fecha.</div>";
   o+="<div class='g2'>";
   o+=fld("aj-f","Fecha",_cajaF,"date");
   o+="<div class='fld'><label class='lbl'>Tipo</label><select class='inp' id='aj-t'><option value='egreso'>Egreso (-)</option><option value='ingreso'>Ingreso (+)</option></select></div>";
@@ -4903,7 +4956,7 @@ function saveGastoAjuste(){
   var esCuentaSocio=CTAS_SOCIOS.indexOf(cta)>=0;
   // Mapear cuenta socio a Cuenta Loli/Hugo
   var socioMap={"MP Loli":"Cuenta Loli","Visa BBVA Loli":"Cuenta Loli","Master BBVA Loli":"Cuenta Loli",
-    "MP Hugo":"Cuenta Hugo","Visa Galicia Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
+    "MP Hugo":"Cuenta Hugo","Master BBVA Hugo":"Cuenta Hugo","Visa BBVA Hugo":"Cuenta Hugo"};
 
   if(esCuentaSocio){
     // Registrar como aporte en movs (Cta Socios)
@@ -5701,37 +5754,37 @@ function rCtaCte(){
     else if(socio==="Cuenta Hugo") movHugo.push(entry);
   });
 
-  // Cobros via socio accounts
+  // Cobros via socio accounts - el socio SE QUEDA con esta plata (retiro), resta de su posicion
   cobA.forEach(function(c){
     pA(c).forEach(function(p){
       var socio=CTAS_SOCIO_MAP[p.cuenta]||"";
       if(!socio) return;
-      var entry={fecha:p.fecha,tipo:"cobro",
-        concepto:"Cobro "+c.unidad+" "+(c.inq||"").split(",")[0],
-        medio:p.cuenta,monto:p.monto};
+      var entry={fecha:p.fecha,tipo:"retiro",
+        concepto:"Cobro "+c.unidad+" "+(c.inq||"").split(",")[0]+" (retirado por el socio)",
+        medio:p.cuenta,monto:-p.monto};
       if(socio==="Cuenta Loli") movLoli.push(entry);
       else if(socio==="Cuenta Hugo") movHugo.push(entry);
     });
   });
 
-  // Costs paid via socio accounts - use individual pagos for correct dates
+  // Costs paid via socio accounts - el socio pone de su bolsillo (aporte), suma a su posicion
   oA(DATA.cst||{}).forEach(function(c){
     if(c.pagos&&Object.keys(c.pagos).length>0){
       Object.values(c.pagos).forEach(function(p){
         var socio=CTAS_SOCIO_MAP[p.cuenta||c.cuenta]||"";
         if(!socio) return;
-        var entry={fecha:p.fecha||c.fecha_pago||c.mes+"-01",tipo:"pago",
-          concepto:"Pago "+(c.desc||""),medio:p.cuenta||c.cuenta,
-          monto:-Number(p.monto||0)};
+        var entry={fecha:p.fecha||c.fecha_pago||c.mes+"-01",tipo:"aporte",
+          concepto:"Pago "+(c.desc||"")+" (pagado de su bolsillo)",medio:p.cuenta||c.cuenta,
+          monto:Number(p.monto||0)};
         if(socio==="Cuenta Loli") movLoli.push(entry);
         else if(socio==="Cuenta Hugo") movHugo.push(entry);
       });
     } else if(c.pagado&&c.cuenta){
       var socio=CTAS_SOCIO_MAP[c.cuenta]||"";
       if(!socio) return;
-      var entry={fecha:c.fecha_pago||c.fec_venc||c.mes+"-01",tipo:"pago",
-        concepto:"Pago "+(c.desc||""),medio:c.cuenta,
-        monto:-Number(c.monto||0)};
+      var entry={fecha:c.fecha_pago||c.fec_venc||c.mes+"-01",tipo:"aporte",
+        concepto:"Pago "+(c.desc||"")+" (pagado de su bolsillo)",medio:c.cuenta,
+        monto:Number(c.monto||0)};
       if(socio==="Cuenta Loli") movLoli.push(entry);
       else if(socio==="Cuenta Hugo") movHugo.push(entry);
     }
