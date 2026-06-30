@@ -371,6 +371,40 @@ function tryLogin(){
 function doLogin(u){USER=u;SEC="alertas";startDB();}
 function logout(){lw("gp_rem",null);stopDB();USER=null;SEC="login";render();}
 
+// Imprimir la vista actual de #main con fondo blanco y texto negro (ahorra tinta). Solo admin.
+function imprimirVista(titulo){
+  if(USER.r!=="admin"){alert("Solo el administrador puede imprimir.");return;}
+  var mainEl=G("main");
+  if(!mainEl){alert("No hay nada para imprimir.");return;}
+  var w=window.open("","_blank");
+  var html=mainEl.innerHTML;
+  w.document.write("<html><head><title>"+esc(titulo||"GestionProp")+"</title><style>"
+    +"*{box-sizing:border-box}"
+    +"body{font-family:Arial,sans-serif;background:#fff;color:#111;padding:20px;font-size:12px}"
+    +"h2,h3{color:#111}"
+    +".card{background:#fff!important;border:1px solid #ccc!important;color:#111!important;padding:10px;margin-bottom:6px;border-radius:6px}"
+    +"table{border-collapse:collapse;width:100%}"
+    +"th,td{border:1px solid #ccc;padding:5px 8px;color:#111!important;background:#fff!important}"
+    +"th{background:#f0f0f0!important;font-weight:700}"
+    +"button,select,input,.btn{display:none!important}"
+    +"[style*='background']{background:#fff!important}"
+    +"[style*='color:#10B981']{color:#0a7a3d!important}"
+    +"[style*='color:#EF4444']{color:#b91c1c!important}"
+    +"[style*='color:#F59E0B']{color:#a16207!important}"
+    +"[style*='color:#3B82F6']{color:#1d4ed8!important}"
+    +"[style*='color:#64748B'],[style*='color:#94A3B8']{color:#444!important}"
+    +"[style*='color:#06B6D4']{color:#0e7490!important}"
+    +"[style*='color:#8B5CF6']{color:#6d28d9!important}"
+    +"@media print{button,select,input{display:none!important}}"
+    +"</style></head><body>"
+    +"<h2>"+esc(titulo||"GestionProp")+"</h2>"
+    +"<p style='color:#666'>Impreso el "+fecDisp(hoy())+"</p>"
+    +html
+    +"</body></html>");
+  w.document.close();
+  setTimeout(function(){w.print();},300);
+}
+
 // SHELL
 function rShell(){
   var esA=USER.r==="admin";
@@ -378,7 +412,7 @@ function rShell(){
   var totU=Object.values(ED).reduce(function(s,e){return s+e.u;},0);
   var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).length;
   // Formularios pendientes: enviados por el inquilino, sin acuerdo creado aún
-  var formsPend=oA(DATA.forms||{}).filter(function(f){return f.estado==="pendiente"&&!_formsConvertidosLocal[f._key];}).length;
+  var formsPend=oA(DATA.forms||{}).filter(function(f){return (f.estado==="pendiente"||f.estado==="renovar_pendiente")&&!_formsConvertidosLocal[f._key];}).length;
   var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["ctacte","Cta Socios"],["stats","Stats"],["config","Config"]];
   var navE=[["alertas","Alertas"],["acuerdos","Acuerdos"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"]];
   var nav=esA?navA:navE;
@@ -2170,7 +2204,7 @@ function rCob(){
 
   var html="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px'>";
   html+="<div><h2 style='font-size:20px;font-weight:800'>Cobranzas</h2><p style='color:#06B6D4;font-size:12px;font-weight:600'>📅 "+mesLabel(_cobMes)+"</p><p style='color:#64748B;font-size:11px'>"+cobA.length+" de "+allCob.length+" registros</p></div>";
-  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'>"+mesSelect('cob-mes-inp',_cobMes,"_cobMes=this.value;rCob()")+"<button class='btn bg bsm' onclick='genCob()'>Generar</button>"+(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button>":"")+"</div></div>";
+  html+="<div style='display:flex;gap:6px;flex-wrap:wrap'>"+mesSelect('cob-mes-inp',_cobMes,"_cobMes=this.value;rCob()")+"<button class='btn bg bsm' onclick='genCob()'>Generar</button>"+(USER.r==="admin"?"<button class='btn bsm' style='background:#EF444422;color:#EF4444;border:1px solid #EF444444' onclick='limpiarDuplicadosCob()'>Limpiar duplicados</button><button class='btn bg bsm' onclick='imprimirVista(this.dataset.t)' data-t='Cobranzas'>🖨 Imprimir</button>":"")+"</div></div>";
 
   html+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>";
   html+="<select class='inp' style='max-width:110px' id='cob-ed'><option value=''>Todos</option>"+edOpts+"</select>";
@@ -2849,7 +2883,9 @@ function rAlertas(){
     var cobsU=cobA.filter(function(x){return x.unidad===inq.unidad;});
     var cobsAlq=cobsU.filter(function(x){return !x.concepto||x.concepto==="Alquiler"||x.concepto==="Alquiler USD"||(x.concepto_extra!==undefined&&!x.concepto);});
     var pg=cobsAlq.reduce(function(s,x){return s+pT(x);},0);if(!cobsAlq.length&&cobsU.length)pg=pT(cobsU[0]);
-    var alq=inq.alquiler,ok=pg>=alq,nom=inq.nombre.split(",")[0].trim();
+    var cobAlqRef=cobsAlq[0]||cobsU[0];
+    var alq=cobAlqRef?(cobAlqRef.monto_total+Number(cobAlqRef.sal_ant||0)):inq.alquiler;
+    var ok=pg>=alq,nom=inq.nombre.split(",")[0].trim();
 
 
 
@@ -3383,6 +3419,7 @@ function rCaja(){
       o+="<div style='background:#10B98122;border:1px solid #10B981;border-radius:8px;padding:8px 14px;font-size:12px;color:#10B981;font-weight:700'>🔒 Caja cerrada</div>";
     }
     o+="<button class='btn bg bsm' onclick='enviarCajaWA()'>Enviar WA</button>";
+    if(esA) o+="<button class='btn bg bsm' onclick='imprimirVista(\"Caja - \"+fecDisp(_cajaF))'>🖨 Imprimir</button>";
     o+="</div>";
 
     } else {
@@ -5656,12 +5693,18 @@ function borrarAhoDesde(){
 }
 
 function confirmarBorrarAho(fecha){
-  if(!confirm("Borrar todas las compras de USD desde "+fecDisp(fecha)+"?"))return;
+  if(!confirm("Borrar todas las compras de USD desde "+fecDisp(fecha)+"? Esto tambien borra el movimiento correspondiente en Caja."))return;
   var ahos=oA(DATA.aho||{}).filter(function(a){return (a.fecha||"")>=fecha;});
   var ups={};
   ahos.forEach(function(a){ups["aho/"+a._key]=null;});
+  // Tambien borrar los ajustes de caja generados por esas compras (esAhorro:true, mismo monto/fecha/cuenta)
+  oA(DATA.aj||{}).forEach(function(adj){
+    if(!adj.esAhorro) return;
+    var matchAho=ahos.find(function(a){return a.fecha===adj.fecha&&a.cuenta===adj.cuenta&&Math.abs(Number(a.pesos||0)-Number(adj.monto||0))<1;});
+    if(matchAho) ups["aj/"+adj._key]=null;
+  });
   DB.ref("/").update(ups,function(){
-    alert("Compras de USD borradas. Podes volver a cargarlas desde Cta Socios.");
+    alert("Compras de USD borradas, incluyendo su movimiento en Caja. Podes volver a cargarlas desde Cta Socios.");
     var res=G("limp-aho-res");
     if(res) res.innerHTML="<p style='color:#10B981;font-size:11px'>Borrado correctamente.</p>";
     setTimeout(rConfig,300);
