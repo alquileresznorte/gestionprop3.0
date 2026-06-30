@@ -1239,6 +1239,7 @@ function openRenovar(key){
   o+=fld("rv-ini","Nueva vigencia desde",sugerIni,"date");
   o+=fld("rv-egr","Nueva vigencia hasta",sugerFin,"date");
   o+="</div>";
+  o+="<div id='rv-resumen-cuotas' style='background:#0F172A;border:2px solid #F59E0B;border-radius:8px;padding:10px;margin:8px 0;font-size:12px;color:#FCD34D;font-weight:700'>Completá los montos para ver el resumen de cuotas</div>";
 
   // Recibo de sueldo actualizado
   o+="<div style='background:#1E293B;border-radius:8px;padding:10px;margin-top:10px'>";
@@ -1301,6 +1302,10 @@ function openRenovar(key){
   openModal("Renovar \u2014 "+esc(i.unidad)+" \u2014 "+esc(i.nombre),o,true);
 
   setTimeout(function(){
+    actualizarResumenRv();
+    ["rv-dep","rv-gs","rv-cuotas-dep","rv-cuotas","rv-ini"].forEach(function(id){
+      var el=G(id); if(el){ el.addEventListener("input",actualizarResumenRv); el.addEventListener("change",actualizarResumenRv); }
+    });
     initRvFirma();
     var rs=G("rv-sueldo");
     if(rs) rs.onchange=function(){
@@ -1322,6 +1327,34 @@ function openRenovar(key){
   };
 }
 
+function actualizarResumenRv(){
+  var el=G("rv-resumen-cuotas"); if(!el) return;
+  var dep=fmtInputVal(G("rv-dep")||{value:"0",dataset:{raw:"0"}});
+  var gs=fmtInputVal(G("rv-gs")||{value:"0",dataset:{raw:"0"}});
+  var cuotasDep=G("rv-cuotas-dep")?parseInt(G("rv-cuotas-dep").value.charAt(0))||1:1;
+  var cuotasGs=G("rv-cuotas")?parseInt(G("rv-cuotas").value.charAt(0))||1:1;
+  var ini=G("rv-ini")?G("rv-ini").value:"";
+  var mesBase=ini?ini.slice(0,7):mes();
+  function getMesN(start,n){
+    var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+n;
+    while(mo>12){mo-=12;yr++;}return yr+"-"+String(mo).padStart(2,"0");
+  }
+  if(!dep&&!gs){ el.innerHTML="Sin deposito ni gastos de renovacion: no se va a generar ninguna cuota."; el.style.borderColor="#334155"; el.style.color="#94A3B8"; return; }
+  var html="";
+  if(gs>0){
+    var cuotaGs=Math.round(gs/cuotasGs);
+    var mesesGs=[]; for(var i=0;i<cuotasGs;i++) mesesGs.push(mesLabel(getMesN(mesBase,i)));
+    html+="<div>💰 <b>Gastos:</b> "+cuotasGs+" cuota"+(cuotasGs>1?"s":"")+" de "+fmt(cuotaGs)+" → "+mesesGs.join(", ")+"</div>";
+  }
+  if(dep>0){
+    var cuotaDep=Math.round(dep/cuotasDep);
+    var mesesDep=[]; for(var j=0;j<cuotasDep;j++) mesesDep.push(mesLabel(getMesN(mesBase,j)));
+    html+="<div style='margin-top:4px'>🏠 <b>Deposito:</b> "+cuotasDep+" cuota"+(cuotasDep>1?"s":"")+" de "+fmt(cuotaDep)+" → "+mesesDep.join(", ")+"</div>";
+  }
+  el.innerHTML=html;
+  el.style.borderColor="#F59E0B";
+  el.style.color="#FCD34D";
+}
 function enviarFormRenovar(key){
   var i=DATA.iq[key]; if(!i)return;
   var base=location.href.split("/").slice(0,-1).join("/")+"/form.html";
@@ -1787,6 +1820,9 @@ function openNA(){
     ["na-alq","na-dep","na-gs","na-desc-gs","na-pc","na-dep-info","na-gs-info","na-deuda-monto"].forEach(function(id){
       var el=G(id);if(el)el.oninput=actualizarResumenNA;
     });
+    ["na-cuotas-dep","na-cuotas-gs","na-ing"].forEach(function(id){
+      var el=G(id);if(el){el.onchange=actualizarResumenNA;el.addEventListener("input",actualizarResumenNA);}
+    });
     // Auto-calcular fin del acuerdo cuando se carga el inicio
     var naIng=G("na-ing");
     if(naIng){
@@ -1882,6 +1918,30 @@ function actualizarResumenNA(){
       +(gsNeto>0?" | Gastos: "+fmt(gsNeto)+(desc>0?" (desc. "+fmt(desc)+")":""):"")
       +(pc>0?"<br><span style='color:#10B981'>Pago a cuenta: "+fmt(pc)+"</span>"
             +"<br><b style='color:#F59E0B'>Saldo pendiente: "+fmt(saldo)+"</b>":"");
+    // Desglose de cuotas y meses para deposito y gastos (mismo formato que en Renovar)
+    var cuotasDepNA=G("na-cuotas-dep")?parseInt((G("na-cuotas-dep").value||"1").charAt(0))||1:1;
+    var cuotasGsNA=G("na-cuotas-gs")?parseInt((G("na-cuotas-gs").value||"1").charAt(0))||1:1;
+    if(cuotasDepNA>1||cuotasGsNA>1){
+      var ingNA=G("na-ing")?G("na-ing").value:"";
+      var mesBaseNA=ingNA?ingNA.slice(0,7):mes();
+      function getMesNNA(start,n){
+        var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+n;
+        while(mo>12){mo-=12;yr++;}return yr+"-"+String(mo).padStart(2,"0");
+      }
+      var cuotasHtml="<div style='margin-top:8px;padding-top:8px;border-top:1px solid #334155;color:#FCD34D'>";
+      if(gsNeto>0&&cuotasGsNA>1){
+        var cuotaGsNA=Math.round(gsNeto/cuotasGsNA);
+        var mesesGsNA=[]; for(var i=0;i<cuotasGsNA;i++) mesesGsNA.push(mesLabel(getMesNNA(mesBaseNA,i)));
+        cuotasHtml+="<div>💰 Gastos en "+cuotasGsNA+" cuotas de "+fmt(cuotaGsNA)+" → "+mesesGsNA.join(", ")+"</div>";
+      }
+      if(dep2>0&&cuotasDepNA>1){
+        var cuotaDepNA=Math.round(dep2/cuotasDepNA);
+        var mesesDepNA=[]; for(var j=0;j<cuotasDepNA;j++) mesesDepNA.push(mesLabel(getMesNNA(mesBaseNA,j)));
+        cuotasHtml+="<div style='margin-top:4px'>🏠 Deposito en "+cuotasDepNA+" cuotas de "+fmt(cuotaDepNA)+" → "+mesesDepNA.join(", ")+"</div>";
+      }
+      cuotasHtml+="</div>";
+      el.innerHTML+=cuotasHtml;
+    }
   }
 }
 
@@ -3643,19 +3703,14 @@ function cerrarMes(){
 
 function openSubc(){
   var m=_cajaMes;
-  var ayerStr=diaAnterior(_cajaF);
-  var cobM2=oA(DATA.cob).filter(function(c){return c.mes===m;});
-  var cstM2=oA(DATA.cst).filter(function(c){return c.mes===m&&c.pagado;});
-  var ajM2=oA(DATA.aj).filter(function(a){return a.fecha&&a.fecha.startsWith(m)&&!a.auto;});
 
   var saldosDia={};
   CTAS.forEach(function(cta){
-    var salIni=saldoAcumulado(cta,ayerStr,m);
-    var ingHoy=cobM2.reduce(function(s,c){return s+pA(c).filter(function(p){return p.fecha===_cajaF&&p.cuenta===cta;}).reduce(function(a,p){return a+p.monto;},0);},0)
-              +ajM2.filter(function(a){return a.fecha===_cajaF&&a.tipo==="ingreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
-    var egrHoy=cstM2.filter(function(c){return c.fec_venc===_cajaF&&c.cuenta===cta;}).reduce(function(s,c){return s+Number(c.monto||0);},0)
-              +ajM2.filter(function(a){return a.fecha===_cajaF&&a.tipo==="egreso"&&a.cuenta===cta;}).reduce(function(s,a){return s+Number(a.monto||0);},0);
-    saldosDia[cta]=salIni+ingHoy-egrHoy;
+    // Usar EXACTAMENTE la misma función que la fila "Total del dia" de la pantalla de Caja,
+    // para que el cierre confirme lo mismo que ya se ve en pantalla y no recalcule aparte
+    // (antes recalculaba con egresos por fec_venc en vez de fecha real de pago, e ignoraba
+    // los aportes/retiros de socios, lo que generaba saldos distintos a los que se ven en Caja).
+    saldosDia[cta]=saldoAcumulado(cta,_cajaF,m);
   });
 
   var o="<div class='wbx' style='margin-bottom:12px'>Al confirmar, la caja del dia <b>"+_cajaF+"</b> queda cerrada por <b>"+USER.n+"</b>. No se puede modificar.</div>";
