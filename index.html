@@ -5852,9 +5852,9 @@ function rCtaCte(){
         var diff=Number(inv.usd_venta)-usdCompra;
         ganStr=diff>=0?"<span style='color:#10B981'>+U$S "+diff.toFixed(0)+"</span>":"<span style='color:#EF4444'>U$S "+diff.toFixed(0)+"</span>";
       }
-      var btnVender="";
+      var btnVender="<button class='btn bsm' style='background:#3B82F622;color:#3B82F6;font-size:10px;margin-right:4px' data-editinv='"+inv._key+"' onclick='openEditarInversion(this.dataset.editinv)'>Editar</button>";
       if(!vendido){
-        btnVender="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-invkey='"+inv._key+"' onclick='openVenderInversion(this.dataset.invkey)'>Vender</button>";
+        btnVender+="<button class='btn bsm' style='background:#EF444422;color:#EF4444;font-size:10px' data-invkey='"+inv._key+"' onclick='openVenderInversion(this.dataset.invkey)'>Vender</button>";
       }
       o+="<tr>";
       o+="<td style='font-weight:600'>"+esc(inv.desc||"")+"</td>";
@@ -5874,6 +5874,40 @@ function rCtaCte(){
   o+=socioTable("Loli",movLoli,totLoli,"#EC4899");
   o+=socioTable("Hugo",movHugo,totHugo,"#3B82F6");
   G("main").innerHTML=o;
+}
+
+function openEditarInversion(key){
+  var inv=(DATA.inv||{})[key];if(!inv)return;
+  var o="<div class='g2'>";
+  o+=fld("einv-desc","Descripcion",inv.desc||"","text");
+  o+=fld("einv-f","Fecha de compra",inv.fecha||hoy(),"date");
+  o+=fld("einv-pesos","Valor total en pesos $",inv.pesos||"","money");
+  o+=fld("einv-tc","TC al momento de compra",inv.tc||"","money");
+  o+="</div>";
+  o+="<div id='einv-preview' style='background:#0F172A;border-radius:8px;padding:8px;font-size:12px;color:#94A3B8;margin:8px 0'>U$S "+Number(inv.usd||0).toLocaleString()+"</div>";
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'><button class='btn bg bsm' onclick='closeModal()'>Cancelar</button><button class='btn bok bsm' data-savekey='"+key+"' onclick='saveEditarInversion(this.dataset.savekey)'>Guardar</button></div>";
+  openModal("Editar Inversion — "+esc(inv.desc||""),o);
+  setTimeout(function(){
+    ["einv-pesos","einv-tc"].forEach(function(id){
+      var el=G(id);if(el)el.oninput=function(){
+        var p=fmtInputVal(G("einv-pesos")||{value:"0",dataset:{raw:"0"}});
+        var tc=fmtInputVal(G("einv-tc")||{value:"0",dataset:{raw:"0"}});
+        var t=G("einv-preview");
+        if(t&&p>0&&tc>0) t.innerHTML="Valor dolarizado: <b style='color:#F59E0B'>U$S "+Math.round(p/tc).toLocaleString()+"</b>";
+      };
+    });
+  },100);
+}
+function saveEditarInversion(key){
+  var desc=G("einv-desc").value.trim();
+  var f=G("einv-f").value;
+  var pesos=fmtInputVal(G("einv-pesos"));
+  var tc=fmtInputVal(G("einv-tc"));
+  if(!desc||!pesos||!tc){alert("Completa todos los campos");return;}
+  var usd=Math.round(pesos/tc);
+  DB.ref("inv/"+key).update({desc:desc,fecha:f,pesos:pesos,tc:tc,usd:usd});
+  closeModal();
+  setTimeout(rCtaCte,400);
 }
 
 function openNuevaInversion(){
