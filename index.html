@@ -192,8 +192,8 @@ function fmtInputVal(el){
   return parseInt(v)||0;
 }
 function fusd(n,tc){return tc>0?"U$S "+Math.round(n/tc):"--";}
-function hoy(){return new Date().toISOString().split("T")[0];}
-function mes(){return new Date().toISOString().slice(0,7);}
+function hoy(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function mes(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
 function fecDisp(s){
   // Convert YYYY-MM-DD to DD/MM/YY for display
   if(!s||s.length<10)return s||"--";
