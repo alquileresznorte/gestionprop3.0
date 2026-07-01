@@ -987,7 +987,7 @@ function openFicha(key){
   // Datos principales
   var o="<div class='g2' style='margin-bottom:10px'>";
   o+="<div><div class='lbl'>ID Acuerdo</div><div style='font-size:12px'>#"+(i.id_ac||"--")+"</div></div>";
-  o+="<div><div class='lbl'>Unidad</div><div style='font-size:12px'>"+esc(i.unidad)+"</div></div>";
+  o+="<div><div class='lbl'>Unidad</div><div style='font-size:12px'>"+esc(i.unidad)+"</div>"+(i.historial_deptos&&i.historial_deptos.length?"<div style='color:#64748B;font-size:10px'>Antes: "+i.historial_deptos.join(", ")+"</div>":"")+"</div>";
   o+="<div><div class='lbl'>Titular</div><div style='font-size:12px'>"+esc(i.nombre)+"</div></div>";
   o+="<div><div class='lbl'>DNI</div><div style='font-size:12px'>"+esc(i.dni||"--")+"</div></div>";
   o+="<div><div class='lbl'>Telefono</div><div style='font-size:12px'>"+esc(i.tel||"--")+(i.tel?"&nbsp;<a class='wa' href='https://wa.me/"+i.tel+"' target='_blank' style='font-size:10px'>WA</a>":"")+"</div>"+(i.tel_historial&&i.tel_historial.length?"<div style='color:#64748B;font-size:10px'>Anteriores: "+i.tel_historial.join(", ")+"</div>":"")+"</div>";
@@ -1080,6 +1080,7 @@ function openFicha(key){
     o+="<button class='btn bw bsm' data-obs='"+ki+"'>Observaciones</button>";
     o+="<button class='btn bok bsm' data-renovar='"+ki+"'>Renovar</button>";
     o+="<button class='btn bpu bsm' data-adicional='"+ki+"'>+ Adicional</button>";
+    o+="<button class='btn bsm' style='background:#06B6D4;color:#000' data-cambiodepto='"+ki+"'>🔀 Cambiar depto</button>";
     o+="<button class='btn bsm' style='background:#334155;color:#CBD5E1' data-editdatos='"+ki+"'>✏ Editar datos</button>";if(i.doc_dni_f||i.doc_dni_d||i.doc_sueldo) o+="<button class='btn bsm' style='background:#0F172A;color:#06B6D4;border:1px solid #06B6D4' data-verdocs='"+ki+"'>📷 Ver docs</button>";o+="<button class='btn bx bsm' data-cerrar='"+ki+"'>Cerrar Acuerdo</button>";
     if((i.deposito||0)>0)o+="<button class='btn bg bsm' data-devdep='"+ki+"'>Devolver Dep.</button>";
   }
@@ -1094,6 +1095,7 @@ function openFicha(key){
     else if(t.dataset.editdatos)openEditDatos(kget(parseInt(t.dataset.editdatos)));else if(t.dataset.verdocs)openVerDocs(kget(parseInt(t.dataset.verdocs)));else if(t.dataset.cerrar)openCerrar(kget(parseInt(t.dataset.cerrar)));
     else if(t.dataset.renovar)openRenovar(kget(parseInt(t.dataset.renovar)));
     else if(t.dataset.adicional)openAdicional(kget(parseInt(t.dataset.adicional)));
+    else if(t.dataset.cambiodepto)openCambiarDepto(kget(parseInt(t.dataset.cambiodepto)));
     else if(t.dataset.hev)openHistorialEventos(kget(parseInt(t.dataset.hev)));
     else if(t.dataset.devdep)openDevolverDeposito(kget(parseInt(t.dataset.devdep)));
     else if(e.target.classList.contains("ov"))closeModal();
@@ -4761,6 +4763,72 @@ function guardarClave(usuario){
 
 
 // ── ADICIONAL POR INQUILINO ───────────────────────────────────────────────────
+// ── CAMBIAR DE DEPTO (mismo acuerdo, mismo id_ac) ─────────────────────────────
+function openCambiarDepto(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var ki=kpush(key);
+  var udl=uds().filter(function(u){
+    return !oA(DATA.iq).filter(function(x){return x.unidad===u&&x.estado==="activo";}).length;
+  });
+  var o="<div class='ibox'>Mismo acuerdo, mismo ID (#"+esc(i.id_ac||"")+"). El depto actual ("+esc(i.unidad)+") queda libre automáticamente al mover a "+esc(i.nombre.split(",")[0])+".</div>";
+  o+="<div class='g2'>";
+  o+="<div><div class='lbl'>Depto actual</div><div style='font-size:13px;font-weight:700'>"+esc(i.unidad)+" — "+fmt(i.alquiler)+"/mes</div></div>";
+  o+="<div class='fld'><label class='lbl'>Nuevo depto *</label><select class='inp' id='cd-u'><option value=''>Seleccionar...</option>"+udl.map(function(u){return "<option>"+u+"</option>";}).join("")+"</select></div>";
+  o+="</div>";
+  o+=fld("cd-alq","Nuevo alquiler mensual $",i.alquiler,"money");
+  o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-top:6px'>";
+  o+="<div style='color:#06B6D4;font-size:11px;font-weight:700;margin-bottom:6px'>Diferencia a cobrar (opcional)</div>";
+  o+="<div class='g2'>"+fld("cd-dif","Monto diferencia $","0","money")+fld("cd-fecha","Fecha del cobro",hoy(),"date")+"</div>";
+  o+="<p style='color:#64748B;font-size:10px;margin-top:2px'>Se crea como un cobro pendiente (concepto \"Cambio de depto\"), lo registrás como pagado desde Cobranzas cuando la cobres, igual que cualquier otro pago.</p>";
+  o+="</div>";
+  o+=tad("cd-obs","Motivo / observaciones (opcional)","");
+  o+="<div style='display:flex;justify-content:flex-end;gap:7px;margin-top:12px'>";
+  o+="<button class='btn bg bsm' onclick='closeModal()'>Cancelar</button>";
+  o+="<button class='btn bok bsm' data-savecd='"+ki+"'>Confirmar cambio</button></div>";
+  openModal("Cambiar de depto — "+esc(i.nombre),o);
+  var md=MODS[MODS.length-1];
+  md.onclick=function(e){
+    if(e.target.dataset.savecd)saveCambiarDepto(kget(parseInt(e.target.dataset.savecd)));
+    else if(e.target.classList.contains("ov"))closeModal();
+  };
+}
+function saveCambiarDepto(key){
+  var i=DATA.iq[key]; if(!i) return;
+  var nuevaUnidad=(G("cd-u")||{value:""}).value;
+  var nuevoAlq=fmtInputVal(G("cd-alq")||{value:"0",dataset:{raw:"0"}});
+  var dif=fmtInputVal(G("cd-dif")||{value:"0",dataset:{raw:"0"}});
+  var fechaDif=(G("cd-fecha")||{value:hoy()}).value||hoy();
+  var obs=(G("cd-obs")||{value:""}).value.trim();
+  if(!nuevaUnidad){alert("Elegí el nuevo depto");return;}
+  if(!nuevoAlq){alert("El nuevo alquiler es obligatorio");return;}
+  var ocupado=oA(DATA.iq).filter(function(x){return x.unidad===nuevaUnidad&&x.estado==="activo"&&x._key!==key;}).length>0;
+  if(ocupado){alert("El depto "+nuevaUnidad+" ya tiene un contrato activo.");return;}
+  var unidadVieja=i.unidad;
+  var alqViejo=i.alquiler;
+  var deptoHist=Array.isArray(i.historial_deptos)?i.historial_deptos.slice():[];
+  deptoHist.push(unidadVieja+" (hasta "+hoy()+")");
+  DB.ref("iq/"+key).update({unidad:nuevaUnidad,alquiler:nuevoAlq,historial_deptos:deptoHist},function(err){
+    if(err){alert("Error al mover: "+err.message);return;}
+    // Registrar el evento en el historial del inquilino
+    DB.ref("cfg").push({
+      tipo:"evento_iq",id_ac:i.id_ac,unidad:nuevaUnidad,
+      texto:"Cambio de depto: "+unidadVieja+" ("+fmt(alqViejo)+") \u2192 "+nuevaUnidad+" ("+fmt(nuevoAlq)+")"+(dif>0?". Diferencia a cobrar: "+fmt(dif):"")+(obs?". "+obs:""),
+      fecha:hoy(),usuario:USER.n,fecha_ts:Date.now()
+    });
+    // Cobro pendiente de la diferencia, si corresponde
+    if(dif>0){
+      DB.ref("cob").push({
+        id_ac:i.id_ac||"",unidad:nuevaUnidad,inq:i.nombre,
+        mes:fechaDif.slice(0,7),monto_total:dif,sal_ant:0,estado:"pendiente",pagos:{},
+        concepto:"Cambio de depto - diferencia"
+      });
+    }
+    closeModal();closeModal();
+    alert("Listo. "+esc(i.nombre)+" se movió de "+unidadVieja+" a "+nuevaUnidad+". "+unidadVieja+" quedó libre."+(dif>0?" Diferencia de "+fmt(dif)+" cargada como cobro pendiente.":""));
+    setTimeout(function(){go("acuerdos");},300);
+  });
+}
+
 function openAdicional(key){
   var i=DATA.iq[key]; if(!i) return;
   var ki=kpush(key);
