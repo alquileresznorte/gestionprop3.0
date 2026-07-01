@@ -3680,7 +3680,7 @@ function rCaja(){
   // Wire date/month inputs
   setTimeout(function(){
     var fd=G("caja-fecha");
-    if(fd) fd.onchange=function(){_cajaF=this.value;rCaja();};
+    if(fd) fd.onchange=function(){_cajaF=this.value;_cajaMes=_cajaF.slice(0,7);rCaja();};
     var fm=G("caja-mes");
     if(fm) fm.onchange=function(){_cajaMes=this.value;rCaja();};
   },50);
