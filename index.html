@@ -218,7 +218,26 @@ function nid(){
   return String(_nc).padStart(6,"0");
 }
 function G(id){return document.getElementById(id);}
-function uds(){var r=[];Object.keys(ED).forEach(function(c){for(var i=1;i<=ED[c].u;i++)r.push(c+"-"+i);});return r;}
+function uds(){
+  var r=[];
+  Object.keys(ED).forEach(function(c){for(var i=1;i<=ED[c].u;i++)r.push(c+"-"+i);});
+  // Unidades adicionales cargadas desde Config > Propiedades (no están en el objeto ED fijo).
+  // Si el código ya existe en ED (ej: OT), la numeración continúa después de la última unidad
+  // existente (OT-1 -> OT-2). Si es un código nuevo, arranca desde 1.
+  var customProps=oA(DATA.cfg||{}).filter(function(x){return x.tipo==="propiedad"&&x.activo!==false;});
+  var contadorPorCodigo={};
+  customProps.forEach(function(p){
+    var cod=(p.codigo||"").trim();
+    if(!cod) return;
+    if(contadorPorCodigo[cod]===undefined) contadorPorCodigo[cod]=ED[cod]?ED[cod].u:0;
+    var cant=Number(p.unidades||1);
+    for(var i=1;i<=cant;i++){
+      contadorPorCodigo[cod]++;
+      r.push(cod+"-"+contadorPorCodigo[cod]);
+    }
+  });
+  return r;
+}
 function pA(c){return c&&c.pagos?Object.values(c.pagos):[];}
 function pT(c){
   // Para cobros USD: sumar en USD; para pesos: sumar en pesos
