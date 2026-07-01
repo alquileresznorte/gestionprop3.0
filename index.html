@@ -2308,14 +2308,6 @@ function rCob(){
   }
 
   var CE={pagado:"#10B981",parcial:"#F59E0B",pendiente:"#EF4444"};
-  // Precalcular, por acuerdo (id_ac), otras cuotas/cobros pendientes en CUALQUIER mes —
-  // así avisamos aunque estén "escondidas" en un mes distinto al que se está mirando ahora.
-  var otrosPendPorIdAc={};
-  oA(DATA.cob).forEach(function(cx){
-    if(cx.archivado_hist||cx.estado==="pagado"||!cx.id_ac) return;
-    if(!otrosPendPorIdAc[cx.id_ac]) otrosPendPorIdAc[cx.id_ac]=[];
-    otrosPendPorIdAc[cx.id_ac].push(cx);
-  });
   var rows=[];
   cobA.forEach(function(c){
     var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0);
@@ -2323,17 +2315,10 @@ function rCob(){
     var ps=pA(c).map(function(p){return fmt(p.monto)+" ("+p.cuenta+")";}).join(" + ");
     var concepto=c.concepto||"Alquiler";
     var ki=kpush(c._key);
-    var otros=(otrosPendPorIdAc[c.id_ac]||[]).filter(function(x){return x._key!==c._key;});
-    var badgeOtros="";
-    if(otros.length){
-      var totalOtros=otros.reduce(function(s,x){return s+((x.monto_total||0)+Number(x.sal_ant||0)-pT(x));},0);
-      var mesesOtros=otros.map(function(x){return x.mes;}).sort().join(", ");
-      badgeOtros="<span title='Meses: "+esc(mesesOtros)+"' style='background:#F59E0B22;color:#F59E0B;border-radius:8px;padding:2px 6px;font-size:10px;font-weight:700;margin-left:6px'>+"+otros.length+" cuota"+(otros.length>1?"s":"")+" pendiente"+(otros.length>1?"s":"")+" ("+fmt(totalOtros)+")</span>";
-    }
     var row="<div class='card' style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px'>";
     row+="<div style='display:flex;gap:9px;align-items:center;flex:1'>";
     row+="<div style='background:"+ec+"22;color:"+ec+";border-radius:9px;padding:5px 8px;font-weight:800;font-size:11px;min-width:44px;text-align:center'>"+c.unidad+"</div>";
-    row+="<div><div style='font-weight:600;font-size:13px'>"+esc(c.inq||"")+badgeOtros+"</div>";
+    row+="<div><div style='font-weight:600;font-size:13px'>"+esc(c.inq||"")+"</div>";
     var montoLabel=c.moneda==="USD"?"U$S "+Number(c.monto_total).toLocaleString():fmt(c.monto_total);
     row+="<div style='color:#64748B;font-size:10px'>"+esc(concepto)+" — "+montoLabel+(c.sal_ant>0?" <span style='color:#F59E0B' title='Saldo del mes anterior'>+Ant.:"+fmt(c.sal_ant)+"</span>":"")+"</div>";
     if(ps) row+="<div style='color:#94A3B8;font-size:9px'>"+ps+"</div>";
