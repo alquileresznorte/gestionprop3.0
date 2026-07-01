@@ -3272,7 +3272,12 @@ function saldoAcumulado(cta, hastaFecha, hastaM){
 
 function rCaja(){
   if(!G("main")) return;
-  var esA=USER.r==="admin",m=_cajaMes;
+  var esA=USER.r==="admin";
+  // La vista Diario SIEMPRE calcula el mes a partir de la fecha que se está mirando (_cajaF),
+  // nunca de _cajaMes por separado. Así es imposible que se desincronicen, sin importar si
+  // se llega acá cambiando la fecha, cambiando de pestaña Mensual->Diario, o cruzando de mes.
+  // La vista Mensual sigue usando su propio selector (_cajaMes) de forma independiente.
+  var m=(_cajaV==="dia")?_cajaF.slice(0,7):_cajaMes;
   // ALL cobranzas and costs for this month
   var cobM=oA(DATA.cob).filter(function(c){return c.mes===m;});
   // Para la vista DIARIA: también incluir cobros de otros meses con pagos en este mes
