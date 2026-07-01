@@ -2308,6 +2308,14 @@ function rCob(){
   }
 
   var CE={pagado:"#10B981",parcial:"#F59E0B",pendiente:"#EF4444"};
+  // Precalcular, por acuerdo (id_ac), otras cuotas/cobros pendientes en CUALQUIER mes —
+  // así avisamos aunque estén "escondidas" en un mes distinto al que se está mirando ahora.
+  var otrosPendPorIdAc={};
+  oA(DATA.cob).forEach(function(cx){
+    if(cx.archivado_hist||cx.estado==="pagado"||!cx.id_ac) return;
+    if(!otrosPendPorIdAc[cx.id_ac]) otrosPendPorIdAc[cx.id_ac]=[];
+    otrosPendPorIdAc[cx.id_ac].push(cx);
+  });
   var rows=[];
   cobA.forEach(function(c){
     var pg=pT(c),tot=c.monto_total+Number(c.sal_ant||0);
@@ -2315,10 +2323,17 @@ function rCob(){
     var ps=pA(c).map(function(p){return fmt(p.monto)+" ("+p.cuenta+")";}).join(" + ");
     var concepto=c.concepto||"Alquiler";
     var ki=kpush(c._key);
+    var otros=(otrosPendPorIdAc[c.id_ac]||[]).filter(function(x){return x._key!==c._key;});
+    var badgeOtros="";
+    if(otros.length){
+      var totalOtros=otros.reduce(function(s,x){return s+((x.monto_total||0)+Number(x.sal_ant||0)-pT(x));},0);
+      var mesesOtros=otros.map(function(x){return x.mes;}).sort().join(", ");
+      badgeOtros="<span title='Meses: "+esc(mesesOtros)+"' style='background:#F59E0B22;color:#F59E0B;border-radius:8px;padding:2px 6px;font-size:10px;font-weight:700;margin-left:6px'>+"+otros.length+" cuota"+(otros.length>1?"s":"")+" pendiente"+(otros.length>1?"s":"")+" ("+fmt(totalOtros)+")</span>";
+    }
     var row="<div class='card' style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px'>";
     row+="<div style='display:flex;gap:9px;align-items:center;flex:1'>";
     row+="<div style='background:"+ec+"22;color:"+ec+";border-radius:9px;padding:5px 8px;font-weight:800;font-size:11px;min-width:44px;text-align:center'>"+c.unidad+"</div>";
-    row+="<div><div style='font-weight:600;font-size:13px'>"+esc(c.inq||"")+"</div>";
+    row+="<div><div style='font-weight:600;font-size:13px'>"+esc(c.inq||"")+badgeOtros+"</div>";
     var montoLabel=c.moneda==="USD"?"U$S "+Number(c.monto_total).toLocaleString():fmt(c.monto_total);
     row+="<div style='color:#64748B;font-size:10px'>"+esc(concepto)+" — "+montoLabel+(c.sal_ant>0?" <span style='color:#F59E0B' title='Saldo del mes anterior'>+Ant.:"+fmt(c.sal_ant)+"</span>":"")+"</div>";
     if(ps) row+="<div style='color:#94A3B8;font-size:9px'>"+ps+"</div>";
@@ -5323,6 +5338,18 @@ function renderCfgLimpieza(){
     o+="</div>";
   }
 
+  // Dividir cobro de renovación mal cargado (1 cuota) en las cuotas correctas
+  o+="<div style='background:#1E293B;border:1px solid #10B98144;border-radius:10px;padding:12px;margin-bottom:10px'>";
+  o+="<p style='color:#10B981;font-size:12px;font-weight:700;margin-bottom:4px'>🔧 Dividir cobro de renovación en cuotas correctas</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Para cobros de depósito/gastos de renovación que se cargaron como 1 sola cuota en vez de varias. NO borra ni mueve ningún pago ya registrado en Caja — solo ajusta el cobro existente y crea las cuotas que faltan como pendientes.</p>";
+  o+="<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:flex-end'>";
+  o+="<div class='fld' style='margin:0'><label class='lbl'>Unidad</label><input class='inp' id='div-cuo-u' placeholder='R2-4' style='max-width:120px'/></div>";
+  o+="<div class='fld' style='margin:0'><label class='lbl'>Mes actual del cobro (opcional)</label><input type='month' class='inp' id='div-cuo-mes' style='max-width:150px'/></div>";
+  o+="<button class='btn bp bsm' onclick='buscarCobroDividir()'>Buscar</button>";
+  o+="</div>";
+  o+="<div id='div-cuo-res'></div>";
+  o+="</div>";
+
   // Borrar solo costos
   o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
   o+="<p style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar solo COSTOS del mes</p>";
@@ -5600,6 +5627,92 @@ function crearCobManual(){
   },function(err){
     if(err){alert("Error: "+err.message);}
     else{alert("✅ Cobro creado. Ahora podés registrar el pago desde Cobranzas.");}
+  });
+}
+
+function buscarCobroDividir(){
+  var u=(G("div-cuo-u")||{value:""}).value.trim().toUpperCase();
+  var mFiltro=(G("div-cuo-mes")||{value:""}).value;
+  var res=G("div-cuo-res"); if(!res) return;
+  if(!u){res.innerHTML="<p style='color:#EF4444;font-size:11px'>Ingresá la unidad</p>";return;}
+  var cobros=oA(DATA.cob).filter(function(c){
+    var okU=c.unidad===u;
+    var okM=!mFiltro||c.mes===mFiltro;
+    return okU&&okM;
+  });
+  if(!cobros.length){res.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:6px'>No se encontraron cobros para esos filtros.</p>";return;}
+  var o="<div style='margin-top:8px'>";
+  cobros.sort(function(a,b){return (a.mes||"").localeCompare(b.mes||"");}).forEach(function(c){
+    var pg=pT(c);
+    var ki=kpush(c._key);
+    var descDefault=(c.concepto||c.concepto_extra||"Gastos renovacion").replace(/\s*cuota\s*\d+\s*\/\s*\d+/i,"").trim()||"Gastos renovacion";
+    o+="<div style='background:#0F172A;border-radius:8px;padding:10px;margin-bottom:8px'>";
+    o+="<div style='font-size:12px;margin-bottom:6px'><b>"+esc(c.unidad)+"</b> · "+esc(c.mes)+" · "+esc(c.concepto||c.concepto_extra||"Alquiler")+"<br>Total actual: "+fmt(c.monto_total)+" — Pagado hasta ahora: "+fmt(pg)+"</div>";
+    o+="<div class='g2' style='margin-bottom:6px'>";
+    o+="<div class='fld' style='margin:0'><label class='lbl'>Cantidad total de cuotas</label><input class='inp' type='number' min='2' max='12' id='div-cant-"+ki+"' value='3' style='max-width:100px'/></div>";
+    o+="<div class='fld' style='margin:0'><label class='lbl'>Mes correcto de la cuota 1</label><input type='month' class='inp' id='div-mesini-"+ki+"' value='"+esc(c.mes)+"' style='max-width:150px'/></div>";
+    o+="</div>";
+    o+="<div class='fld' style='margin:0 0 6px'><label class='lbl'>Descripción base (sin \"cuota X/Y\")</label><input class='inp' id='div-desc-"+ki+"' value='"+esc(descDefault)+"'/></div>";
+    o+="<button class='btn bok bsm' data-dividir='"+ki+"'>Dividir en cuotas</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  res.innerHTML=o;
+  res.onclick=function(e){
+    var b=e.target.closest("[data-dividir]");
+    if(!b) return;
+    dividirCobroEnCuotas(parseInt(b.dataset.dividir));
+  };
+}
+
+function dividirCobroEnCuotas(ki){
+  var cobKey=kget(ki);
+  var c=DATA.cob[cobKey]; if(!c){alert("Cobro no encontrado");return;}
+  var cant=parseInt((G("div-cant-"+ki)||{value:"3"}).value)||0;
+  var mesIni=(G("div-mesini-"+ki)||{value:c.mes}).value||c.mes;
+  var descBase=(G("div-desc-"+ki)||{value:"Gastos renovacion"}).value.trim()||"Gastos renovacion";
+  if(cant<2){alert("La cantidad de cuotas debe ser 2 o más (si es 1 no hay nada que dividir)");return;}
+  var totalOriginal=Number(c.monto_total||0);
+  var cuotaMonto=Math.round(totalOriginal/cant);
+  var pg=pT(c);
+  if(pg>cuotaMonto){
+    if(!confirm("Lo ya pagado ("+fmt(pg)+") es MAYOR al valor de una cuota ("+fmt(cuotaMonto)+"). Esto puede significar que ese pago cubre más de una cuota.\n\n¿Igual querés continuar? La cuota 1 va a quedar con ese pago completo asignado (puede figurar en verde aunque el monto de la cuota sea menor a lo pagado) y las demás cuotas se crean sin pagos, para que las repartas vos manualmente si hace falta."))return;
+  }
+  var estado1 = pg>=cuotaMonto ? "pagado" : (pg>0 ? "parcial" : "pendiente");
+  var ups={};
+  ups["cob/"+cobKey+"/mes"]=mesIni;
+  ups["cob/"+cobKey+"/monto_total"]=cuotaMonto;
+  ups["cob/"+cobKey+"/concepto"]=descBase+" cuota 1/"+cant;
+  ups["cob/"+cobKey+"/estado"]=estado1;
+  DB.ref("/").update(ups,function(err){
+    if(err){alert("Error al actualizar la cuota 1: "+err.message);return;}
+    function getMesN(start,n){
+      var yr=parseInt(start.slice(0,4)),mo=parseInt(start.slice(5,7))+n;
+      while(mo>12){mo-=12;yr++;}return yr+"-"+String(mo).padStart(2,"0");
+    }
+    var totalCrear=cant-1;
+    if(totalCrear<=0){alert("Cobro actualizado como cuota 1/"+cant+".");return;}
+    var creaciones=0,huboError=false;
+    for(var i=1;i<cant;i++){
+      DB.ref("cob").push({
+        id_ac:c.id_ac||"",
+        unidad:c.unidad,
+        inq:c.inq,
+        mes:getMesN(mesIni,i),
+        monto_total:cuotaMonto,
+        sal_ant:0,
+        estado:"pendiente",
+        pagos:{},
+        concepto:descBase+" cuota "+(i+1)+"/"+cant
+      },function(err2){
+        creaciones++;
+        if(err2) huboError=true;
+        if(creaciones===totalCrear){
+          if(huboError) alert("Se actualizó la cuota 1, pero hubo un error creando alguna de las cuotas siguientes. Revisá manualmente.");
+          else alert("Listo. Cuota 1/"+cant+" = "+fmt(cuotaMonto)+" ("+estado1+"), y "+totalCrear+" cuota(s) más creadas como pendientes en los meses siguientes.");
+        }
+      });
+    }
   });
 }
 
