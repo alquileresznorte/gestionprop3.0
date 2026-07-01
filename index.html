@@ -2264,9 +2264,19 @@ function openFichaHist(key){
 // COBRANZAS
 var _cobMes=mes();
 function rCob(){
-  var allCob=oA(DATA.cob).filter(function(c){return c.mes===_cobMes&&!c.archivado_hist;});
-  var esp=allCob.reduce(function(s,c){return s+c.monto_total+Number(c.sal_ant||0);},0);
-  var cob=allCob.reduce(function(s,c){return s+pT(c);},0);
+  var cobMesActual=oA(DATA.cob).filter(function(c){return c.mes===_cobMes&&!c.archivado_hist;});
+  // Saldos VENCIDOS de meses anteriores (mes < mes actual) que siguen sin pagar, de acuerdos
+  // activos — ej: depósito o gastos de gestión que quedaron sin terminar de cobrar. Esto es
+  // distinto a cuotas futuras (esas no deben aparecer todavía, no vencieron). Se muestran como
+  // renglón propio para que ningún saldo quede "escondido" solo por estar en otro mes.
+  var idsActivos={};
+  oA(DATA.iq).filter(function(i){return i.estado==="activo";}).forEach(function(i){if(i.id_ac) idsActivos[i.id_ac]=true;});
+  var saldosVencidos=oA(DATA.cob).filter(function(c){
+    return c.mes&&c.mes<_cobMes&&!c.archivado_hist&&c.estado!=="pagado"&&c.id_ac&&idsActivos[c.id_ac];
+  });
+  var allCob=cobMesActual.concat(saldosVencidos);
+  var esp=cobMesActual.reduce(function(s,c){return s+c.monto_total+Number(c.sal_ant||0);},0);
+  var cob=cobMesActual.reduce(function(s,c){return s+pT(c);},0);
 
   // Apply filters
   var edFil=localStorage.getItem("gp_cob_ed")||"";
@@ -2314,6 +2324,7 @@ function rCob(){
     var cod=(c.unidad||"").split("-")[0],ec=COL[cod]||"#64748B";
     var ps=pA(c).map(function(p){return fmt(p.monto)+" ("+p.cuenta+")";}).join(" + ");
     var concepto=c.concepto||"Alquiler";
+    if(c.mes&&c.mes!==_cobMes) concepto+=" ["+esc(c.mes)+" vencido]";
     var ki=kpush(c._key);
     var row="<div class='card' style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px'>";
     row+="<div style='display:flex;gap:9px;align-items:center;flex:1'>";
