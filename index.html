@@ -5396,6 +5396,32 @@ function renderCfgLimpieza(){
   o+="<h3 style='font-size:13px;font-weight:700;margin-bottom:4px;color:#EF4444'>⚠ Zona de limpieza de datos</h3>";
   o+="<p style='color:#64748B;font-size:11px;margin-bottom:14px'>Estas acciones son irreversibles. Los datos borrados no se pueden recuperar.</p>";
 
+  // Detectar unidades con MÁS DE UN acuerdo activo al mismo tiempo (doble alquiler)
+  var porUnidad={};
+  oA(DATA.iq).filter(function(i){return i.estado==="activo";}).forEach(function(i){
+    if(!porUnidad[i.unidad]) porUnidad[i.unidad]=[];
+    porUnidad[i.unidad].push(i);
+  });
+  var duplicadas=Object.keys(porUnidad).filter(function(u){return porUnidad[u].length>1;});
+  if(duplicadas.length){
+    o+="<div style='background:#1E293B;border:2px solid #EF4444;border-radius:10px;padding:12px;margin-bottom:10px'>";
+    o+="<p style='color:#EF4444;font-size:13px;font-weight:800;margin-bottom:4px'>🚨 "+duplicadas.length+" unidad(es) con más de un acuerdo activo</p>";
+    o+="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>Dos inquilinos figuran activos en la misma unidad al mismo tiempo. Revisá cuál es el correcto y cerrá el otro con el botón \"Cerrar Acuerdo\" de su Ficha (no lo hago automático porque solo vos sabés cuál es el real).</p>";
+    duplicadas.forEach(function(u){
+      o+="<div style='background:#0F172A;border-radius:8px;padding:8px 10px;margin-bottom:8px'>";
+      o+="<div style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:4px'>"+esc(u)+"</div>";
+      porUnidad[u].forEach(function(i){
+        var ki=kpush(i._key);
+        o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px'>";
+        o+="<span style='color:#CBD5E1'>"+esc(i.nombre||"")+" · ID #"+esc(i.id_ac||"--")+" · desde "+fecDisp(i.ingreso||"")+" · "+fmt(i.alquiler||0)+"</span>";
+        o+="<button class='btn bp bsm' style='font-size:10px' data-verficha='"+ki+"'>Ver ficha</button>";
+        o+="</div>";
+      });
+      o+="</div>";
+    });
+    o+="</div>";
+  }
+
   // Asignar IDs a contratos sin ID
   var sinId=oA(DATA.iq).filter(function(i){return i.estado==="activo"&&!i.id_ac;});
   if(sinId.length){
@@ -5555,6 +5581,10 @@ function renderCfgLimpieza(){
   // Wire buscar cobros
   var lcu=G("limp-cob-u");
   if(lcu) lcu.addEventListener("keydown",function(e){if(e.key==="Enter")buscarCobrosLimp();});
+  el.addEventListener("click",function(e){
+    var vf=e.target.closest("[data-verficha]");
+    if(vf) openFicha(kget(parseInt(vf.dataset.verficha)));
+  });
 }
 
 function buscarCostosLimp(){
