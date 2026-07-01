@@ -1116,7 +1116,14 @@ function enviarFormFicha(){
     +"&ing="+encodeURIComponent(i.ingreso||"")
     +"&egr="+encodeURIComponent(i.egreso||"");
   var nom=(i.nombre||"").split(",")[0].trim();
-  var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+" Adm: 1555787641";
+  // Si hay una diferencia pendiente por cambio de depto, avisarla en el mensaje
+  var difPend=oA(DATA.cob).filter(function(c){return c.id_ac===i.id_ac&&c.concepto==="Cambio de depto - diferencia"&&c.estado!=="pagado";});
+  var difTxt="";
+  if(difPend.length){
+    var totalDif=difPend.reduce(function(s,c){return s+((c.monto_total||0)+Number(c.sal_ant||0)-pT(c));},0);
+    difTxt=" Recordá que además queda pendiente una diferencia de "+fmt(totalDif)+" por el cambio de depto.";
+  }
+  var msg="Hola "+nom+"! Te enviamos el formulario de ingreso al departamento "+i.unidad+". Completa tus datos y firma el acuerdo: "+link+difTxt+" Adm: 1555787641";
   var o="<div style='margin-bottom:10px'>";
   o+="<div class='lbl'>Teléfono destinatario</div>";
   o+="<input class='inp' id='fef-tel' value='"+(i.tel||i.telefono||"")+"' placeholder='5491...' style='margin-bottom:8px'/>";
