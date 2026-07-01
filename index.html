@@ -1977,7 +1977,7 @@ function actualizarResumenNA(){
 function saveNA(){
   var u=G("na-u").value,n=G("na-n").value,d=G("na-d").value||"PENDIENTE";
   if(!u||!n){alert("Unidad y nombre son obligatorios");return;}
-  // Verificar que no haya contrato activo para esa unidad
+  // Verificar que no haya contrato activo para esa unidad (chequeo rápido con datos locales)
   var deptoActivo=oA(DATA.iq).filter(function(i){return i.unidad===u&&i.estado==="activo";}).length>0;
   if(deptoActivo){
     alert("El depto "+u+" ya tiene un contrato activo. Solo puede haber uno por departamento.");return;
@@ -1986,8 +1986,30 @@ function saveNA(){
   var btnCrear=document.querySelector("button[onclick='saveNA()']");
   if(btnCrear){
     if(btnCrear.disabled){alert("Ya se esta creando el contrato, por favor espera.");return;}
-    btnCrear.disabled=true;btnCrear.textContent="Creando...";btnCrear.style.opacity="0.5";
+    btnCrear.disabled=true;btnCrear.textContent="Verificando...";btnCrear.style.opacity="0.5";
   }
+  // Revalidación con lectura FRESCA directa a Firebase (no la copia local, que puede estar
+  // desactualizada) justo antes de crear el acuerdo. Esto reduce al mínimo la posibilidad de
+  // que dos personas creen un acuerdo activo en la misma unidad casi al mismo tiempo.
+  DB.ref("iq").orderByChild("unidad").equalTo(u).once("value",function(snap){
+    var yaOcupado=false;
+    snap.forEach(function(ch){
+      var v=ch.val();
+      if(v&&v.estado==="activo") yaOcupado=true;
+    });
+    if(yaOcupado){
+      if(btnCrear){btnCrear.disabled=false;btnCrear.textContent="Crear Acuerdo";btnCrear.style.opacity="1";}
+      alert("El depto "+u+" se acaba de ocupar (por otra persona, justo ahora). Cerrá esta ventana y elegí otra unidad, o revisá Acuerdos.");
+      return;
+    }
+    if(btnCrear) btnCrear.textContent="Creando...";
+    _crearAcuerdoNA(u,n,d,btnCrear);
+  },function(err){
+    if(btnCrear){btnCrear.disabled=false;btnCrear.textContent="Crear Acuerdo";btnCrear.style.opacity="1";}
+    alert("Error de conexión al verificar disponibilidad, intentá de nuevo: "+err.message);
+  });
+}
+function _crearAcuerdoNA(u,n,d,btnCrear){
   // Guardar key de reserva localmente ANTES de cualquier operacion async
   var resKeyLocal=window._resConvertKey||null;
   var vigente=G("na-vigente")&&G("na-vigente").checked;
@@ -3370,7 +3392,7 @@ function rCaja(){
               concepto:esc(c.desc||""),
               mov: esSocioCt ? 0 : -porCuenta[ct], // no impacta caja si lo pagó el socio
               cuenta: esSocioCt ? "_socios_costo" : ct,
-              socioMov: esSocioCt ? porCuenta[ct] : undefined, // aparece como aporte en columna Socios
+              socioMov: esSocioCt ? -porCuenta[ct] : undefined, // aporte = sale del bolsillo del socio (negativo), igual que el aporte manual
               tipo:"costo"
             });
           }
@@ -3384,7 +3406,7 @@ function rCaja(){
             concepto:esc(c.desc||""),
             mov: esSocioC ? 0 : -Number(c.monto||0),
             cuenta: esSocioC ? "_socios_costo" : ctC,
-            socioMov: esSocioC ? Number(c.monto||0) : undefined,
+            socioMov: esSocioC ? -Number(c.monto||0) : undefined,
             tipo:"costo"
           });
         }
@@ -3413,7 +3435,7 @@ function rCaja(){
     movimientosD.forEach(function(mv){
       if(mv.cuenta==="Banco") mv.cuenta="Efectivo";
       if(["Cuenta Hugo","Cuenta Loli"].indexOf(mv.cuenta)>=0) mv.cuenta=mv.cuenta_caja||"Efectivo";
-      // Costos ya procesados como _socios_costo: no tocar, ya tienen socioMov correcto (positivo=aporte)
+      // Costos ya procesados como _socios_costo: no tocar, ya tienen socioMov correcto (negativo=aporte, sale del bolsillo del socio)
       if(mv.cuenta==="_socios_costo") return;
       // Cobros/ajustes registrados en cuentas de socios (MP Loli, MP Hugo, tarjetas) -> columna Socios
       if(CTAS_SOCIOS.indexOf(mv.cuenta)>=0){
@@ -5406,16 +5428,19 @@ function renderCfgLimpieza(){
   if(duplicadas.length){
     o+="<div style='background:#1E293B;border:2px solid #EF4444;border-radius:10px;padding:12px;margin-bottom:10px'>";
     o+="<p style='color:#EF4444;font-size:13px;font-weight:800;margin-bottom:4px'>🚨 "+duplicadas.length+" unidad(es) con más de un acuerdo activo</p>";
-    o+="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>Dos inquilinos figuran activos en la misma unidad al mismo tiempo. Revisá cuál es el correcto y cerrá el otro con el botón \"Cerrar Acuerdo\" de su Ficha (no lo hago automático porque solo vos sabés cuál es el real).</p>";
+    o+="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>Dos inquilinos figuran activos en la misma unidad al mismo tiempo. Elegí cuál es el acuerdo correcto con \"Mantener este\": se copian a ese los datos que le falten (trabajo, documentos, firma, etc.) desde el otro registro, y el otro se elimina — <b>solo si no tiene pagos reales registrados</b> (si los tiene, te avisa y no borra nada, para que lo revises a mano).</p>";
     duplicadas.forEach(function(u){
       o+="<div style='background:#0F172A;border-radius:8px;padding:8px 10px;margin-bottom:8px'>";
       o+="<div style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:4px'>"+esc(u)+"</div>";
       porUnidad[u].forEach(function(i){
         var ki=kpush(i._key);
-        o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px'>";
+        var fki=kpush({unidad:u,keepKey:i._key});
+        o+="<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;flex-wrap:wrap;gap:6px'>";
         o+="<span style='color:#CBD5E1'>"+esc(i.nombre||"")+" · ID #"+esc(i.id_ac||"--")+" · desde "+fecDisp(i.ingreso||"")+" · "+fmt(i.alquiler||0)+"</span>";
+        o+="<div style='display:flex;gap:4px'>";
         o+="<button class='btn bp bsm' style='font-size:10px' data-verficha='"+ki+"'>Ver ficha</button>";
-        o+="</div>";
+        o+="<button class='btn bok bsm' style='font-size:10px' data-fusionar='"+fki+"'>Mantener este</button>";
+        o+="</div></div>";
       });
       o+="</div>";
     });
@@ -5584,6 +5609,59 @@ function renderCfgLimpieza(){
   el.addEventListener("click",function(e){
     var vf=e.target.closest("[data-verficha]");
     if(vf) openFicha(kget(parseInt(vf.dataset.verficha)));
+    var fu=e.target.closest("[data-fusionar]");
+    if(fu) fusionarUnidadDuplicada(parseInt(fu.dataset.fusionar));
+  });
+}
+
+function fusionarUnidadDuplicada(idx){
+  var info=kget(idx); if(!info)return;
+  var u=info.unidad,keepKey=info.keepKey;
+  var keep=DATA.iq[keepKey]; if(!keep){alert("No encontrado");return;}
+  var grupo=oA(DATA.iq).filter(function(x){return x.unidad===u&&x.estado==="activo";});
+  var descartar=grupo.filter(function(x){return x._key!==keepKey;});
+  if(!descartar.length){alert("No hay duplicados para fusionar en esta unidad.");return;}
+
+  // Verificar que ninguno de los que se van a descartar tenga pagos reales
+  var conPagos=[];
+  descartar.forEach(function(d){
+    var cobsD=oA(DATA.cob).filter(function(c){return c.id_ac===d.id_ac;});
+    var totalPagado=cobsD.reduce(function(s,c){return s+pT(c);},0);
+    if(totalPagado>0) conPagos.push({nombre:d.nombre,id_ac:d.id_ac,total:totalPagado});
+  });
+  if(conPagos.length){
+    var msg="⚠ No se puede fusionar automáticamente: el/los otro(s) registro(s) tienen pagos reales:\n";
+    conPagos.forEach(function(cp){msg+="- "+cp.nombre+" (ID #"+(cp.id_ac||"--")+"): "+fmt(cp.total)+" pagado\n";});
+    msg+="\nNo los borro para no perder esos pagos. Revisalo manualmente (por ejemplo, con \"Dividir cobro en cuotas correctas\" para mover el pago al acuerdo correcto, y después cerrá el que sobra).";
+    alert(msg);
+    return;
+  }
+
+  if(!confirm("Vas a mantener el acuerdo de "+esc(keep.nombre)+" (ID #"+(keep.id_ac||keepKey)+") en "+u+".\n\nSe van a copiar los datos que le falten (trabajo, documentos, firma, etc.) desde el/los otro(s) registro(s), y esos otros se van a eliminar junto con sus cobros pendientes sin pagos (son duplicados de carga, no acuerdos reales).\n\n¿Confirmás?")) return;
+
+  var camposAFusionar=["trabajo","trabajo1","trabajo_dir","trabajo_tel","trabajo_jefe",
+    "doc_dni_f","doc_dni_d","doc_sueldo","firma","firma2","fecha_firma",
+    "nom2","dni2","tel2","trabajo2","trabajo2_dir","trabajo2_tel","trabajo2_jefe",
+    "foto_dni2f","foto_dni2d","foto_sue2",
+    "ct_emerg","tel_emerg","rel_emerg","fecha_posesion","obs_ingreso"];
+  var ups={};
+  descartar.forEach(function(d){
+    camposAFusionar.forEach(function(campo){
+      if(!keep[campo]&&d[campo]){
+        ups["iq/"+keepKey+"/"+campo]=d[campo];
+        keep[campo]=d[campo]; // para no pisarse si hay más de un descartado
+      }
+    });
+    // Borrar los cobros del descartado (ya confirmamos que no tienen pagos)
+    oA(DATA.cob).filter(function(c){return c.id_ac===d.id_ac;}).forEach(function(c){
+      ups["cob/"+c._key]=null;
+    });
+    ups["iq/"+d._key]=null;
+  });
+  DB.ref("/").update(ups,function(err){
+    if(err){alert("Error al fusionar: "+err.message);return;}
+    alert("Listo. Quedó un solo acuerdo activo en "+u+" (#"+(keep.id_ac||keepKey)+"), con los datos combinados.");
+    setTimeout(function(){go("config");},400);
   });
 }
 
@@ -5600,10 +5678,23 @@ function buscarCostosLimp(){
   var html="<div style='margin-top:8px'>";
   costos.forEach(function(c){
     var ki=kpush(c._key);
-    html+="<div style='display:flex;justify-content:space-between;align-items:center;padding:8px;background:#0F172A;border-radius:6px;margin-bottom:4px'>";
+    var pagosArr=c.pagos?Object.values(c.pagos):[];
+    html+="<div style='padding:8px;background:#0F172A;border-radius:6px;margin-bottom:4px'>";
+    html+="<div style='display:flex;justify-content:space-between;align-items:center'>";
     html+="<div><div style='font-size:12px;font-weight:600'>"+esc(c.desc||"--")+"</div>";
-    html+="<div style='color:#64748B;font-size:10px'>"+c.mes+" — "+fmt(c.monto||0)+(c.pagado?" — Pagado":"")+"</div></div>";
-    html+="<button class='btn bx bsm' onclick='borrarCostoLimp("+JSON.stringify(c._key)+")'>Borrar</button>";
+    html+="<div style='color:#64748B;font-size:10px'>"+c.mes+" — "+fmt(c.monto||0)+(c.pagado?" — Pagado":" — Sin pagar")+"</div></div>";
+    html+="<button class='btn bx bsm' onclick='borrarCostoLimp(\""+c._key+"\")'>Borrar</button>";
+    html+="</div>";
+    html+="<div style='color:#06B6D4;font-size:10px;margin-top:4px;font-family:monospace'>cuenta: "+esc(c.cuenta||"(vacío)")+" · fecha_pago: "+esc(c.fecha_pago||"(vacío)")+" · fec_venc: "+esc(c.fec_venc||"(vacío)")+" · tipo: "+esc(c.tipo||"(vacío)")+"</div>";
+    if(pagosArr.length){
+      html+="<div style='margin-top:4px;padding-left:8px;border-left:2px solid #334155'>";
+      pagosArr.forEach(function(pg){
+        html+="<div style='color:#94A3B8;font-size:10px;font-family:monospace'>pago: "+fmt(pg.monto||0)+" · cuenta: "+esc(pg.cuenta||"(vacío)")+" · fecha: "+esc(pg.fecha||"(vacío)")+"</div>";
+      });
+      html+="</div>";
+    } else {
+      html+="<div style='color:#F59E0B;font-size:10px;margin-top:2px'>Sin pagos individuales registrados (campo \"pagos\" vacío)</div>";
+    }
     html+="</div>";
   });
   html+="</div>";
