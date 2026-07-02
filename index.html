@@ -432,7 +432,7 @@ function rShell(){
   var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).length;
   // Formularios pendientes: enviados por el inquilino, sin acuerdo creado aún
   var formsPend=oA(DATA.forms||{}).filter(function(f){return (f.estado==="pendiente"||f.estado==="renovar_pendiente")&&!_formsConvertidosLocal[f._key];}).length;
-  var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["ctacte","Cta Socios"],["stats","Stats"],["config","Config"]];
+  var navA=[["alertas","Alertas"],["acuerdos","Acuerdos"],["historial","Historial"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"],["stats","Stats"],["config","Config"]];
   var navE=[["alertas","Alertas"],["acuerdos","Acuerdos"],["cobranzas","Cobros"],["costos","Costos"],["caja","Caja"]];
   var nav=esA?navA:navE;
   var nh=nav.map(function(n){
@@ -6092,7 +6092,7 @@ function _setCobTC(v){
 }
 function _ctsMesChange(v){localStorage.setItem("gp_cts_mes",v);rCtaCte();}
 function rCtaCte(){
-  if(USER.r!=="admin"){G("main").innerHTML="<p style='color:#EF4444;padding:20px'>Solo el administrador puede acceder.</p>";return;}
+  G("main").innerHTML="<p style='color:#64748B;padding:20px'>Esta seccion fue movida a Finanzas L&H.</p>";return;
   var movs=oA(DATA.movs||{});
   var cobA=oA(DATA.cob);
   var cstA=oA(DATA.cst||{});
