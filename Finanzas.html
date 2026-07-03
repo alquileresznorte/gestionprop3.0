@@ -366,12 +366,24 @@ function isCtaPers(m){return CTAS_PERS.indexOf(m)>=0;}
 // - tipo=retiro &rarr; siempre ingreso
 // - cuenta_caja=cuenta personal (MP/TJ) &rarr; ingreso (plata que entro a cuenta personal)
 // - tipo=aporte + cuenta empresa &rarr; egreso (pusiste plata en la empresa)
+function gpAmt(mv){return Math.abs(+mv.monto||0);}
 function gpIsIncome(mv){
-  return mv.tipo==='retiro'||isCtaPers(mv.cuenta_caja||'');
+  var base=mv.tipo==='retiro'||isCtaPers(mv.cuenta_caja||'');
+  // Si el monto vino negativo desde GP, invierte la direccion (ej: aporte cargado como -X = ingreso)
+  if((+mv.monto||0)<0)return !base;
+  return base;
+}
+function gpSocio(mv){
+  if(mv.cuenta==='Cuenta Loli')return'loli';
+  if(mv.cuenta==='Cuenta Hugo')return'hugo';
+  var cc=(mv.cuenta||'')+' '+(mv.cuenta_caja||'');
+  if(cc.indexOf('Loli')>=0)return'loli';
+  if(cc.indexOf('Hugo')>=0)return'hugo';
+  return'';
 }
 function gpLabel(mv){
   if(isCtaPers(mv.cuenta_caja||''))return mv.nota||'Cobro en '+(mv.cuenta_caja||'MP');
-  return(mv.tipo==='retiro'?'Retiro':'Aporte')+' &mdash; '+(mv.nota||'');
+  return(mv.tipo==='retiro'?'Retiro':'Aporte')+' \u2014 '+(mv.nota||'');
 }
 function mvId(mv){
   var s=(mv.fecha||'')+'|'+(mv.nota||'')+'|'+(mv.monto||'')+'|'+(mv.tipo||'');
@@ -396,8 +408,10 @@ function wBadge(who,pct){
 function getMovs(){
   var k=KEY();
   return gpMovs.filter(function(mv){
-    if(!mv.fecha||!mv.fecha.startsWith(k))return false;
-    return mv.cuenta==='Cuenta Loli'||mv.cuenta==='Cuenta Hugo';
+    var f=mv.fecha||mv.mes||'';
+    if(!f||!String(f).startsWith(k))return false;
+    if(!(+mv.monto||0))return false;
+    return true; // no descartar por cuenta: todo mov de socios del mes entra a la bandeja
   }).sort(function(a,b){return(a.fecha||'').localeCompare(b.fecha||'');});
 }
 
@@ -510,8 +524,8 @@ function renderMov(mv,isDone){
   var isInc=gpIsIncome(mv);
   var lbl=gpLabel(mv);
   var cat=ov.cat?getCat(ov.cat):null;
-  var who=ov.who||(mv.cuenta==='Cuenta Loli'?'loli':'hugo');
-  var quien=mv.cuenta==='Cuenta Loli'?'loli':'hugo';
+  var quien=gpSocio(mv)||'hugo';
+  var who=ov.who||quien;
 
   var h='<div class="card'+(isDone?' ok dim':'')+'" style="margin-bottom:10px">';
   h+='<div class="row" style="margin-bottom:8px">';
@@ -520,11 +534,12 @@ function renderMov(mv,isDone){
   h+='<div class="sub">';
   h+='<span class="tag">'+esc(mv.fecha||'')+'</span>';
   if(mv.cuenta_caja)h+='<span class="tag">'+esc(mv.cuenta_caja)+'</span>';
+  if(!gpSocio(mv))h+='<span class="tag" style="color:#F59E0B;border-color:#F59E0B50">&#x26A0; cuenta: '+esc(mv.cuenta||'sin dato')+'</span>';
   if(cat)h+='<span class="tag tu">'+cat.e+' '+cat.n+'</span>';
   if(isDone)h+=wBadge(ov.who||quien,ov.pct);
   h+='</div></div>';
   h+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
-  h+='<span class="'+(isInc?'pos':'neu')+'">'+(isInc?'+':'-')+p$(+mv.monto)+'</span>';
+  h+='<span class="'+(isInc?'pos':'neu')+'">'+(isInc?'+':'-')+p$(gpAmt(mv))+'</span>';
   if(isDone){
     h+='<button class="btn-sm" onclick="undoMov(\''+mid+'\')">Reclasificar</button>';
   }
@@ -733,7 +748,7 @@ function rTarjetas(){
     var aportesGP=movs.filter(function(mv){
       return mv.cuenta_caja===medio && mv.tipo==='aporte';
     });
-    var totAportesGP=aportesGP.reduce(function(s,mv){return s+(+mv.monto||0);},0);
+    var totAportesGP=aportesGP.reduce(function(s,mv){return s+gpAmt(mv);},0);
 
     // B: gastos personales cargados con este medio
     var gastosPerso=gs.filter(function(g){return g.medio===medio&&g.cur==='ARS';});
@@ -748,7 +763,7 @@ function rTarjetas(){
     movs.forEach(function(mv){
       var mid=mvId(mv);var ov=getOv(mid);
       if(ov.done&&ov.cat==='pagoTJ'&&ov.medioPago===medio){
-        pagoReal+=+mv.monto||0;
+        pagoReal+=gpAmt(mv);
       }
     });
 
@@ -776,7 +791,7 @@ function rTarjetas(){
       aportesGP.forEach(function(mv){
         html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #334155;font-size:12px">';
         html+='<span style="color:#64748B">'+esc(mv.fecha||'')+' &mdash; '+esc(mv.nota||'')+'</span>';
-        html+='<span class="neg">'+p$(+mv.monto)+'</span></div>';
+        html+='<span class="neg">'+p$(gpAmt(mv))+'</span></div>';
       });
     }
     if(gastosPerso.length){
@@ -814,9 +829,10 @@ function rResumen(){
   movs.forEach(function(m){
     var ov=getOv(mvId(m));
     var inc=gpIsIncome(m);
-    var amt=+m.monto;
+    var amt=gpAmt(m);
+    var sc=ov.who&&ov.who!=='shared'?ov.who:(gpSocio(m)||'hugo');
     // Aportes via cuenta personal son ingresos
-    if(m.cuenta==='Cuenta Loli'){if(inc)lRet+=amt;else lAp+=amt;}
+    if(sc==='loli'){if(inc)lRet+=amt;else lAp+=amt;}
     else{if(inc)hRet+=amt;else hAp+=amt;}
   });
   var lNet=lRet-lAp,hNet=hRet-hAp;
