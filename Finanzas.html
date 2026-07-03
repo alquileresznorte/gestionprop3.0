@@ -288,7 +288,7 @@ var CATS=[
 
 var cM=new Date().getMonth()+1,cY=new Date().getFullYear(); // 1-12 (enero=1, junio=6)
 var gpSt='loading',gpMovs=[];
-var FD={fijos:{},pagados:{},gastos:{},capital:{},ovs:{},aho:{},inv:{},cfg_aho:{},usdMovs:{}};
+var FD={fijos:{},pagados:{},gastos:{},capital:{},ovs:{},aho:{},inv:{},cfg_aho:{},usdMovs:{},cob:{},cst:{}};
 var DB,_who={g:'shared',f:'shared',usd:'shared'};
 
 firebase.initializeApp({
@@ -305,11 +305,13 @@ function fbRm(p){spin(true);DB.ref(p).remove(function(){spin(false);});}
 function fbPush(p,v){spin(true);return DB.ref(p).push(v,function(){spin(false);}).key;}
 
 function loadAll(){
-  var done={},keys=['movs','aho','inv','cfg_aho','fin_fijos','fin_pagados','fin_gastos','fin_capital','fin_ovs'];
+  var done={},keys=['movs','cob','cst','aho','inv','cfg_aho','fin_fijos','fin_pagados','fin_gastos','fin_capital','fin_ovs'];
   keys.forEach(function(k){done[k]=false;});
   function chk(){if(Object.values(done).every(Boolean)){gpSt='ok';render();updateBadge();}}
   function mk(k,fn){DB.ref(k).on('value',function(s){fn(s);done[k]=true;chk();},function(){done[k]=true;chk();});}
   mk('movs',function(s){gpMovs=s.exists()?Object.values(s.val()):[];});
+  mk('cob',function(s){FD.cob=s.exists()?s.val():{};});
+  mk('cst',function(s){FD.cst=s.exists()?s.val():{};});
   mk('aho',function(s){FD.aho=s.exists()?s.val():{};});
   mk('inv',function(s){FD.inv=s.exists()?s.val():{};});
   mk('cfg_aho',function(s){FD.cfg_aho=s.exists()?s.val():{};});
@@ -368,6 +370,7 @@ function isCtaPers(m){return CTAS_PERS.indexOf(m)>=0;}
 // - tipo=aporte + cuenta empresa &rarr; egreso (pusiste plata en la empresa)
 function gpAmt(mv){return Math.abs(+mv.monto||0);}
 function gpIsIncome(mv){
+  if(mv._dir)return mv._dir==='in';
   var base=mv.tipo==='retiro'||isCtaPers(mv.cuenta_caja||'');
   // Si el monto vino negativo desde GP, invierte la direccion (ej: aporte cargado como -X = ingreso)
   if((+mv.monto||0)<0)return !base;
@@ -386,7 +389,7 @@ function gpLabel(mv){
   return(mv.tipo==='retiro'?'Retiro':'Aporte')+' \u2014 '+(mv.nota||'');
 }
 function mvId(mv){
-  var s=(mv.fecha||'')+'|'+(mv.nota||'')+'|'+(mv.monto||'')+'|'+(mv.tipo||'');
+  var s=(mv.fecha||'')+'|'+(mv.nota||'')+'|'+(mv.monto||'')+'|'+(mv.tipo||'')+(mv._vid?'|'+mv._vid:'');
   var h=0;for(var i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}
   return 'gp'+(h>>>0).toString(36);
 }
@@ -405,6 +408,51 @@ function wBadge(who,pct){
 }
 
 // Get GP movs for month
+var CTA_SOCIO_MAP={'MP Loli':'Cuenta Loli','Visa BBVA Loli':'Cuenta Loli','Master BBVA Loli':'Cuenta Loli','MP Hugo':'Cuenta Hugo','Master BBVA Hugo':'Cuenta Hugo','Visa BBVA Hugo':'Cuenta Hugo'};
+// Misma logica que la Cta Socios de GestionProp:
+// - Cobro pagado a cuenta personal (MP/TJ) = retiro (el socio se queda con la plata) -> ingreso
+// - Costo pagado con cuenta personal = aporte en especie (salio del bolsillo del socio) -> egreso
+function getVirtualMovs(){
+  var k=KEY(),out=[];
+  Object.keys(FD.cob||{}).forEach(function(ck){
+    var c=FD.cob[ck];if(!c||!c.pagos)return;
+    Object.keys(c.pagos).forEach(function(pk){
+      var p=c.pagos[pk];if(!p)return;
+      if(!p.fecha||!String(p.fecha).startsWith(k))return;
+      if(!isCtaPers(p.cuenta||''))return;
+      var m=Number(p.monto||0);if(!m)return;
+      out.push({fecha:p.fecha,monto:Math.abs(m),tipo:'retiro',_dir:'in',_src:'Cobro GP',
+        cuenta:CTA_SOCIO_MAP[p.cuenta]||'',cuenta_caja:p.cuenta,
+        nota:((c.unidad||'')+' - '+String(c.inq||'').split(',')[0]+(c.concepto&&c.concepto!=='Alquiler'?' ('+c.concepto+')':'')),
+        _vid:'cob|'+ck+'|'+pk});
+    });
+  });
+  Object.keys(FD.cst||{}).forEach(function(ck){
+    var c=FD.cst[ck];if(!c)return;
+    if(c.pagos&&Object.keys(c.pagos).length>0){
+      Object.keys(c.pagos).forEach(function(pk){
+        var pg=c.pagos[pk];if(!pg)return;
+        if(!pg.fecha||!String(pg.fecha).startsWith(k))return;
+        var ct=pg.cuenta||c.cuenta||'Efectivo';
+        if(!isCtaPers(ct))return;
+        var m=Number(pg.monto||0);if(!m)return;
+        out.push({fecha:pg.fecha,monto:Math.abs(m),tipo:'aporte',_dir:'out',_src:'Costo GP',
+          cuenta:CTA_SOCIO_MAP[ct]||'',cuenta_caja:ct,nota:c.desc||'Costo empresa',
+          _vid:'cst|'+ck+'|'+pk});
+      });
+    } else {
+      var fp=c.fecha_pago||c.fec_venc||'';
+      if(!c.pagado||!fp||!String(fp).startsWith(k))return;
+      var ctC=c.cuenta||'Efectivo';
+      if(!isCtaPers(ctC))return;
+      var mC=Number(c.monto||0);if(!mC)return;
+      out.push({fecha:fp,monto:Math.abs(mC),tipo:'aporte',_dir:'out',_src:'Costo GP',
+        cuenta:CTA_SOCIO_MAP[ctC]||'',cuenta_caja:ctC,nota:c.desc||'Costo empresa',
+        _vid:'cst|'+ck});
+    }
+  });
+  return out;
+}
 function getMovs(){
   var k=KEY();
   return gpMovs.filter(function(mv){
@@ -412,7 +460,7 @@ function getMovs(){
     if(!f||!String(f).startsWith(k))return false;
     if(!(+mv.monto||0))return false;
     return true; // no descartar por cuenta: todo mov de socios del mes entra a la bandeja
-  }).sort(function(a,b){return(a.fecha||'').localeCompare(b.fecha||'');});
+  }).concat(getVirtualMovs()).sort(function(a,b){return(a.fecha||'').localeCompare(b.fecha||'');});
 }
 
 // Pending = movs not yet categorized (done=false)
@@ -534,6 +582,7 @@ function renderMov(mv,isDone){
   h+='<div class="sub">';
   h+='<span class="tag">'+esc(mv.fecha||'')+'</span>';
   if(mv.cuenta_caja)h+='<span class="tag">'+esc(mv.cuenta_caja)+'</span>';
+  if(mv._src)h+='<span class="tag" style="color:#38BDF8;border-color:#38BDF850">'+esc(mv._src)+'</span>';
   if(!gpSocio(mv))h+='<span class="tag" style="color:#F59E0B;border-color:#F59E0B50">&#x26A0; cuenta: '+esc(mv.cuenta||'sin dato')+'</span>';
   if(cat)h+='<span class="tag tu">'+cat.e+' '+cat.n+'</span>';
   if(isDone)h+=wBadge(ov.who||quien,ov.pct);
