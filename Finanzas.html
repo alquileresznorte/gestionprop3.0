@@ -288,7 +288,7 @@ var CATS=[
 
 var cM=new Date().getMonth()+1,cY=new Date().getFullYear(); // 1-12 (enero=1, junio=6)
 var gpSt='loading',gpMovs=[];
-var FD={fijos:{},pagados:{},gastos:{},capital:{},ovs:{},aho:{},inv:{},cfg_aho:{},usdMovs:{},cob:{},cst:{}};
+var FD={fijos:{},pagados:{},gastos:{},capital:{},ovs:{},aho:{},inv:{},cfg_aho:{},usdMovs:{},cob:{},cst:{},aj:{}};
 var DB,_who={g:'shared',f:'shared',usd:'shared'};
 
 firebase.initializeApp({
@@ -305,13 +305,14 @@ function fbRm(p){spin(true);DB.ref(p).remove(function(){spin(false);});}
 function fbPush(p,v){spin(true);return DB.ref(p).push(v,function(){spin(false);}).key;}
 
 function loadAll(){
-  var done={},keys=['movs','cob','cst','aho','inv','cfg_aho','fin_fijos','fin_pagados','fin_gastos','fin_capital','fin_ovs'];
+  var done={},keys=['movs','cob','cst','aj','aho','inv','cfg_aho','fin_fijos','fin_pagados','fin_gastos','fin_capital','fin_ovs'];
   keys.forEach(function(k){done[k]=false;});
   function chk(){if(Object.values(done).every(Boolean)){gpSt='ok';render();updateBadge();}}
   function mk(k,fn){DB.ref(k).on('value',function(s){fn(s);done[k]=true;chk();},function(){done[k]=true;chk();});}
   mk('movs',function(s){gpMovs=s.exists()?Object.values(s.val()):[];});
   mk('cob',function(s){FD.cob=s.exists()?s.val():{};});
   mk('cst',function(s){FD.cst=s.exists()?s.val():{};});
+  mk('aj',function(s){FD.aj=s.exists()?s.val():{};});
   mk('aho',function(s){FD.aho=s.exists()?s.val():{};});
   mk('inv',function(s){FD.inv=s.exists()?s.val():{};});
   mk('cfg_aho',function(s){FD.cfg_aho=s.exists()?s.val():{};});
@@ -450,6 +451,17 @@ function getVirtualMovs(){
         cuenta:CTA_SOCIO_MAP[ctC]||'',cuenta_caja:ctC,nota:c.desc||'Costo empresa',
         _vid:'cst|'+ck});
     }
+  });
+  Object.keys(FD.aj||{}).forEach(function(ak){
+    var a=FD.aj[ak];if(!a)return;
+    if(!a.fecha||!String(a.fecha).startsWith(k))return;
+    if(a.auto&&a.sub==='Diferencia de caja')return;
+    if(!isCtaPers(a.cuenta||''))return;
+    var mA=Number(a.monto||0);if(!mA)return;
+    var esIng=a.tipo==='ingreso';
+    out.push({fecha:a.fecha,monto:Math.abs(mA),tipo:esIng?'retiro':'aporte',_dir:esIng?'in':'out',_src:'Ajuste GP',
+      cuenta:CTA_SOCIO_MAP[a.cuenta]||'',cuenta_caja:a.cuenta,nota:a.concepto||'Ajuste',
+      _vid:'aj|'+ak});
   });
   return out;
 }
