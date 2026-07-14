@@ -4614,9 +4614,21 @@ function openAjusteCuat(){
   if(!iqA.length){alert("No hay acuerdos activos");return;}
   var hoy_mes=new Date().getMonth()+1;
   var prox=hoy_mes<4?"Abril":hoy_mes<8?"Agosto":hoy_mes<12?"Diciembre":"Abril";
+  // Historial: ultimos 3 meses de ajuste, tomados de las cobranzas de alquiler
+  var mesesAj=_mesesAjustePrevios(3).reverse(); // ascendente: mas viejo a la izquierda
+  var MN={"04":"Abr","08":"Ago","12":"Dic"};
+  var cobAll=oA(DATA.cob);
+  var _alqDe=function(u,m){
+    return cobAll.filter(function(c){
+      return c.unidad===u&&c.mes===m&&(!c.concepto||String(c.concepto).indexOf("Alquiler")===0);
+    })[0]||null;
+  };
   var o="<p style='color:#94A3B8;font-size:12px;margin-bottom:4px'>Ajuste cuatrimestral (<b style='color:#8B5CF6'>"+prox+"</b>) — modificacion discrecional por inquilino.</p>";
-  o+="<p style='color:#64748B;font-size:11px;margin-bottom:10px'>Ingresa el nuevo valor para cada uno. Deja igual los que no cambian. El sistema enviara alertas WA 15 dias antes desde la seccion Alertas.</p>";
-  o+="<div style='overflow-x:auto'><table class='tbl'><thead><tr><th>Unidad</th><th>Inquilino</th><th>Alquiler actual</th><th>Nuevo valor $ (editable)</th><th>Diferencia</th></tr></thead><tbody id='aj-tbody'></tbody></table></div>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:4px'>Ingresa el nuevo valor para cada uno. Deja igual los que no cambian. El sistema enviara alertas WA 15 dias antes desde la seccion Alertas.</p>";
+  o+="<p style='color:#F59E0B;font-size:10px;margin-bottom:10px'>Valores en <b>naranja</b> = eran de otro inquilino (cambio de inquilino desde ese ajuste).</p>";
+  o+="<div style='overflow-x:auto'><table class='tbl'><thead><tr><th>Unidad</th><th>Inquilino</th>";
+  mesesAj.forEach(function(m){o+="<th style='color:#64748B'>"+(MN[m.slice(5,7)]||m.slice(5,7))+" "+m.slice(0,4)+"</th>";});
+  o+="<th>Alquiler actual</th><th>Nuevo valor $ (editable)</th><th>Diferencia</th></tr></thead><tbody id='aj-tbody'></tbody></table></div>";
   o+="<div style='display:flex;gap:8px;margin:10px 0;flex-wrap:wrap'>";
   o+="<div class='fld' style='margin:0;flex:1'><label class='lbl'>Aplicar % a todos</label><div style='display:flex;gap:5px'><input class='inp' type='number' id='aj-pct' placeholder='ej: 15' style='max-width:90px'/><button class='btn bg bsm' onclick='aplicarPct()'>Aplicar %</button></div></div>";
   o+="</div>";
@@ -4626,8 +4638,17 @@ function openAjusteCuat(){
   setTimeout(function(){
     var tbody=G("aj-tbody"); if(!tbody) return;
     iqA.sort(function(a,b){return a.unidad.localeCompare(b.unidad);}).forEach(function(i){
+      var histTd="";
+      mesesAj.forEach(function(m){
+        var c=_alqDe(i.unidad,m);
+        if(!c){histTd+="<td style='color:#475569;font-size:11px'>--</td>";return;}
+        var otro=(c.id_ac&&i.id_ac&&c.id_ac!==i.id_ac)||(!c.id_ac&&c.inq&&c.inq!==i.nombre);
+        var esU=c.moneda==="USD";
+        var val=esU?("U$S "+Number(c.monto_total||0).toLocaleString()):fmt(Number(c.monto_total||0));
+        histTd+="<td style='font-size:11px;color:"+(otro?"#F59E0B":"#94A3B8")+"'"+(otro?" title='Otro inquilino: "+esc(c.inq||"")+"'":"")+">"+val+(otro?"<div style='font-size:9px;color:#F59E0B'>"+esc((c.inq||"").split(",")[0])+"</div>":"")+"</td>";
+      });
       var tr=document.createElement("tr");
-      tr.innerHTML="<td style='font-weight:600'>"+i.unidad+"</td><td style='font-size:11px'>"+esc(i.nombre.split(",")[0])+"</td><td style='color:#10B981'>"+fmt(i.alquiler)+"</td><td><input class='inp' type='number' id='ajv-"+i._key+"' value='"+i.alquiler+"' style='padding:4px 8px;font-size:12px'/></td><td id='ajd-"+i._key+"' style='color:#94A3B8;font-size:11px'>--</td>";
+      tr.innerHTML="<td style='font-weight:600'>"+i.unidad+"</td><td style='font-size:11px'>"+esc(i.nombre.split(",")[0])+"</td>"+histTd+"<td style='color:#10B981'>"+fmt(i.alquiler)+"</td><td><input class='inp' type='number' id='ajv-"+i._key+"' value='"+i.alquiler+"' style='padding:4px 8px;font-size:12px'/></td><td id='ajd-"+i._key+"' style='color:#94A3B8;font-size:11px'>--</td>";
       tbody.appendChild(tr);
       G("ajv-"+i._key).oninput=function(){
         var nuevo=Number(this.value||0);
@@ -4656,6 +4677,8 @@ function saveAjusteCuat(){
     var inp=G("ajv-"+i._key); if(!inp) return;
     var nuevo=Number(inp.value||0);
     if(nuevo>0&&nuevo!==i.alquiler){
+      // Historial del ajuste (nodo nuevo aj_hist, solo registro)
+      DB.ref("aj_hist").push({fecha:hoy(),mes:mes(),unidad:i.unidad,id_ac:i.id_ac||"",inq:i.nombre||"",anterior:i.alquiler,nuevo:nuevo});
       DB.ref("iq/"+i._key).update({alquiler:nuevo,nuevo_alq:nuevo});
       cambios++;
     }
