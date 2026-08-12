@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Cuentas Personales</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0B1120;color:#E2E8F0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;padding-bottom:60px}
+  .wrap{max-width:820px;margin:0 auto;padding:12px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#111827;border-bottom:1px solid #1F2937;position:sticky;top:0;z-index:20}
+  .brand{font-weight:800;font-size:16px;color:#A78BFA;letter-spacing:.5px}
+  .nav{display:flex;gap:4px;flex-wrap:wrap;padding:8px 12px;background:#0F172A;position:sticky;top:44px;z-index:19;border-bottom:1px solid #1F2937}
+  .nbtn{background:#1E293B;color:#94A3B8;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer}
+  .nbtn.on{background:#7C3AED;color:#fff}
+  .sec{font-size:16px;font-weight:800;margin:14px 0 8px;color:#E2E8F0}
+  .sub{font-size:12px;color:#94A3B8;margin-bottom:8px;line-height:1.5}
+  .card{background:#111827;border:1px solid #1F2937;border-radius:12px;padding:14px;margin-bottom:12px}
+  .btn{background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer}
+  .btn.g{background:#334155;color:#CBD5E1}
+  .btn.sm{padding:5px 10px;font-size:11px}
+  .btn.dz{background:#7F1D1D;color:#FCA5A5}
+  input,select{width:100%;background:#0F172A;border:1px solid #334155;border-radius:8px;padding:9px;color:#E2E8F0;font-size:14px}
+  label{font-size:12px;color:#94A3B8;display:block;margin-bottom:4px}
+  .fg{margin-bottom:10px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1E293B}
+  .row:last-child{border-bottom:none}
+  .pill{font-size:10px;background:#1E293B;color:#93C5FD;border-radius:6px;padding:2px 7px}
+  .muted{color:#64748B;font-size:11px}
+  .empty{color:#64748B;font-size:13px;padding:16px;text-align:center}
+  .tag{display:inline-block;font-size:10px;border:1px solid;border-radius:6px;padding:2px 7px}
+  .spin{position:fixed;top:8px;right:8px;width:14px;height:14px;border:2px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;display:none;z-index:50}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="spin" id="spin"></div>
+<div class="topbar"><span class="brand">CUENTAS</span><span class="muted" id="hoy"></span></div>
+<div class="nav" id="nav"></div>
+<div class="wrap" id="app"><div class="empty">Cargando…</div></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:'AIzaSyDhuSP_WTWI3hqf5GqgFExkptFfpqJUn50',
+  authDomain:'gestion-prop.firebaseapp.com',
+  databaseURL:'https://gestion-prop-default-rtdb.firebaseio.com',
+  projectId:'gestion-prop'
+});
+var DB=firebase.database();
+
+// ── Estado ────────────────────────────────────────────────────────────────
+// Nodos NUEVOS (cn_*) para no tocar nada de las apps que ya andan.
+var D={cuentas:{},fijos:{},cats:{},gastos:{},movs:{}};
+var TAB='caja';
+var LOADED={};
+var cM='2026-07'; // mes que se está reordenando (empezamos por julio)
+
+function spin(on){document.getElementById('spin').style.display=on?'block':'none';}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fbSet(p,v){spin(true);DB.ref(p).set(v,function(){spin(false);});}
+function fbPush(p,v){spin(true);return DB.ref(p).push(v,function(){spin(false);}).key;}
+function fbRm(p){spin(true);DB.ref(p).remove(function(){spin(false);});}
+function arr(o){o=o||{};return Object.keys(o).map(function(k){var x=Object.assign({},o[k]);x._k=k;return x;});}
+function p$(n){n=Math.round(+n||0);return '$'+n.toLocaleString('es-AR');}
+
+// ── Carga ─────────────────────────────────────────────────────────────────
+function bind(node,key){
+  DB.ref(node).on('value',function(s){
+    D[key]=s.exists()?s.val():{};
+    LOADED[node]=true;
+    if(Object.keys(LOADED).length>=3) render();
+  });
+}
+bind('cn_cuentas','cuentas');
+bind('cn_fijos','fijos');
+bind('cn_cats','cats');
+// Datos EXISTENTES (solo lectura para reordenar): gastos personales y movimientos de empresa.
+DB.ref('fin_gastos').on('value',function(s){D.gastos=s.exists()?s.val():{};LOADED['fin_gastos']=true;if(TAB==='caja')render();});
+DB.ref('movs').on('value',function(s){D.movs=s.exists()?s.val():{};LOADED['movs']=true;if(TAB==='caja')render();});
+
+document.getElementById('hoy').textContent=new Date().toLocaleDateString('es-AR');
+
+// ── Navegación ──────────────────────────────────────────────────────────────
+var TABS=[['caja','Caja'],['resumen','Resumen'],['capital','Capital'],['config','⚙ Config']];
+function go(t){TAB=t;render();}
+function render(){
+  var nav=document.getElementById('nav');
+  nav.innerHTML=TABS.map(function(t){return '<button class="nbtn'+(TAB===t[0]?' on':'')+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</button>';}).join('');
+  var app=document.getElementById('app');
+  if(TAB==='config') app.innerHTML=vConfig();
+  else if(TAB==='caja') app.innerHTML=vCaja();
+  else if(TAB==='resumen') app.innerHTML=vProximamente('Resumen','El resumen se arma una vez que tengas las cuentas asignadas.');
+  else if(TAB==='capital') app.innerHTML=vProximamente('Capital','Acá van a estar tus activos (dólares, propiedades, etc.).');
+}
+function vProximamente(titulo,txt){
+  return '<div class="sec">'+titulo+'</div><div class="card"><div class="sub">'+txt+'</div></div>';
+}
+
+// ── CAJA (lee tus datos reales de julio para reordenarlos uno a uno) ─────────
+var MESES=['2026-06','2026-07','2026-08'];
+function cambiarMes(m){cM=m;render();}
+function dueLbl(w){return w==='loli'?'💜 Loli':w==='hugo'?'💙 Hugo':'🤝 Comp.';}
+function vCaja(){
+  var o='<div class="sec">Caja — '+cM+'</div>';
+  o+='<div class="fg"><label>Mes a reordenar</label><select onchange="cambiarMes(this.value)">'+MESES.map(function(m){return '<option'+(m===cM?' selected':'')+'>'+m+'</option>';}).join('')+'</select></div>';
+  var cuentas=arr(D.cuentas);
+  if(!cuentas.length) o+='<div class="card"><div class="sub">⚠ Primero creá tus cuentas en ⚙ Config, así podés asignar cada gasto a una cuenta.</div></div>';
+  // Gastos personales del mes (datos existentes)
+  var gs=(D.gastos&&D.gastos[cM])?arr(D.gastos[cM]):[];
+  gs=gs.filter(function(g){return (g.cur||'ARS')==='ARS';});
+  gs.sort(function(a,b){return String(a.fecha||'').localeCompare(String(b.fecha||''));});
+  var sinAsig=gs.filter(function(g){return !g.cuenta_nueva;}).length;
+  var nDesc=gs.filter(function(g){return g.cuenta_nueva==='__descartar__';}).length;
+  o+='<div class="card">';
+  o+='<div style="font-weight:700;margin-bottom:2px">🛒 Gastos de '+cM+' <span class="muted">('+gs.length+' — faltan asignar '+sinAsig+(nDesc?' · '+nDesc+' descartados':'')+')</span></div>';
+  o+='<div class="sub">Cada gasto trae su info tal como la tenías: <b>a quién corresponde</b> (económico) y <b>con qué se pagó</b> (financiero). Asigná cada uno a una de tus cuentas nuevas.</div>';
+  if(!gs.length) o+='<div class="empty">No hay gastos cargados en '+cM+'.</div>';
+  else gs.forEach(function(g){
+    var asignado=!!g.cuenta_nueva;
+    var descartado=(g.cuenta_nueva==='__descartar__');
+    o+='<div class="row" style="flex-wrap:wrap;'+(descartado?'opacity:.5;':asignado?'':'background:#78350F14;')+'align-items:flex-start;padding:10px 0">';
+    o+='<div style="flex:1;min-width:180px">';
+    o+='<div style="font-weight:600">'+(descartado?'🚫 ':asignado?'':'⚠ ')+esc(g.desc||'Gasto')+' <span class="muted">'+p$(g.monto)+'</span>'+(descartado?' <span class="muted">(descartado)</span>':'')+'</div>';
+    o+='<div class="muted">'+esc(String(g.fecha||'').slice(5))+' · corresponde a '+dueLbl(g.who)+(g.who==='shared'?' ('+(g.pct||50)+'/'+(100-(g.pct||50))+')':'')+' · pagó: '+(g.pago==='loli'?'💜 Loli':g.pago==='hugo'?'💙 Hugo':'cada uno')+(g.medio?' ['+esc(g.medio)+']':'')+'</div>';
+    o+='</div>';
+    o+='<select onchange="asignarCuenta(\''+cM+'\',\''+g._k+'\',this.value)" style="max-width:170px">';
+    o+='<option value="">— asignar cuenta —</option>';
+    o+='<optgroup label="Cuentas">';
+    cuentas.forEach(function(c){o+='<option value="'+esc(c.nombre)+'"'+(g.cuenta_nueva===c.nombre?' selected':'')+'>'+esc(c.nombre)+'</option>';});
+    o+='</optgroup>';
+    o+='<optgroup label="Otros">';
+    o+='<option value="__empresa__"'+(g.cuenta_nueva==='__empresa__'?' selected':'')+'>🏢 Empresa</option>';
+    o+='<option value="__descartar__"'+(descartado?' selected':'')+'>🚫 Descartar (no es gasto / ajuste)</option>';
+    o+='</optgroup>';
+    o+='</select>';
+    o+='</div>';
+  });
+  o+='</div>';
+  return o;
+}
+function asignarCuenta(mes,key,cuenta){
+  if(cuenta) fbSet('fin_gastos/'+mes+'/'+key+'/cuenta_nueva',cuenta);
+  else fbRm('fin_gastos/'+mes+'/'+key+'/cuenta_nueva');
+  setTimeout(function(){if(TAB==='caja')render();},300);
+}
+
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+function vConfig(){
+  var o='<div class="sec">⚙ Configuración</div>';
+  // --- Cuentas ---
+  o+='<div class="card">';
+  o+='<div style="font-weight:700;margin-bottom:4px">🏦 Cuentas</div>';
+  o+='<div class="sub">Creá tus cuentas con nombres genéricos y agrupables (ej: "Personal de limpieza" en vez de "Cecilia"). Cada cuenta puede ser tuya, de Hugo, o compartida.</div>';
+  var cs=arr(D.cuentas);
+  if(!cs.length) o+='<div class="empty">Todavía no hay cuentas. Agregá la primera abajo.</div>';
+  else o+=cs.sort(function(a,b){return (a.orden||0)-(b.orden||0);}).map(function(c){
+    var dueno=c.dueno==='loli'?'💜 Loli':c.dueno==='hugo'?'💙 Hugo':'🤝 Compartida';
+    return '<div class="row"><span style="flex:1">'+esc(c.nombre)+' <span class="pill">'+esc(c.grupo||'sin grupo')+'</span></span><span class="muted">'+dueno+'</span><button class="btn g sm" onclick="editCuenta(\''+c._k+'\')">✏</button><button class="btn dz sm" onclick="delCuenta(\''+c._k+'\')">🗑</button></div>';
+  }).join('');
+  o+='<div style="margin-top:10px" class="g2">';
+  o+='<div class="fg"><label>Nombre de la cuenta</label><input id="nc-nombre" placeholder="Ej: Personal de limpieza"/></div>';
+  o+='<div class="fg"><label>Grupo / rubro</label><input id="nc-grupo" placeholder="Ej: Sueldos"/></div>';
+  o+='</div>';
+  o+='<div class="fg"><label>¿De quién es?</label><select id="nc-dueno"><option value="loli">💜 Loli</option><option value="hugo">💙 Hugo</option><option value="shared">🤝 Compartida</option></select></div>';
+  o+='<button class="btn" onclick="addCuenta()">+ Agregar cuenta</button>';
+  o+='</div>';
+  // --- Costos fijos ---
+  o+='<div class="card">';
+  o+='<div style="font-weight:700;margin-bottom:4px">📅 Costos fijos</div>';
+  o+='<div class="sub">Enumerá tus costos fijos como recordatorio para no olvidarte de pagarlos. Podés subirlos y bajarlos de la lista. (Acá solo se enuncian; el pago se registra en la Caja.)</div>';
+  var fs=arr(D.fijos).sort(function(a,b){return (a.orden||0)-(b.orden||0);});
+  if(!fs.length) o+='<div class="empty">Todavía no hay costos fijos. Agregá el primero abajo.</div>';
+  else o+=fs.map(function(f,i){
+    var dueno=f.dueno==='loli'?'💜 Loli':f.dueno==='hugo'?'💙 Hugo':'🤝 Comp.';
+    return '<div class="row"><span style="flex:1">'+esc(f.nombre)+(f.grupo?' <span class="pill">'+esc(f.grupo)+'</span>':'')+'</span><span class="muted">'+dueno+'</span>'+
+      '<button class="btn g sm" onclick="moverFijo(\''+f._k+'\',-1)"'+(i===0?' disabled':'')+'>▲</button>'+
+      '<button class="btn g sm" onclick="moverFijo(\''+f._k+'\',1)"'+(i===fs.length-1?' disabled':'')+'>▼</button>'+
+      '<button class="btn dz sm" onclick="delFijo(\''+f._k+'\')">🗑</button></div>';
+  }).join('');
+  o+='<div style="margin-top:10px" class="g2">';
+  o+='<div class="fg"><label>Nombre del costo fijo</label><input id="nf-nombre" placeholder="Ej: Expensas"/></div>';
+  o+='<div class="fg"><label>Grupo / rubro (opcional)</label><input id="nf-grupo" placeholder="Ej: Servicios"/></div>';
+  o+='</div>';
+  o+='<div class="fg"><label>¿De quién es?</label><select id="nf-dueno"><option value="shared">🤝 Compartido</option><option value="loli">💜 Loli</option><option value="hugo">💙 Hugo</option></select></div>';
+  o+='<button class="btn" onclick="addFijo()">+ Agregar costo fijo</button>';
+  o+='</div>';
+  return o;
+}
+
+// --- Cuentas: acciones ---
+function addCuenta(){
+  var nombre=document.getElementById('nc-nombre').value.trim();
+  if(!nombre){alert('Poné un nombre para la cuenta');return;}
+  var grupo=document.getElementById('nc-grupo').value.trim();
+  var dueno=document.getElementById('nc-dueno').value;
+  fbPush('cn_cuentas',{nombre:nombre,grupo:grupo,dueno:dueno,orden:arr(D.cuentas).length});
+}
+function editCuenta(k){
+  var c=D.cuentas[k];if(!c)return;
+  var nombre=prompt('Nombre de la cuenta:',c.nombre);if(nombre===null)return;
+  var grupo=prompt('Grupo / rubro:',c.grupo||'');if(grupo===null)return;
+  fbSet('cn_cuentas/'+k+'/nombre',nombre.trim());
+  fbSet('cn_cuentas/'+k+'/grupo',grupo.trim());
+}
+function delCuenta(k){
+  var c=D.cuentas[k];if(!c)return;
+  if(!confirm('Borrar la cuenta "'+c.nombre+'"?'))return;
+  fbRm('cn_cuentas/'+k);
+}
+
+// --- Fijos: acciones ---
+function addFijo(){
+  var nombre=document.getElementById('nf-nombre').value.trim();
+  if(!nombre){alert('Poné un nombre para el costo fijo');return;}
+  var grupo=document.getElementById('nf-grupo').value.trim();
+  var dueno=document.getElementById('nf-dueno').value;
+  fbPush('cn_fijos',{nombre:nombre,grupo:grupo,dueno:dueno,orden:arr(D.fijos).length});
+}
+function delFijo(k){
+  var f=D.fijos[k];if(!f)return;
+  if(!confirm('Borrar "'+f.nombre+'" de la lista de fijos?'))return;
+  fbRm('cn_fijos/'+k);
+}
+function moverFijo(k,dir){
+  var fs=arr(D.fijos).sort(function(a,b){return (a.orden||0)-(b.orden||0);});
+  var i=fs.findIndex(function(x){return x._k===k;});
+  var j=i+dir;
+  if(j<0||j>=fs.length)return;
+  var ups={};
+  fs.forEach(function(x,idx){ups['cn_fijos/'+x._k+'/orden']=idx;});
+  ups['cn_fijos/'+fs[i]._k+'/orden']=j;
+  ups['cn_fijos/'+fs[j]._k+'/orden']=i;
+  spin(true);DB.ref('/').update(ups,function(){spin(false);});
+}
+</script>
+</body>
+</html>
