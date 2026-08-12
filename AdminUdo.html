@@ -6793,6 +6793,16 @@ function renderCfgLimpieza(){
   o+="<details style='margin-bottom:8px'>";
   o+="<summary style='cursor:pointer;list-style:none;background:#EF444422;border:1px solid #EF444455;border-radius:10px;padding:11px 14px;font-size:13px;font-weight:800;color:#EF4444;user-select:none'>🗑 Borrar datos (irreversible)</summary>";
   o+="<div style='padding:10px 0 2px'>";
+  // === TABLERO ÚNICO: Borrar por día (todo junto) ===
+  o+="<div style='background:#1E293B;border:2px solid #7C3AED;border-radius:10px;padding:12px;margin-bottom:14px'>";
+  o+="<p style='color:#A78BFA;font-size:13px;font-weight:800;margin-bottom:4px'>🗓 Borrar por día — todo junto</p>";
+  o+="<p style='color:#64748B;font-size:11px;margin-bottom:8px'>Poné el día y te trae TODO lo que cayó en la caja (cobros, costos, ajustes, retiros/aportes, compras USD). Cada uno con su botón: se borra donde corresponde y, si hace falta, recalcula. Si la caja del día está cerrada, no se puede tocar nada.</p>";
+  o+="<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'>";
+  o+="<input type='date' class='inp' id='dia-uni-fecha' value='"+hoy()+"' style='max-width:160px'/>";
+  o+="<button class='btn bp bsm' onclick='verDiaUnificado()'>Ver todo el día</button>";
+  o+="</div>";
+  o+="<div id='dia-uni-res'></div>";
+  o+="</div>";
   // Borrar solo costos
   o+="<div style='background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:10px'>";
   o+="<p style='color:#F59E0B;font-size:12px;font-weight:700;margin-bottom:4px'>Borrar solo COSTOS del mes</p>";
@@ -7452,6 +7462,115 @@ function buscarMovEspecifico(){
   };
 }
 
+
+function verDiaUnificado(){
+  var cont=G("dia-uni-res");if(!cont)return;
+  var F=G("dia-uni-fecha")?G("dia-uni-fecha").value:hoy();
+  if(!F){cont.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:8px'>Elegí una fecha.</p>";return;}
+  var cerrada=oA(DATA.subc).some(function(s){return s.fecha===F;});
+  var items=[];
+  // Cobros (por pago del día)
+  oA(DATA.cob).forEach(function(c){
+    var pgs=c.pagos||{};
+    Object.keys(pgs).forEach(function(pk){
+      var p=pgs[pk];if((p.fecha||"")!==F)return;
+      items.push({tipo:"cobro",label:esc((c.unidad||"")+" · "+(c.inq||c.concepto||"Alquiler")),monto:Number(p.monto||0),ckey:c._key,pk:pk});
+    });
+  });
+  // Costos (por pago del día + legacy pagado)
+  oA(DATA.cst).forEach(function(c){
+    var pgs=c.pagos||{};
+    if(Object.keys(pgs).length>0){
+      Object.keys(pgs).forEach(function(pk){
+        var p=pgs[pk];if((p.fecha||"")!==F)return;
+        items.push({tipo:"costo",label:esc(c.desc||"Costo"),monto:-Number(p.monto||0),ckey:c._key,pk:pk});
+      });
+    } else if(c.pagado&&((c.fecha_pago||c.fec_venc||"")===F)){
+      items.push({tipo:"costo_legacy",label:esc(c.desc||"Costo"),monto:-Number(c.monto||0),ckey:c._key});
+    }
+  });
+  // Ajustes manuales (no auto)
+  oA(DATA.aj).forEach(function(a){
+    if((a.fecha||"")!==F||a.auto)return;
+    items.push({tipo:"ajuste",label:esc(a.concepto||"Ajuste")+(a.esVale?" (vale)":"")+(a.foto?" 📎":""),monto:(a.tipo==="ingreso"?1:-1)*Number(a.monto||0),ajkey:a._key});
+  });
+  // Movimientos de socios
+  oA(DATA.movs).forEach(function(mv){
+    if((mv.fecha||"")!==F)return;
+    items.push({tipo:"mov",label:esc((mv.tipo||"")+(mv.nota?" - "+mv.nota:"")+" ("+(mv.cuenta||"")+")"),monto:Number(mv.monto||0),mvkey:mv._key});
+  });
+  // Compras USD
+  oA(DATA.aho).forEach(function(a){
+    if((a.fecha||"")!==F)return;
+    items.push({tipo:"usd",label:"Compra USD U$S "+Number(a.usd||0).toLocaleString()+" @ "+Number(a.tc||0).toLocaleString(),monto:-Number(a.pesos||0),ahokey:a._key});
+  });
+
+  if(!items.length){cont.innerHTML="<p style='color:#64748B;font-size:11px;margin-top:8px'>No hay nada cargado el "+fecDisp(F)+".</p>";return;}
+
+  var meta={cobro:{ic:"💰",cl:"#10B981",t:"Cobro"},costo:{ic:"🏷",cl:"#F59E0B",t:"Costo"},costo_legacy:{ic:"🏷",cl:"#F59E0B",t:"Costo"},ajuste:{ic:"🧾",cl:"#EF4444",t:"Ajuste"},mov:{ic:"🔄",cl:"#8B5CF6",t:"Movimiento"},usd:{ic:"💵",cl:"#06B6D4",t:"USD"}};
+  var o="<div style='margin-top:10px'>";
+  o+="<p style='color:#94A3B8;font-size:11px;margin-bottom:6px'>"+items.length+" registro(s) del "+fecDisp(F)+":</p>";
+  if(cerrada) o+="<div style='background:#3B0E0E;border:1px solid #EF444488;border-radius:8px;padding:9px 12px;font-size:12px;color:#FCA5A5;margin-bottom:8px'>🔒 La caja del "+fecDisp(F)+" está CERRADA. No se puede borrar nada de este día.</div>";
+  items.forEach(function(it,idx){
+    var mt=meta[it.tipo];
+    o+="<div style='background:#0F172A;border-left:3px solid "+mt.cl+";border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>";
+    o+="<div style='font-size:11px;flex:1'>";
+    o+="<span style='background:"+mt.cl+"22;color:"+mt.cl+";border-radius:4px;padding:1px 6px;font-weight:700;font-size:10px'>"+mt.ic+" "+mt.t+"</span> ";
+    o+="<span style='color:#F1F5F9'>"+it.label+"</span> · ";
+    o+="<span style='color:"+(it.monto>=0?"#10B981":"#EF4444")+";font-weight:700'>"+(it.monto>=0?"+":"")+fmt(it.monto)+"</span>";
+    o+="</div>";
+    if(!cerrada) o+="<button class='btn bsm' style='background:#EF4444;color:#fff;font-size:10px' data-uni='"+idx+"'>Borrar</button>";
+    o+="</div>";
+  });
+  o+="</div>";
+  cont.innerHTML=o;
+  window._diaUniItems=items;window._diaUniFecha=F;
+  cont.onclick=function(e){
+    var b=e.target.closest("[data-uni]");if(!b)return;
+    var it=window._diaUniItems[parseInt(b.dataset.uni)];if(it)borrarUnoDelDia(it);
+  };
+}
+
+function borrarUnoDelDia(it){
+  var F=window._diaUniFecha;
+  if(oA(DATA.subc).some(function(s){return s.fecha===F;})){alert("La caja del "+fecDisp(F)+" está cerrada. No se puede borrar.");return;}
+  if(it.tipo==="cobro"){
+    // Función oficial: chequea cierre y día anterior, recalcula estado y arrastre
+    deletePago(it.ckey,it.pk);
+    setTimeout(verDiaUnificado,700);
+    return;
+  }
+  if(it.tipo==="costo"){
+    if(!confirm("Borrar este pago de costo?\n"+it.label+" "+fmt(it.monto)))return;
+    var c=DATA.cst[it.ckey];if(!c){alert("No encontrado");return;}
+    var rest=Object.assign({},c.pagos||{});delete rest[it.pk];
+    var pg=Object.values(rest).reduce(function(s,p){return s+Number(p.monto||0);},0);
+    var ups={};ups["cst/"+it.ckey+"/pagos/"+it.pk]=null;ups["cst/"+it.ckey+"/pagado"]=(pg>0&&pg>=Number(c.monto||0));
+    DB.ref("/").update(ups,function(){setTimeout(verDiaUnificado,400);});
+    return;
+  }
+  if(it.tipo==="costo_legacy"){
+    if(!confirm("Este costo figura pagado el "+fecDisp(F)+". Marcarlo como NO pagado (lo saca de la caja de ese día)?\n"+it.label+" "+fmt(it.monto)))return;
+    var u={};u["cst/"+it.ckey+"/pagado"]=false;u["cst/"+it.ckey+"/fecha_pago"]=null;
+    DB.ref("/").update(u,function(){setTimeout(verDiaUnificado,400);});
+    return;
+  }
+  if(it.tipo==="ajuste"){
+    if(!confirm("Borrar este ajuste de caja?\n"+it.label+" "+fmt(it.monto)))return;
+    DB.ref("aj/"+it.ajkey).remove(function(){setTimeout(verDiaUnificado,400);});
+    return;
+  }
+  if(it.tipo==="mov"){
+    if(!confirm("Borrar este movimiento?\n"+it.label+" "+fmt(it.monto)))return;
+    DB.ref("movs/"+it.mvkey).remove(function(){setTimeout(verDiaUnificado,400);});
+    return;
+  }
+  if(it.tipo==="usd"){
+    if(!confirm("Borrar esta compra de USD?\n"+it.label))return;
+    DB.ref("aho/"+it.ahokey).remove(function(){setTimeout(verDiaUnificado,400);});
+    return;
+  }
+}
 
 function borrarMovsDia(){
   var fecha=G("limp-fecha-movs")?G("limp-fecha-movs").value:hoy();
