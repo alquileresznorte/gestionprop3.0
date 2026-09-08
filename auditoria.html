@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auditoría GP — solo lectura</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{background:#0F172A;color:#F1F5F9;font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:14px;font-size:13px}
+  h1{font-size:18px;margin:0 0 4px}
+  h2{font-size:14px;margin:22px 0 8px;color:#38BDF8;border-bottom:1px solid #1E293B;padding-bottom:4px}
+  .sub{color:#64748B;font-size:11px;margin-bottom:14px}
+  .warn{background:#3B2A0E;border:1px solid #F59E0B66;border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#F59E0B}
+  .ok{background:#0E3B1E;border:1px solid #10B98166;border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#10B981}
+  input,select{background:#1E293B;color:#F1F5F9;border:1px solid #334155;border-radius:6px;padding:7px 9px;font-size:13px}
+  button{background:#2563EB;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px}
+  th{background:#1E293B;color:#94A3B8;text-align:left;padding:6px 7px;font-size:10.5px;white-space:nowrap}
+  td{padding:5px 7px;border-bottom:1px solid #1E293B;vertical-align:top}
+  .card{background:#131C2E;border:1px solid #1E293B;border-radius:10px;padding:12px;margin-bottom:12px;overflow-x:auto}
+  .red{color:#EF4444}.green{color:#10B981}.amber{color:#F59E0B}.mono{font-family:ui-monospace,monospace;font-size:11px;background:#0F172A;padding:1px 4px;border-radius:3px}
+  .pill{display:inline-block;border-radius:4px;padding:1px 6px;font-size:9.5px;font-weight:700;margin-left:4px}
+  .pill-bad{background:#EF444422;color:#EF4444;border:1px solid #EF444466}
+  .pill-ok{background:#10B98122;color:#10B981;border:1px solid #10B98166}
+  .pill-out{background:#8B5CF622;color:#8B5CF6;border:1px solid #8B5CF666}
+  #loading{padding:30px;text-align:center;color:#64748B}
+</style>
+</head>
+<body>
+<h1>🔍 Auditoría GestionProp</h1>
+<div class="sub">Herramienta de SOLO LECTURA — no modifica nada en Firebase. Compara los datos crudos contra la misma lógica que usa la Caja diaria del sistema.</div>
+<div id="loading">Cargando datos de Firebase…</div>
+<div id="app" style="display:none"></div>
+
+<script>
+firebase.initializeApp({apiKey:"AIzaSyDhuSP_WTWI3hqf5GqgFExkptFfpqJUn50",authDomain:"gestion-prop.firebaseapp.com",databaseURL:"https://gestion-prop-default-rtdb.firebaseio.com",projectId:"gestion-prop"});
+var DB=firebase.database();
+var DATA={};
+var CTAS=["Efectivo","Bco Loli","Bco Hugo","Efectivo Loli","Efectivo Hugo","MP Loli","MP Hugo","ML Loli","ML Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+var CTAS_VALIDAS=CTAS.concat(["Fuera de caja"]);
+var CTAS_SOCIOS=["Efectivo Loli","Efectivo Hugo","MP Loli","MP Hugo","ML Loli","ML Hugo","Master BBVA Hugo","Visa BBVA Hugo","Visa BBVA Loli","Master BBVA Loli"];
+
+function oA(o){if(!o)return[];return Object.keys(o).map(function(k){var v=Object.assign({},o[k]);v._key=k;return v;});}
+function pA(c){return c&&c.pagos?Object.values(c.pagos):[];}
+function pT(c){if(c&&c.moneda==="USD")return pA(c).reduce(function(s,p){return s+Number(p.usd||0);},0);return pA(c).reduce(function(s,p){return s+Number(p.monto||0);},0);}
+function pTpesos(c){return pA(c).reduce(function(s,p){return s+Number(p.monto||0);},0);}
+function fmt(n){return "$"+Number(n||0).toLocaleString("es-AR");}
+function fecDisp(s){if(!s||s.length<10)return s||"--";var p=s.split("-");return p[2]+"/"+p[1]+"/"+p[0].slice(2);}
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function fechaOk(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s);}
+function crudo(s){ // muestra el valor tal cual, revelando comillas/espacios/undefined
+  if(s===undefined)return "<span class='red mono'>undefined</span>";
+  if(s===null)return "<span class='red mono'>null</span>";
+  if(s==="")return "<span class='red mono'>\"\" (vacío)</span>";
+  if(typeof s==="string"&&s.trim()!==s)return "<span class='amber mono'>"+JSON.stringify(s)+" (con espacios)</span>";
+  return "<span class='mono'>"+JSON.stringify(s)+"</span>";
+}
+function esCobroAlq(c){
+  if(c.concepto==="Alquiler"||/^Alquiler/.test(c.concepto||""))return true;
+  if(c.concepto==="Cambio de depto - diferencia")return true;
+  return String(c.concepto||"").indexOf("Saldo pendiente")===0;
+}
+function iqDeCobro(c){return oA(DATA.iq).filter(function(i){return i.id_ac===c.id_ac&&i.estado==="activo";})[0]||null;}
+function saldoInq(idAc,hasta){
+  var cargosArs=0,pagArs=0,usd=0;
+  oA(DATA.cob).forEach(function(c){
+    if(c.id_ac!==idAc||c.archivado_hist)return;
+    if(hasta&&(c.mes||"")>hasta)return;
+    if(c.moneda==="USD"){
+      var pu=pA(c).reduce(function(s,p){return s+Number(p.usd||0);},0);
+      usd+=Number(c.monto_total||0)-pu;
+    } else {
+      cargosArs+=Number(c.monto_total||0);
+      pagArs+=pTpesos(c);
+    }
+  });
+  return {ars:Math.round(cargosArs-pagArs),usd:Math.round(usd),cargos:Math.round(cargosArs),pagado:Math.round(pagArs)};
+}
+// Replica EXACTA de la condición que usa rCaja() para decidir si un pago de cobro entra al día
+function motivoNoCaja(p){
+  if(p.cuenta==="Fuera de caja")return "cuenta = \"Fuera de caja\" (excluido a propósito por diseño)";
+  if(!fechaOk(p.fecha))return "fecha con formato inválido: "+JSON.stringify(p.fecha)+" (la Caja compara fecha exacta YYYY-MM-DD)";
+  if(!p.cuenta)return "cuenta vacía/indefinida — no matchea ninguna columna de Caja, pero SI se agrega como fila con montos en $0";
+  if(CTAS_VALIDAS.indexOf(p.cuenta)<0)return "cuenta desconocida: "+JSON.stringify(p.cuenta)+" (no es ninguna de las cuentas oficiales — igual entraría a Caja pero en ninguna columna reconocida)";
+  return null; // Debería aparecer normalmente
+}
+
+function cargar(){
+  var claves=["iq","cob","hist","aj","movs","subc","cst","cfg","forms","res"];
+  var pend=claves.length;
+  claves.forEach(function(k){
+    DB.ref(k).once("value",function(s){DATA[k]=s.exists()?s.val():{};pend--;if(pend===0)listo();});
+  });
+}
+
+function mesActualStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+
+function listo(){
+  document.getElementById("loading").style.display="none";
+  var app=document.getElementById("app");
+  app.style.display="block";
+  app.innerHTML=""
+    +"<div class='card'><h2 style='margin-top:0'>Buscar por unidad o inquilino</h2>"
+    +"<div style='display:flex;gap:8px;flex-wrap:wrap'><input id='busq' placeholder='ej: R1-12 o Emanuel' style='flex:1;min-width:180px'/><button onclick='buscar()'>Buscar</button></div>"
+    +"<div id='resBusq'></div></div>"
+    +"<div id='secIdComp'></div>"
+    +"<div id='secDup'></div>"
+    +"<div class='card'><h2 style='margin-top:0'>📅 Reporte de cobros por mes — para reconciliar contra la realidad</h2>"
+    +"<div class='sub'>Todas las unidades marcadas <b>pagado</b> o <b>parcial</b> ese mes, con el detalle crudo de cada pago: fecha, cuenta, quién lo cargó, y si debería o no verse en la Caja real de ese día.</div>"
+    +"<div style='display:flex;gap:8px;align-items:center'><input type='month' id='mesRep' value='"+mesActualStr()+"'/><button onclick='renderReporteMes()'>Ver mes</button></div>"
+    +"<div id='resMes'></div></div>"
+    +"<div id='secDatos'></div>"
+    +"<div id='secActivos'></div>"
+    +"<div id='secReparar'></div>";
+  renderIdCompartido();
+  renderDatosSospechosos();
+  renderActivos();
+  renderReporteMes();
+  renderDuplicados();
+  renderReparar();
+}
+
+function renderIdCompartido(){
+  var out=document.getElementById("secIdComp");
+  var porId={};
+  oA(DATA.iq).forEach(function(i){
+    if(!i.id_ac)return;
+    (porId[i.id_ac]=porId[i.id_ac]||[]).push({unidad:i.unidad,nombre:i.nombre,ingreso:i.ingreso,estado:"activo"});
+  });
+  oA(DATA.hist).forEach(function(h){
+    if(!h.id_ac)return;
+    (porId[h.id_ac]=porId[h.id_ac]||[]).push({unidad:h.unidad,nombre:h.nombre,ingreso:h.ingreso,estado:"dado de baja"});
+  });
+  var problema=Object.keys(porId).filter(function(id){
+    var unidades={};porId[id].forEach(function(i){unidades[i.unidad]=1;});
+    return Object.keys(unidades).length>1; // mismo id_ac, unidades distintas
+  });
+  var h="<div class='card' style='border-color:#EF4444aa'><h2 style='margin-top:0;color:#EF4444'>🚨 Mismo ID de Acuerdo en unidades distintas (bug de nid() — el más grave)</h2>";
+  h+="<div class='sub'>Dos inquilinos de unidades diferentes con el mismo id_ac comparten cobros/pagos entre sí en saldoInq y en la ficha. Incluye activos y dados de baja. "+problema.length+" caso(s) encontrado(s) sobre "+Object.keys(porId).length+" id_ac en total.</div>";
+  if(!problema.length){
+    h+="<div class='ok'>No se encontraron más casos así — R1-12/R2-12 parece haber sido el único.</div>";
+  } else {
+    problema.forEach(function(id){
+      h+="<div style='background:#0F172A;border:1px solid #EF444466;border-radius:8px;padding:8px;margin-bottom:8px'>";
+      h+="<b>ID #"+esc(id)+"</b> compartido por:<br>";
+      porId[id].forEach(function(i){
+        h+="&nbsp;&nbsp;· "+esc(i.unidad)+" — "+esc(i.nombre)+" ("+i.estado+", ingresó "+fecDisp(i.ingreso)+")<br>";
+      });
+      h+="</div>";
+    });
+  }
+  h+="</div>";
+  out.innerHTML=h;
+}
+
+function conceptoNorm(c){
+  // Agrupa "Deposito cuota 1/1", "Deposito cuota 2/3", etc. como el MISMO tipo de cargo
+  // (si hay más de un registro del mismo id_ac+mes+tipo+cuota, es duplicado real).
+  var s=String(c.concepto||(esCobroAlq(c)?"Alquiler":"")||"").trim();
+  return s||"Alquiler";
+}
+function renderDuplicados(){
+  var grupos={};
+  oA(DATA.cob).forEach(function(c){
+    if(c.archivado_hist)return;
+    var k=(c.id_ac||"?")+"|"+c.mes+"|"+conceptoNorm(c);
+    (grupos[k]=grupos[k]||[]).push(c);
+  });
+  var dup=Object.keys(grupos).filter(function(k){return grupos[k].length>1;});
+  var h="<div class='card'><h2 style='margin-top:0'>🔁 Cobros duplicados (mismo acuerdo + mes + concepto, más de un registro)</h2>";
+  h+="<div class='sub'>"+dup.length+" grupo(s) duplicado(s) encontrados sobre "+Object.keys(grupos).length+" grupos totales. Cada grupo debería tener UN solo registro — si hay dos, uno suele ser el real (con la plata en Caja) y el otro fantasma.</div>";
+  if(!dup.length){
+    h+="<div class='ok'>No se encontraron cobros duplicados por id_ac+mes+concepto.</div></div>";
+    document.getElementById("secDup").innerHTML=h;
+    return;
+  }
+  dup.sort(function(a,b){return (grupos[a][0].unidad||"").localeCompare(grupos[b][0].unidad||"");}).forEach(function(k){
+    var items=grupos[k];
+    var u=items[0].unidad,inq=items[0].inq,mm=items[0].mes,con=conceptoNorm(items[0]);
+    h+="<div style='background:#0F172A;border:1px solid #EF444444;border-radius:8px;padding:8px;margin-bottom:8px'>";
+    h+="<b>"+esc(u)+" — "+esc(inq)+"</b> · "+esc(mm)+" · "+esc(con)+" <span class='pill pill-bad'>"+items.length+" registros</span>";
+    h+="<table style='margin-top:6px'><thead><tr><th>_key</th><th>Total</th><th>Estado</th><th>Pagos (fecha · monto · cuenta · quién)</th></tr></thead><tbody>";
+    items.forEach(function(c){
+      var pagos=pA(c).map(function(p){return fecDisp(p.fecha)+" · "+fmt(p.monto)+" · "+esc(p.cuenta||"--")+" · "+esc(p.u||"(sin usuario)");}).join("<br>")||"<span class='sub'>sin pagos</span>";
+      h+="<tr><td class='mono'>"+esc(c._key)+"</td><td>"+fmt(c.monto_total)+"</td><td>"+esc(c.estado)+"</td><td>"+pagos+"</td></tr>";
+    });
+    h+="</tbody></table></div>";
+  });
+  h+="</div>";
+  document.getElementById("secDup").innerHTML=h;
+}
+
+function renderReporteMes(){
+  var m=(document.getElementById("mesRep")||{value:mesActualStr()}).value||mesActualStr();
+  var cobs=oA(DATA.cob).filter(function(c){return c.mes===m&&(c.estado==="pagado"||c.estado==="parcial")&&!c.archivado_hist;})
+    .sort(function(a,b){return (a.unidad||"").localeCompare(b.unidad||"");});
+  var out=document.getElementById("resMes");
+  if(!cobs.length){out.innerHTML="<div class='sub'>No hay cobros pagado/parcial cargados para "+esc(m)+".</div>";return;}
+  var h="<table><thead><tr><th>Unidad</th><th>Inquilino</th><th>Concepto</th><th>Estado</th><th>Fecha pago</th><th>Monto</th><th>Cuenta</th><th>Cargado por</th><th>¿En Caja real?</th></tr></thead><tbody>";
+  cobs.forEach(function(c){
+    var pagos=pA(c);
+    if(!pagos.length){
+      h+="<tr><td>"+esc(c.unidad)+"</td><td>"+esc(c.inq)+"</td><td>"+esc(c.concepto||"Alquiler")+"</td><td>"+esc(c.estado)+"</td><td colspan='5' class='amber'>Marcado \""+esc(c.estado)+"\" pero SIN ningún pago cargado — revisar manualmente</td></tr>";
+      return;
+    }
+    pagos.forEach(function(p,idx){
+      var motivo=motivoNoCaja(p);
+      h+="<tr><td>"+(idx===0?esc(c.unidad):"")+"</td><td>"+(idx===0?esc(c.inq):"")+"</td><td>"+(idx===0?esc(c.concepto||"Alquiler"):"")+"</td><td>"+(idx===0?esc(c.estado):"")+"</td>"
+        +"<td>"+fecDisp(p.fecha)+"</td><td>"+fmt(p.monto)+"</td><td>"+esc(p.cuenta||"--")+"</td><td>"+(p.u?esc(p.u):"<span class='amber'>(sin usuario)</span>")+"</td>"
+        +"<td>"+(motivo?"<span class='red'>NO — "+motivo+"</span>":"<span class='green'>Sí, debería figurar</span>")+"</td></tr>";
+    });
+  });
+  h+="</tbody></table>";
+  out.innerHTML=h;
+}
+
+function renderDatosSospechosos(){
+  var filas=[];
+  oA(DATA.cob).forEach(function(c){
+    pA(c).forEach(function(p,idx){
+      var motivo=motivoNoCaja(p);
+      if(motivo){
+        filas.push({unidad:c.unidad,inq:c.inq,mes:c.mes,concepto:c.concepto,monto:p.monto,fecha:p.fecha,cuenta:p.cuenta,u:p.u,motivo:motivo});
+      }
+    });
+  });
+  var h="<div class='card'><h2 style='margin-top:0'>⚠ Pagos que NO aparecerían (o aparecerían mal) en la Caja</h2>";
+  h+="<div class='sub' style='margin-bottom:8px'>Se revisaron "+oA(DATA.cob).reduce(function(s,c){return s+pA(c).length;},0)+" pagos en total. Estos "+filas.length+" tienen algo que hace que la Caja los excluya o los muestre distinto de lo esperado.</div>";
+  if(!filas.length){
+    h+="<div class='ok'>No se encontraron pagos con fecha/cuenta con formato inválido. Si igual falta algo en la Caja, puede ser un caso de acuerdo duplicado — mirá la sección de abajo o buscá la unidad puntual.</div>";
+  } else {
+    h+="<table><thead><tr><th>Unidad</th><th>Inquilino</th><th>Mes cobro</th><th>Concepto</th><th>Monto</th><th>Fecha (cruda)</th><th>Cuenta (cruda)</th><th>Cargado por</th><th>Motivo</th></tr></thead><tbody>";
+    filas.forEach(function(f){
+      h+="<tr><td>"+esc(f.unidad)+"</td><td>"+esc(f.inq)+"</td><td>"+esc(f.mes)+"</td><td>"+esc(f.concepto)+"</td><td>"+fmt(f.monto)+"</td><td>"+crudo(f.fecha)+"</td><td>"+crudo(f.cuenta)+"</td><td>"+esc(f.u||"--")+"</td><td class='amber'>"+f.motivo+"</td></tr>";
+    });
+    h+="</tbody></table>";
+  }
+  h+="</div>";
+  document.getElementById("secDatos").innerHTML=h;
+}
+
+function renderActivos(){
+  var act=oA(DATA.iq).filter(function(i){return i.estado==="activo";}).sort(function(a,b){return (a.unidad||"").localeCompare(b.unidad||"");});
+  var h="<div class='card'><h2 style='margin-top:0'>📋 Todos los acuerdos activos (revisar cuáles ya se fueron y siguen "+"\"activos\")</h2>";
+  h+="<table><thead><tr><th>Unidad</th><th>Inquilino</th><th>Inicio</th><th>Posesión</th><th>Vencimiento</th><th>Último cobro</th><th>Estado último cobro</th><th>Saldo (motor)</th></tr></thead><tbody>";
+  act.forEach(function(i){
+    var cobs=oA(DATA.cob).filter(function(c){return c.id_ac===i.id_ac;}).sort(function(a,b){return String(a.mes).localeCompare(String(b.mes));});
+    var ult=cobs[cobs.length-1];
+    var sal=saldoInq(i.id_ac);
+    var salTxt=sal.ars>0?"<span class='red'>debe "+fmt(sal.ars)+"</span>":sal.ars<0?"<span class='green'>a favor "+fmt(-sal.ars)+"</span>":"al día $0";
+    h+="<tr><td>"+esc(i.unidad)+"</td><td>"+esc(i.nombre)+"</td><td>"+fecDisp(i.ingreso)+"</td><td>"+fecDisp(i.fecha_posesion)+"</td><td>"+fecDisp(i.egreso)+"</td>"
+      +"<td>"+(ult?esc(ult.mes)+" — "+esc(ult.concepto||""):"--")+"</td>"
+      +"<td>"+(ult?esc(ult.estado):"--")+"</td><td>"+salTxt+"</td></tr>";
+  });
+  h+="</tbody></table></div>";
+  document.getElementById("secActivos").innerHTML=h;
+}
+
+function buscarSeniaReal(c){
+  // Busca en forms/res un registro de la misma unidad+nombre con seña cargada, para saber la fecha real.
+  var nom=String(c.inq||"").toLowerCase().trim();
+  var u=c.unidad;
+  var candF=oA(DATA.forms).filter(function(f){return f.unidad===u&&f.senia>0&&f.senia_fecha&&String(f.nombre||"").toLowerCase().trim()===nom;})[0];
+  if(candF)return {fecha:candF.senia_fecha,monto:candF.senia,origen:"formulario"};
+  var candR=oA(DATA.res).filter(function(r){return r.unidad===u&&r.senia>0&&r.fecha&&String(r.nombre||"").toLowerCase().trim()===nom;})[0];
+  if(candR)return {fecha:candR.fecha,monto:candR.senia,origen:"reserva"};
+  return null;
+}
+
+function renderReparar(){
+  var out=document.getElementById("secReparar");
+  var h="<div class='card' style='border-color:#EF444466'><h2 style='margin-top:0;color:#EF4444'>⚠ Casos para corregir (solo diagnóstico — la corrección se hace en AdminUdo, no acá)</h2>";
+  h+="<div class='sub'>Esta herramienta NO escribe en Firebase. Corregir el estado o la fecha de un pago acá, por afuera, no recalcula el arrastre (+Ant) del mes siguiente y puede descuadrar otro mes. Esa corrección tiene que hacerse dentro del sistema real.</div>";
+
+  var vacios=oA(DATA.cob).filter(function(c){return !c.archivado_hist&&(c.estado==="pagado"||c.estado==="parcial")&&pA(c).length===0;});
+  h+="<h3 style='font-size:12px;color:#F1F5F9;margin-bottom:6px'>A) Marcados pagado/parcial sin ningún pago cargado ("+vacios.length+")</h3>";
+  if(!vacios.length){h+="<div class='sub'>Ninguno encontrado.</div>";}
+  else{
+    h+="<table><thead><tr><th>Unidad</th><th>Inquilino</th><th>Mes</th><th>Concepto</th><th>Total</th><th>Estado actual</th></tr></thead><tbody>";
+    vacios.forEach(function(c){
+      h+="<tr><td>"+esc(c.unidad)+"</td><td>"+esc(c.inq)+"</td><td>"+esc(c.mes)+"</td><td>"+esc(c.concepto||"Alquiler")+"</td><td>"+fmt(c.monto_total)+"</td><td class='red'>"+esc(c.estado)+"</td></tr>";
+    });
+    h+="</tbody></table>";
+  }
+
+  var sospechosos=[];
+  oA(DATA.cob).forEach(function(c){
+    if(c.archivado_hist)return;
+    pA(c).forEach(function(p,idx){
+      if(p.concepto==="Pago a cuenta"&&!p.u){
+        var real=buscarSeniaReal(c);
+        if(real&&real.fecha&&real.fecha!==p.fecha){
+          var pk=Object.keys(c.pagos)[idx];
+          sospechosos.push({c:c,pk:pk,p:p,real:real});
+        }
+      }
+    });
+  });
+  h+="<h3 style='font-size:12px;color:#F1F5F9;margin:14px 0 6px'>B) Seña aplicada con fecha distinta a la fecha real conocida ("+sospechosos.length+")</h3>";
+  if(!sospechosos.length){h+="<div class='sub'>Ninguna encontrada (o no hay formulario/reserva para cruzar).</div>";}
+  else{
+    h+="<table><thead><tr><th>Unidad</th><th>Inquilino</th><th>Monto</th><th>Fecha actual (mal)</th><th>Fecha real</th></tr></thead><tbody>";
+    sospechosos.forEach(function(s){
+      h+="<tr><td>"+esc(s.c.unidad)+"</td><td>"+esc(s.c.inq)+"</td><td>"+fmt(s.p.monto)+"</td><td class='red'>"+fecDisp(s.p.fecha)+"</td><td class='green'>"+fecDisp(s.real.fecha)+" <span class='sub'>("+s.real.origen+")</span></td></tr>";
+    });
+    h+="</tbody></table>";
+  }
+  h+="</div>";
+  out.innerHTML=h;
+}
+function buscar(){
+  var q=(document.getElementById("busq").value||"").trim().toLowerCase();
+  var out=document.getElementById("resBusq");
+  if(!q){out.innerHTML="";return;}
+  var cobs=oA(DATA.cob).filter(function(c){
+    return (c.unidad||"").toLowerCase().indexOf(q)>=0||(c.inq||"").toLowerCase().indexOf(q)>=0;
+  });
+  var iqs=oA(DATA.iq).filter(function(i){return (i.unidad||"").toLowerCase().indexOf(q)>=0||(i.nombre||"").toLowerCase().indexOf(q)>=0;});
+  var hists=oA(DATA.hist).filter(function(i){return (i.unidad||"").toLowerCase().indexOf(q)>=0||(i.nombre||"").toLowerCase().indexOf(q)>=0;});
+  if(!cobs.length&&!iqs.length&&!hists.length){out.innerHTML="<div class='warn'>Sin resultados para \""+esc(q)+"\"</div>";return;}
+  var h="";
+  if(iqs.length){
+    h+="<h2>Acuerdo(s) activo(s)</h2>";
+    iqs.forEach(function(i){
+      var sal=saldoInq(i.id_ac);
+      h+="<div class='card'><b>"+esc(i.unidad)+" — "+esc(i.nombre)+"</b> <span class='pill pill-ok'>ACTIVO</span><br>"
+        +"<span class='sub'>id_ac: "+esc(i.id_ac)+" · Inicio "+fecDisp(i.ingreso)+" · Posesión "+fecDisp(i.fecha_posesion)+" · Vencimiento "+fecDisp(i.egreso)+"</span><br>"
+        +"Saldo motor único: <b>"+(sal.ars>0?"<span class='red'>debe "+fmt(sal.ars)+"</span>":sal.ars<0?"<span class='green'>a favor "+fmt(-sal.ars)+"</span>":"al día $0")+"</b>"
+        +" &nbsp;(cargos totales "+fmt(sal.cargos)+" − pagado "+fmt(sal.pagado)+")</div>";
+    });
+  }
+  if(hists.length){
+    h+="<h2>En historial (bajas registradas)</h2>";
+    hists.forEach(function(hh){
+      h+="<div class='card'><b>"+esc(hh.unidad)+" — "+esc(hh.nombre)+"</b> <span class='pill pill-out'>DADO DE BAJA</span><br>"
+        +"<span class='sub'>Egreso real: "+fecDisp(hh.fecha_egreso_real)+" · Cierre registrado: "+fecDisp(hh.fecha_cierre)+" · Tipo: "+esc(hh.cierre_tipo||"--")+" · Deuda archivada: "+fmt(hh.deuda_pendiente||0)+"</span></div>";
+    });
+  }
+  if(cobs.length){
+    h+="<h2>Cobros y pagos (detalle crudo)</h2>";
+    cobs.sort(function(a,b){return String(a.mes).localeCompare(String(b.mes));}).forEach(function(c){
+      h+="<div class='card'><b>"+esc(c.unidad)+" — "+esc(c.mes)+" — "+esc(c.concepto||"")+"</b> · Total "+fmt(c.monto_total)+" · sal_ant "+fmt(c.sal_ant||0)+" · estado <b>"+esc(c.estado)+"</b>"+(c.archivado_hist?" <span class='pill pill-bad'>ARCHIVADO_HIST</span>":"")+"<br>";
+      var pagos=pA(c);
+      if(!pagos.length){h+="<span class='sub'>Sin pagos registrados.</span>";}
+      else{
+        h+="<table style='margin-top:6px'><thead><tr><th>Fecha</th><th>Monto</th><th>Cuenta</th><th>Cargado por</th><th>¿Aparece en Caja de ese día?</th></tr></thead><tbody>";
+        pagos.forEach(function(p){
+          var motivo=motivoNoCaja(p);
+          h+="<tr><td>"+crudo(p.fecha)+" <span class='sub'>("+fecDisp(p.fecha)+")</span></td><td>"+fmt(p.monto)+"</td><td>"+crudo(p.cuenta)+"</td><td>"+esc(p.u||"--")+"</td>"
+            +"<td>"+(motivo?"<span class='red'>NO — "+motivo+"</span>":"<span class='green'>Sí, debería figurar el "+fecDisp(p.fecha)+" en cuenta "+esc(p.cuenta)+"</span>")+"</td></tr>";
+        });
+        h+="</tbody></table>";
+      }
+      h+="</div>";
+    });
+  }
+  out.innerHTML=h;
+}
+
+cargar();
+</script>
+</body>
+</html>
