@@ -1,5 +1,8 @@
 name: Backup Firebase GestionProp
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # 12:00 Argentina (UTC-3) = 15:00 UTC, todos los sábados
