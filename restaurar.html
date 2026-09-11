@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restaurar backup — GestionProp</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{background:#0F172A;color:#F1F5F9;font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:16px;font-size:14px}
+  h1{font-size:18px}
+  .card{background:#131C2E;border:1px solid #1E293B;border-radius:10px;padding:14px;margin-bottom:12px}
+  .warn{background:#3B2A0E;border:1px solid #F59E0B66;border-radius:8px;padding:10px 12px;margin-bottom:10px;color:#F59E0B;font-size:13px}
+  .danger{background:#3B0E0E;border:2px solid #EF4444;border-radius:8px;padding:12px;margin:10px 0;color:#FCA5A5}
+  input[type=file]{background:#1E293B;border:1px solid #334155;border-radius:6px;padding:10px;width:100%;color:#F1F5F9}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+  th{background:#1E293B;color:#94A3B8;text-align:left;padding:6px}
+  td{padding:5px 6px;border-bottom:1px solid #1E293B}
+  button{background:#2563EB;color:#fff;border:none;border-radius:6px;padding:10px 16px;font-size:14px;cursor:pointer;font-weight:700}
+  button.danger-btn{background:#DC2626}
+  button:disabled{opacity:.5;cursor:not-allowed}
+</style>
+</head>
+<body>
+<h1>⏮ Restaurar desde un backup</h1>
+<div class="warn">Esto reemplaza TODA la base de datos (GestionProp + Cuentas Personales) por lo que había en el archivo que subas. Todo lo cargado DESPUÉS de esa fecha se pierde. Usalo solo si algo salió mal y hace falta volver atrás.</div>
+<div class="card">
+  <label style="display:block;margin-bottom:8px;font-weight:700">1) Elegí el archivo backup-AAAA-MM-DD.json</label>
+  <input type="file" id="file" accept=".json"/>
+  <div id="resumen"></div>
+</div>
+<div id="confirmar" style="display:none" class="card">
+  <div class="danger">
+    <b>⚠ Última confirmación.</b><br>
+    Esto va a borrar lo que hay AHORA en Firebase y poner en su lugar el contenido del archivo de arriba.<br><br>
+    Para confirmar, escribí <code>RESTAURAR</code> acá abajo:
+  </div>
+  <input type="text" id="confirmText" style="width:100%;padding:10px;background:#1E293B;border:1px solid #334155;border-radius:6px;color:#fff;margin-bottom:10px"/>
+  <button class="danger-btn" onclick="ejecutarRestauracion()">Restaurar ahora</button>
+</div>
+<div id="resultado" style="margin-top:12px;font-weight:700"></div>
+
+<script>
+firebase.initializeApp({apiKey:"AIzaSyDhuSP_WTWI3hqf5GqgFExkptFfpqJUn50",authDomain:"gestion-prop.firebaseapp.com",databaseURL:"https://gestion-prop-default-rtdb.firebaseio.com",projectId:"gestion-prop"});
+var DB=firebase.database();
+var DATOS_A_RESTAURAR=null;
+
+document.getElementById('file').addEventListener('change',function(e){
+  var f=e.target.files[0];
+  if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      DATOS_A_RESTAURAR=JSON.parse(ev.target.result);
+    }catch(err){
+      alert('Ese archivo no es un JSON válido: '+err.message);
+      return;
+    }
+    var claves=Object.keys(DATOS_A_RESTAURAR);
+    var h='<p style="color:#10B981;margin-top:10px">Archivo leído — '+claves.length+' secciones encontradas:</p>';
+    h+='<table><thead><tr><th>Sección</th><th>Cantidad de registros</th></tr></thead><tbody>';
+    claves.forEach(function(k){
+      var v=DATOS_A_RESTAURAR[k];
+      var cant=v&&typeof v==='object'?Object.keys(v).length:1;
+      h+='<tr><td>'+k+'</td><td>'+cant+'</td></tr>';
+    });
+    h+='</tbody></table>';
+    document.getElementById('resumen').innerHTML=h;
+    document.getElementById('confirmar').style.display='block';
+  };
+  reader.readAsText(f);
+});
+
+function ejecutarRestauracion(){
+  var txt=document.getElementById('confirmText').value.trim().toUpperCase();
+  if(txt!=='RESTAURAR'){alert('Escribí exactamente RESTAURAR para confirmar.');return;}
+  if(!DATOS_A_RESTAURAR){alert('Primero subí el archivo.');return;}
+  document.getElementById('resultado').textContent='Restaurando... no cierres esta página.';
+  DB.ref('/').set(DATOS_A_RESTAURAR,function(err){
+    if(err){
+      document.getElementById('resultado').innerHTML='<span style="color:#EF4444">Error: '+err.message+'</span>';
+      return;
+    }
+    document.getElementById('resultado').innerHTML='<span style="color:#10B981">✓ Restaurado. Recargá GestionProp y Cuentas Personales para ver los datos de ese backup.</span>';
+  });
+}
+</script>
+</body>
+</html>
