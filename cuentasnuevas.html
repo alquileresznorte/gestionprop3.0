@@ -1009,6 +1009,7 @@ function pagarTJ(tk){
   var ups=upsU;
   var pagoRec={fecha:f||(mes+'-01'),tipo:'pagotj',monto:m,cuenta:caja,tjCta:tk,cierre:cierre,desc:'Pago resumen '+tname+' (cierre '+cierre+')',_pagoid:pagoid};
   if(editing){
+    var _prevP=(D.gastos[EDITTJ.mes]||{})[EDITTJ.key]||{};if(_prevP._emp)pagoRec._emp=_prevP._emp; // pago traído de AU: no re-importar
     if(EDITTJ.mes!==mes){ups['cn_gastos/'+EDITTJ.mes+'/'+EDITTJ.key]=null;ups['cn_gastos/'+mes+'/'+DB.ref('cn_gastos/'+mes).push().key]=pagoRec;}
     else ups['cn_gastos/'+mes+'/'+EDITTJ.key]=pagoRec;
     Object.keys(D.gastos||{}).forEach(function(mm){var gg=D.gastos[mm]||{};Object.keys(gg).forEach(function(kk){if(gg[kk].tipo==='gasto'&&gg[kk]._pagoid===pagoid)ups['cn_gastos/'+mm+'/'+kk]=null;});});
@@ -1027,6 +1028,30 @@ function pagarTJ(tk){
   spin(true);DB.ref('/').update(ups,function(){spin(false);PAGOTJ='';EDITTJ=null;render();});
 }
 
+// ── Pagos de tarjeta desde AU: automáticos a partir de esta fecha (los anteriores se cargan a mano) ──
+var TJ_AUTO_DESDE='2026-09-30';
+function _normTxt(t){return String(t||'').toLowerCase().replace(/\s+/g,' ').trim();}
+function pagoTJdeAU(mv,k){
+  var txt=_normTxt((mv.cuenta_caja||'')+' '+(mv.nota||''));
+  var tj=cuentasTarj().filter(function(t){var nm=_normTxt(t.nombre);return nm&&txt.indexOf(nm)>=0;}).sort(function(a,b){return String(b.nombre).length-String(a.nombre).length;})[0];
+  if(!tj)return null;
+  var monto=Math.round(+mv.monto||0),fecha=mv.fecha||(cM+'-01');
+  // ¿ya está cargado a mano? mismo monto, misma tarjeta, ±3 días
+  var dup=false;Object.keys(D.gastos||{}).forEach(function(mm){var g=D.gastos[mm]||{};Object.keys(g).forEach(function(kk){var x=g[kk];
+    if(x.tipo==='pagotj'&&x.tjCta===tj._k&&x.moneda!=='usd'&&Math.round(+x.monto||0)===monto&&_diasEntre(x.fecha||'',fecha)<=3)dup=true;});});
+  if(dup)return 'dup';
+  // cierre: el último cierre cargado anterior (o igual) a la fecha del pago
+  var cs=[];var cr=(D.cuentas[tj._k]||{}).cierres||{};Object.keys(cr).forEach(function(id){if(cr[id]&&cr[id].cierre)cs.push(cr[id].cierre);});
+  Object.keys(D.gastos||{}).forEach(function(mm){var g=D.gastos[mm]||{};Object.keys(g).forEach(function(kk){var x=g[kk];if(x.tipo==='pagotj'&&x.tjCta===tj._k&&x.cierre)cs.push(x.cierre);});});
+  cs=cs.filter(function(c){return c<=fecha;}).sort();
+  var cierre=cs.length?cs[cs.length-1]:fecha;
+  // sale de: cuenta 🏢 empresa que coincida con la caja de AU (sigue contando como retiro del socio)
+  var cc=_normTxt(mv.cuenta_caja),emp=null;
+  if(cc){emp=cuentasEmp().filter(function(c){return _normTxt(c.nombre).indexOf(cc)===0;}).sort(function(a,b){return String(a.nombre).length-String(b.nombre).length;})[0]||cuentasEmp().filter(function(c){return _normTxt(c.nombre).indexOf(cc)>=0;})[0]||null;}
+  var rec={fecha:fecha,tipo:'pagotj',monto:monto,cuenta:emp?emp._k:'',tjCta:tj._k,cierre:cierre,desc:'Pago resumen '+tj.nombre+' (cierre '+cierre+') · desde AU',_emp:k,_pagoid:'au'+k};
+  if(!cs.length)rec._cierreAuto=true;
+  return rec;
+}
 function _collectEmp(allMovs,allCob,allCst){
   var yaImp={};movsMes(cM).forEach(function(g){if(g._emp)yaImp[g._emp]=true;});
   var desc=D.descartados||{};
@@ -1034,6 +1059,8 @@ function _collectEmp(allMovs,allCob,allCst){
   Object.keys(allMovs).forEach(function(k){var mv=allMovs[k];if(String(mv.fecha||'').slice(0,7)!==cM||yaImp[k]||desc[k])return;
     if((mv.origen||'')==='Cuentas Personales')return; // salió de acá (ej. inversión de empresa): no duplicar
     var sub=String(mv.tipo||'').toLowerCase();
+    // Pago de tarjeta hecho en AU (retiro que nombra una tarjeta) → entra como Pago resumen, no como mov. de empresa
+    if(sub==='retiro'&&(mv.fecha||'')>=TJ_AUTO_DESDE){var pg=pagoTJdeAU(mv,k);if(pg){if(pg!=='dup'){ups['cn_gastos/'+cM+'/'+DB.ref('cn_gastos/'+cM).push().key]=pg;n++;}return;}}
     var descr=(mv.tipo||'Mov empresa')+(mv.cuenta_caja?' · '+mv.cuenta_caja:'')+(mv.nota?' - '+mv.nota:'');
     ups['cn_gastos/'+cM+'/'+DB.ref('cn_gastos/'+cM).push().key]={fecha:mv.fecha||(cM+'-01'),desc:descr,monto:Math.round(+mv.monto||0),tipo:'empresa',subtipo:sub,cuenta:'',_emp:k};n++;});
   function esSocioCta(c){return /loli|hugo/i.test(c||'')&&!/bco/i.test(c||'');}
