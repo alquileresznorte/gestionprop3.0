@@ -890,6 +890,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
   function guardar(m, forzar) {
     var av = $("#m_aviso"), e = validar(m);
     if (e) { av.innerHTML = '<div class="aviso mal">' + esc(e) + "</div>"; return; }
+    var ptj = forzar ? null : avisoPagoTj(m); if (ptj) { borradorDup = m; av.innerHTML = ptj; return; }
     var pz = forzar ? [] : parecidos(m);
     if (pz.length) {
       borradorDup = m;
@@ -1015,7 +1016,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     var p = pendientes();
     var fila = function (e) { return '<div class="lado"><span class="num">' + fecha(e.fecha) + "</span><span>" + esc(e.desc) + '</span><span class="nota">' + esc(cta(e.cuenta)) + (e.categoria ? " · " + esc(e.categoria) : "") + "</span>" + $$(e.monto) + (puedeEscribir && !bloqueado(e) ? ' <button class="btn chico" data-acc="editar" data-id="' + esc(e.id) + '">Editar</button>' : "") + "</div>"; };
     return '<section><div><span class="eti">Antes de cerrar ' + esc(nomMes(per)) + "</span><h2>Para revisar</h2>" +
-      '<p class="nota">Nada de esto se corrige solo. Son cargas que conviene mirar porque cambian la estadística.</p></div>' + vSaldos0109() + vPlanesPend() + vControlAU() + vAuditoria() + vSenasPend() +
+      '<p class="nota">Nada de esto se corrige solo. Son cargas que conviene mirar porque cambian la estadística.</p></div>' + vSaldos0109() + vPlanesPend() + vPagosTjDobles() + vControlAU() + vAuditoria() + vSenasPend() +
       (function () { var aj = ajustesSueltos(); return aj.length ? '<div class="hoja" style="display:grid;gap:4px"><h3>Correcciones de caja que no salen de un arqueo <span class="estado av">' + aj.length + "</span></h3>" +
         '<p class="nota">Suelen tapar un error de carga: la caja queda bien pero el movimiento equivocado sigue sumando en el resultado. Conviene corregir el movimiento original y anular la corrección.</p>' +
         aj.map(function (e) { return '<div class="par">' + fila(e) + "</div>"; }).join("") + "</div>" : ""; })() +
@@ -2626,14 +2627,15 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     var o = { tarjetas: {} }; o.tarjetas[tj] = { cierres: {} }; o.tarjetas[tj].cierres[k] = null;
     enCola(function () { return DB.doc("base/tarjetas").update(o); }).then(function () { var loc = D.tarjetas[tj]; if (loc && loc.cierres) { loc.cierres = Object.assign({}, loc.cierres); delete loc.cierres[k]; } FTJ.idx[tj] = null; abrirPanel(formCierreTj(tj)); toast("Cierre borrado"); }, function (e) { toast(errTxt(e)); });
   }
-  function formPagarTj(tj, cierre) {
+  function formPagarTj(tj, cierre, desde) {
     tj = tj || FTJ.tj; var t = CTA[tj], T = periodosTj(tj), cerr = T.per.filter(function (P) { return !P.abierto; }), ctas = D.cuentas.filter(function (c) { return c.tipo !== "tarjeta" && c.tipo !== "usd"; });
     if (!cierre && cerr.length) { var yaC = cerr.filter(function (x) { return x.hasta <= hoyISO(); }); cierre = (yaC.length ? yaC[yaC.length - 1] : cerr[0]).hasta; }
     var P = cerr.filter(function (x) { return x.hasta === cierre; })[0], r = P ? totalesTj(P) : { aPagar: 0, pg: 0 };
     return cabPanel("Pagar resumen · " + t.nombre, P ? "Resumen con cierre " + fDM(cierre) + (P.info && P.info.vto ? ", vence " + fDM(P.info.vto) : "") + (r.pg ? " · ya pagado " + $$(r.pg) : "") : "") +
       '<form class="mov" id="formPagoTj" data-tj="' + esc(tj) + '" novalidate><label>Resumen<select id="pt_r">' + cerr.slice().reverse().map(function (x) { return opt(x.hasta, "Cierre " + fDM(x.hasta), cierre); }).join("") + "</select></label>" +
       '<label>Monto ($)<input type="number" id="pt_m" value="' + r.aPagar + '"></label><label>Fecha del pago<input type="date" id="pt_f" value="' + hoyISO() + '"></label>' +
-      '<label>Pagado desde<select id="pt_c">' + ctas.map(function (c) { return opt(c.id, c.nombre, "bco_" + (t.titular === "hugo" ? "hugo" : "loli")); }).join("") + "</select></label>" +
+      '<label>Pagado desde<select id="pt_c">' + ctas.map(function (c) { return opt(c.id, c.nombre, desde || "bco_" + (t.titular === "hugo" ? "hugo" : "loli")); }).join("") + "</select></label>" +
+      '<p class="nota ancho" id="pt_ret" style="grid-column:1/-1">' + retiroTjTxt(tj, desde || "bco_" + (t.titular === "hugo" ? "hugo" : "loli")) + "</p>" +
       (r.aPagarU ? '<p class="nota ancho" style="grid-column:1/-1">La parte en dólares (U$S ' + fmt.format(r.aPagarU) + ") se paga aparte: sumala en pesos al monto si la pagaste en pesos.</p>" : "") +
       '<div id="pt_aviso" class="ancho" style="grid-column:1/-1"></div><div class="acciones"><button class="btn pri" type="submit">Registrar pago</button><button class="btn" type="button" data-acc="cerrarPanel">Cancelar</button></div></form>';
   }
@@ -2715,6 +2717,63 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     editarMov(m, { monto: p.cuotas[0].monto, desc: base + " (" + p.k + "/" + p.n + ")", cuota: p.k + "/" + p.n, grupo_cuotas: g })
       .then(function () { return nuevos.reduce(function (pr, x) { return pr.then(function () { return crearMov(x); }); }, Promise.resolve()); })
       .then(function () { cerrarPanel(); toast("Pasada a " + p.n + " cuotas"); }, function (e) { $("#formCuotas button[type=submit]").disabled = false; av.innerHTML = '<div class="aviso mal">' + esc(e.message) + "</div>"; });
+  }
+
+  // ---------- Pago de tarjeta: un solo movimiento "Pago resumen" desde la cuenta de donde salió la plata ----------
+  // El retiro no se carga aparte: el libro lo calcula según de quién es la tarjeta y de dónde sale la plata.
+  function retiroTjTxt(tj, c) {
+    var t = (CTA[tj] || {}).titular, quien = t === "loli" ? "Loli" : t === "hugo" ? "Hugo" : t === "socios" ? "Loli y Hugo (mitad cada uno)" : "";
+    if (!quien || !c) return "";
+    if (esEmp(c) || (L.aRendir && L.aRendir(c))) return "Cuenta como <b>retiro de " + quien + "</b> (la tarjeta es suya y la paga la caja común). No cargues otro retiro aparte.";
+    return "No cuenta como retiro: sale de una cuenta personal.";
+  }
+  function esPagoTjTxt(t) { return /visa|master|amex|cabal|naranja|tarj|\btj\b|resumen/i.test(String(t || "")); }
+  // Al cargar un pase de plata al Efectivo de un socio: si parece el pago de una tarjeta, avisa antes de guardar.
+  function avisoPagoTj(m) {
+    if (!m || m.tipo !== "transferencia" || !(L.aRendir && L.aRendir(m.cuenta_destino))) return null;
+    var s = L.titular(m.cuenta_destino), hit = null;
+    tarjetasCtas().filter(function (t) { return t.titular === s || t.titular === "socios"; }).forEach(function (t) {
+      if (hit) return;
+      periodosTj(t.id).per.filter(function (P) { return !P.abierto; }).forEach(function (P) { var r = totalesTj(P); if (!hit && r.aPagar > 0 && Math.abs(r.aPagar - m.monto) <= 1) hit = [t, P.hasta]; });
+    });
+    if (!hit && esPagoTjTxt(m.desc)) { // la tarjeta del socio cuyo nombre más se parece a la descripción
+      var d = String(m.desc).toLowerCase(), pts = function (t) { return String(t.nombre).toLowerCase().split(/\s+/).filter(function (w) { return w.length >= 3 && d.indexOf(w) >= 0; }).length; };
+      var t0 = tarjetasCtas().filter(function (t) { return t.titular === s; }).sort(function (x, y) { return pts(y) - pts(x); })[0]; if (t0) hit = [t0, ""]; }
+    if (!hit) return null;
+    return '<div class="aviso"><b>¿Es para pagar la ' + esc(hit[0].nombre) + "?</b> El pago de una tarjeta se carga una sola vez, con <b>Pagar este resumen</b>, desde la cuenta de donde sale la plata. El retiro lo calcula el libro solo." +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn pri" type="button" data-acc="pagarTj" data-id="' + esc(hit[0].id) + '" data-c="' + esc(hit[1]) + '" data-desde="' + esc(m.cuenta) + '">Sí, pagar la tarjeta</button>' +
+      '<button class="btn" type="button" data-acc="guardarIgual">No, es otra cosa, guardarlo</button></div></div>';
+  }
+  // Pagos de tarjeta cargados en dos pasos (pase al Efectivo del socio y del Efectivo a la tarjeta, mismo monto): se pueden unir en uno.
+  function pagosTjDobles() {
+    var ms = D.movimientos.filter(function (m) { return m.estado !== "excluido" && m.estado !== "movido" && m.tipo === "transferencia"; }), out = [], usado = {};
+    ms.filter(function (b) { return CTA[b.cuenta_destino] && CTA[b.cuenta_destino].tipo === "tarjeta" && L.aRendir && L.aRendir(b.cuenta); }).forEach(function (b) {
+      var a = ms.filter(function (x) { return !usado[x.id] && x.id !== b.id && x.cuenta_destino === b.cuenta && x.monto === b.monto && x.cuenta !== b.cuenta && x.fecha <= b.fecha && difDias(x.fecha, b.fecha) <= 3; })[0];
+      if (a) { usado[a.id] = 1; out.push([a, b]); }
+    });
+    return out;
+  }
+  function vPagosTjDobles() {
+    var xs = pagosTjDobles(); if (!xs.length) return "";
+    return '<div class="hoja" style="display:grid;gap:6px"><h3>Pagos de tarjeta cargados en dos pasos <span class="estado av">' + xs.length + "</span></h3>" +
+      '<p class="nota">Regla: un pago de tarjeta es un solo movimiento "Pago resumen" desde donde salió la plata. Unir no cambia ningún número (mismo retiro, misma tarjeta pagada, mismas cajas).</p>' +
+      xs.map(function (x) { var a = x[0], b = x[1];
+        return '<div class="par"><div class="lado"><span class="num">' + fecha(b.fecha) + "</span><span>" + esc(a.desc) + " + " + esc(b.desc) + '</span><span class="nota">' + esc(cta(a.cuenta)) + " → " + esc(cta(b.cuenta)) + " → " + esc(cta(b.cuenta_destino)) + "</span><b>" + $$(b.monto) + "</b></div>" +
+          (puedeEscribir ? '<button class="btn chico" data-acc="unirPagoTj" data-id="' + esc(a.id) + '" data-c="' + esc(b.id) + '">Unir en uno</button>' : "") + "</div>"; }).join("") + "</div>";
+  }
+  function unirPagoTj(aid, bid, btn) {
+    var a = D.movimientos.filter(function (x) { return x.id === aid; })[0], b = D.movimientos.filter(function (x) { return x.id === bid; })[0]; if (!a || !b) return;
+    var mes = [a, b].map(function (x) { var f = String(x.fecha).slice(0, 7); return cerrado(x.periodo) ? x.periodo : cerrado(f) ? f : null; }).filter(Boolean)[0];
+    if (mes) { toast("El mes " + mes + " está cerrado: para unirlos un admin tiene que reabrirlo."); return; }
+    // Mismo día: la caja y el Efectivo terminan el día igual, así que no cambia ningún arqueo. Días distintos: rigen las cajas cerradas.
+    if (a.fecha !== b.fecha) { var e = bloqueado(a) || bloqueado(b) || bloqueado(Object.assign({}, b, { cuenta: a.cuenta })); if (e) { toast(e); return; } }
+    btn.disabled = true;
+    var ts = new Date().toISOString(), k = ts.replace(/[^0-9]/g, ""), regB = {}, regA = {};
+    regB[k] = { cuando: ts, por: uid || "", antes: { cuenta: b.cuenta, unido_de: null } }; regA[k] = { cuando: ts, por: uid || "", antes: { estado: a.estado || "ok" } };
+    var oB = { movs: {} }; oB.movs[b.id] = { cuenta: a.cuenta, unido_de: a.id, cambios: regB };
+    var oA = { movs: {} }; oA.movs[a.id] = { estado: "excluido", excluido_el: ts, excluido_por: uid || "", unido_a: b.id, cambios: regA };
+    enCola(function () { return DB.doc("libro/" + b._doc).update(oB).then(function () { return DB.doc("libro/" + a._doc).update(oA); }); })
+      .then(function () { toast("Unido: " + cta(a.cuenta) + " → " + cta(b.cuenta_destino)); }, function (e) { btn.disabled = false; toast(errTxt(e)); });
   }
 
   // ---------- Estadística mensual comparada ----------
@@ -39482,7 +39541,8 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     else if (a === "compraTj") { abrirPanel(formCompraTj(), "#cp_m"); syncCompra(); }
     else if (a === "cierreTj") abrirPanel(formCierreTj(b.getAttribute("data-id") || FTJ.tj, b.getAttribute("data-mes") || ""), "#ct_c");
     else if (a === "borrarCierreTj") borrarCierreTj(b.getAttribute("data-id"), b.getAttribute("data-mes"), b);
-    else if (a === "pagarTj") abrirPanel(formPagarTj(b.getAttribute("data-id"), b.getAttribute("data-c")), "#pt_m");
+    else if (a === "pagarTj") { borradorDup = null; abrirPanel(formPagarTj(b.getAttribute("data-id"), b.getAttribute("data-c") || undefined, b.getAttribute("data-desde") || undefined), "#pt_m"); }
+    else if (a === "unirPagoTj") unirPagoTj(b.getAttribute("data-id"), b.getAttribute("data-c"), b);
     else if (a === "compararAU") compararAU();
     else if (a === "aCuotas") { abrirPanel(formCuotas(b.getAttribute("data-id")), "#cu_n"); syncCuotas(); }
     else if (a === "deshacer") deshacerMov(b.getAttribute("data-id"), b);
@@ -39581,7 +39641,8 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     if (ev.target.getAttribute && ev.target.getAttribute("data-rv")) { guardarRv(ev.target); return; }
     if (ev.target.id === "frv_ver" || ev.target.id === "frv_cta") { FRV[ev.target.id === "frv_ver" ? "ver" : "cta"] = ev.target.value; render(); return; }
     if (ev.target.classList && ev.target.classList.contains("selbien")) { asignarBien(ev.target.getAttribute("data-id"), ev.target.value); return; }
-    if (ev.target.id === "pt_r") { abrirPanel(formPagarTj($("#formPagoTj").getAttribute("data-tj"), ev.target.value), "#pt_m"); return; }
+    if (ev.target.id === "pt_r") { abrirPanel(formPagarTj($("#formPagoTj").getAttribute("data-tj"), ev.target.value, $("#pt_c").value), "#pt_m"); return; }
+    if (ev.target.id === "pt_c") { $("#pt_ret").innerHTML = retiroTjTxt($("#formPagoTj").getAttribute("data-tj"), ev.target.value); return; }
     var id = ev.target.id;
     if (id === "per") { per = ev.target.value; if (dia && dia.slice(0, 7) !== per) dia = per === hoyISO().slice(0, 7) ? hoyISO() : per + "-01"; render(); }
     else if (id === "m_tipo" || id === "m_clase" || id === "m_cta" || id === "m_dest") syncForm();
