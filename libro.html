@@ -603,7 +603,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     D.cargos.forEach(function (c) { c.incobrable = !c.contrato_id || est[c.contrato_id] !== "activo"; });
     D.fijos = Object.keys(obj((S.fijos || {}).fijos)).map(function (k) { return Object.assign({}, S.fijos.fijos[k], { id: k }); });
     D.tarjetas = obj((S.tarjetas || {}).tarjetas);
-    D.tc = obj(c.tc); D.rubros = [].concat(c.rubros || []); D.bajas = obj(c.bajas_edificio); D.usdRef = obj(c.usd_ref); D.reparto = obj(c.reparto); D.auditoria = obj(c.auditoria);
+    D.tc = obj(c.tc); D.rubros = [].concat(c.rubros || []); D.bienesBorrados = [].concat(c.bienes_borrados || []); D.bajas = obj(c.bajas_edificio); D.usdRef = obj(c.usd_ref); D.reparto = obj(c.reparto); D.auditoria = obj(c.auditoria);
     L = Ledger.motor(D);
     D.inmuebles.forEach(function (i) { EDIF[i.id] = i.nombre; });
     D.bienes.forEach(function (b) { BIEN[b.id] = b.nombre; });
@@ -850,7 +850,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
       '<label>Corresponde a<select id="m_corr">' + ["empresa", "familia", "loli", "hugo"].map(function (k) { return o(k, CORR_TXT[k]); }).join("") + "</select></label>" +
       '<label>Categoría' + selRubro("m_cat", "") + "</label>" +
       '<label>Edificio<select id="m_ed">' + o("", "General") + D.inmuebles.map(function (i) { return o(i.id, i.nombre); }).join("") + "</select></label>" +
-      '<label id="l_bien" hidden>Bien<select id="m_bien">' + o("", "Elegir bien…") + D.bienes.map(function (b) { return o(b.id, b.nombre); }).join("") + "</select></label>" +
+      '<label id="l_bien" hidden>Bien<select id="m_bien">' + o("", "Elegir bien…") + D.bienes.filter(function (b) { return !b.vendido; }).map(function (b) { return o(b.id, b.nombre); }).join("") + "</select></label>" +
       '<label class="ancho">Descripción<input id="m_desc" required maxlength="140" placeholder="Qué se pagó o cobró"></label>' +
       '<datalist id="cats">' + rubrosLista(per).map(function (c) { return o(c, c); }).join("") + "</datalist>" +
       '<div id="m_aviso" class="ancho" style="grid-column:1/-1"></div>' +
@@ -1498,7 +1498,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
       '<label>Corresponde a<select id="e_corresponde">' + ["empresa", "familia", "loli", "hugo"].map(function (k) { return o(k, CORR_TXT[k], m.corresponde); }).join("") + "</select></label>" +
       '<label>Categoría' + selRubro("e_categoria", m.categoria || "", rubrosLista(m.periodo)) + "</label>" +
       '<label>Edificio<select id="e_edificio">' + o("", "General", m.edificio || "") + D.inmuebles.map(function (i) { return o(i.id, i.nombre, m.edificio); }).join("") + "</select></label>" +
-      '<label>Bien (si es inversión)<select id="e_bien">' + o("", "Ninguno", m.bien || "") + D.bienes.map(function (b) { return o(b.id, b.nombre, m.bien); }).join("") + "</select></label>" +
+      '<label>Bien (si es inversión)<select id="e_bien">' + o("", "Ninguno", m.bien || "") + D.bienes.filter(function (b) { return !b.vendido || b.id === m.bien; }).map(function (b) { return o(b.id, b.nombre, m.bien); }).join("") + "</select></label>" +
       '<label class="ancho">Descripción<input id="e_desc" maxlength="140" value="' + esc(m.desc || "") + '"></label>' +
       '<datalist id="cats2">' + rubrosLista(m.periodo).map(function (c) { return o(c, c); }).join("") + "</datalist>" +
       '<div id="e_aviso" class="ancho" style="grid-column:1/-1"></div>' +
@@ -2985,7 +2985,8 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
       '<label class="ancho">Nota<input id="bi_o" maxlength="200" value="' + esc(b.nota || "") + '"></label>' +
       (id ? '<label><span><input type="checkbox" id="bi_v"' + (b.vendido ? " checked" : "") + "> Vendido</span></label>" : "") +
       '<p class="nota ancho" style="grid-column:1/-1">La seña y los gastos no van acá: se cargan como movimientos (Es: Inversión → este bien), así salen de la caja.</p>' +
-      '<div id="bi_aviso" class="ancho" style="grid-column:1/-1"></div><div class="acciones"><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" data-acc="cerrarPanel">Cancelar</button></div></form>';
+      '<div id="bi_aviso" class="ancho" style="grid-column:1/-1"></div><div class="acciones"><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" data-acc="cerrarPanel">Cancelar</button>' +
+        (id && esAdmin ? '<button class="btn peligro" type="button" data-acc="borrarBien" data-id="' + esc(id) + '" style="margin-left:auto">Borrar bien</button>' : "") + "</div></form>";
   }
   function guardarBien(id) {
     var g = function (k) { return $("#" + k) ? $("#" + k).value.trim() : ""; }, av = $("#bi_aviso"), n = g("bi_n");
@@ -3107,6 +3108,18 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
       '<p class="nota">Hasta el ' + fDia(cc.corte) + ' son los movimientos en U$S de GP; después, lo que se carga acá en las cuentas en dólares (marcado "libro"). Si en septiembre se compraron dólares con los retiros de efectivo y no se anotaron, el saldo real es mayor: contalos y lo ajustamos.</p></div>';
   }
 
+  // Borrar un bien cargado por error (ej. repetido). Solo si no tiene movimientos: si tiene, primero se pasan a otro bien.
+  function borrarBien(id, btn) {
+    var b = D.bienes.filter(function (x) { return x.id === id; })[0]; if (!b) return;
+    var n = movsBien(id).length, av = $("#bi_aviso");
+    if (n) { av.innerHTML = '<div class="aviso mal">Tiene ' + n + " movimiento(s). Pasalos a otro bien (Patrimonio → abrí el bien → Asignar a…) y después borralo.</div>"; return; }
+    if (btn.getAttribute("data-ok") !== "1") { btn.setAttribute("data-ok", "1"); btn.textContent = "¿Borrar " + b.nombre + "? Tocá de nuevo"; return; }
+    btn.disabled = true;
+    var ref = DB.doc("base/config");
+    enCola(function () { return ref.get().then(function (s) { var c = s.data() || {}, lista = (c.bienes || []).filter(function (x) { return x.id !== id; }), bor = [].concat(c.bienes_borrados || []); [b.id, b.origen].forEach(function (k) { if (k && bor.indexOf(k) < 0) bor.push(k); }); return ref.update({ bienes: lista, bienes_borrados: bor }); }); })
+      .then(function () { cerrarPanel(); toast("Bien borrado"); }, function (e) { btn.disabled = false; av.innerHTML = '<div class="aviso mal">' + esc(errTxt(e)) + "</div>"; });
+  }
+
   // ---------- Señas: cada seña cobrada se puede aplicar una sola vez ----------
   // Unidad de un movimiento: la cargada o, en las señas viejas de AU, la que figura en la descripción ("Seña reserva SC-5 - ...").
   function unidadMov(m) { if (m.unidad) return m.unidad; var r = /\b([A-Z][A-Z0-9]-\d+)\b/.exec(String(m.desc || "")); return r ? r[1] : ""; }
@@ -3191,7 +3204,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     Object.keys(AUDIT.saldos.cuentas).forEach(function (c) { if (CTA[c] && (sc[c] === undefined || sc[c] === null)) o[c] = AUDIT.saldos.cuentas[c]; });
     return o;
   }
-  function bienesFaltantes() { var ya = {}; D.bienes.forEach(function (b) { ya[b.id] = 1; if (b.origen) ya[b.origen] = 1; }); return AUDIT.bienes.filter(function (b) { return !ya[b.id] && !ya[b.origen]; }); }
+  function bienesFaltantes() { var ya = {}; D.bienes.forEach(function (b) { ya[b.id] = 1; if (b.origen) ya[b.origen] = 1; }); (D.bienesBorrados || []).forEach(function (k) { ya[k] = 1; }); return AUDIT.bienes.filter(function (b) { return !ya[b.id] && !ya[b.origen]; }); }
   // Compras con tarjeta de julio y agosto (de GP): completan los resúmenes que cruzan el 1/9. Quedan como "previo": no suman a resultados ni saldos.
   function previasFaltantes() {
     var ya = {}; D.movimientos.concat(D.previos || []).forEach(function (m) { ya[m.fuente] = 1; ya[m.id] = 1; });
@@ -3216,7 +3229,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     if (!esAdmin || typeof AUDIT === "undefined") return "";
     var cs = AUDIT.correcciones.map(function (c) { return [c, estadoCorreccion(c)]; }), pend = cs.filter(function (x) { return x[1] === "pendiente"; }).length;
     var ff = Object.keys(fijosFaltantes()).length, cf = cierresFaltantes().length, sf = Object.keys(saldosFaltantes()).length, bf = bienesFaltantes().length;
-    var rf = AUDIT.rubros.filter(function (r) { return D.rubros.indexOf(r) < 0; }).length, otros = (D.inmuebles.some(function (x) { return x.id === "ADM"; }) ? 0 : 1) + ((AUDIT.bienes_nuevos || []).some(function (b) { return !D.bienes.some(function (x) { return mismoBien(x, b) && (!b.venta || (x.venta && x.venta.retenidos)); }); }) ? 1 : 0) + (!D.reparto.reserva_base_hasta ? 1 : 0) + (!D.usdRef.stock_fecha ? 1 : 0) + (Object.keys(D.bajas).length ? 0 : 1);
+    var rf = AUDIT.rubros.filter(function (r) { return D.rubros.indexOf(r) < 0; }).length, otros = (D.inmuebles.some(function (x) { return x.id === "ADM"; }) ? 0 : 1) + ((AUDIT.bienes_nuevos || []).some(function (b) { return (D.bienesBorrados || []).indexOf(b.id) < 0 && !D.bienes.some(function (x) { return mismoBien(x, b) && (!b.venta || (x.venta && x.venta.retenidos)); }); }) ? 1 : 0) + (!D.reparto.reserva_base_hasta ? 1 : 0) + (!D.usdRef.stock_fecha ? 1 : 0) + (Object.keys(D.bajas).length ? 0 : 1);
     var agf = agendaFaltante().length, pvf = previasFaltantes().length, dff = Object.keys(datosFijosFaltantes()).length, mnf = movsNuevosFaltan().length, ncf = nombresFaltan().length ? 1 : 0, nImp = ff + cf + sf + bf + rf + otros + agf + pvf + dff + mnf + ncf, todo = pend + nImp;
     // Correcciones pendientes que tocan un mes ya cerrado: hay que reabrirlo, aplicar y volver a cerrar.
     var mesesC = {}; cs.forEach(function (x) { if (x[1] !== "pendiente") return; x[0].movs.forEach(function (o) { var m = movPorFuente(o.fuente); if (!m || m.estado === "previo") return; [m.periodo, String(m.fecha).slice(0, 7)].concat(o.cambios && o.cambios.periodo ? [o.cambios.periodo] : []).forEach(function (p) { if (cerrado(p)) mesesC[p] = 1; }); }); (x[0].cargos || []).forEach(function (cg) { if (cerrado(cg.periodo)) mesesC[cg.periodo] = 1; }); });
@@ -3269,11 +3282,11 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
           var ref = DB.doc("base/config");
           return ref.get().then(function (s) {
             var c = s.data() || {}, o = {}, lista = (c.bienes || []).slice(), ids = {};
-            lista.forEach(function (b) { ids[b.id] = 1; if (b.origen) ids[b.origen] = 1; });
+            lista.forEach(function (b) { ids[b.id] = 1; if (b.origen) ids[b.origen] = 1; }); (c.bienes_borrados || []).forEach(function (k) { ids[k] = 1; });
             AUDIT.bienes.forEach(function (b) { if (!ids[b.id] && !ids[b.origen]) lista.push(b); });
             lista = lista.map(function (b) { return AUDIT.mejoras[b.id] && !b.mejoras_previas ? Object.assign({}, b, { mejoras_previas: AUDIT.mejoras[b.id] }) : b; });
             (AUDIT.bienes_nuevos || []).forEach(function (b) {
-              var i = -1; lista.forEach(function (x, k) { if (i < 0 && mismoBien(x, b)) i = k; });
+              if (ids[b.id]) return; var i = -1; lista.forEach(function (x, k) { if (i < 0 && mismoBien(x, b)) i = k; });
               if (i < 0) { lista.push(b); return; }
               var x = Object.assign({}, lista[i]); ["venta", "nota"].forEach(function (k) { if (b[k] && !x[k]) x[k] = b[k]; }); if (b.venta && x.venta && !x.venta.retenidos) x.venta = Object.assign({}, b.venta, x.venta, { retenidos: b.venta.retenidos, a_recuperar: b.venta.a_recuperar, tc: x.venta.tc || b.venta.tc }); if (b.vendido) x.vendido = true; lista[i] = x;
             });
@@ -39753,6 +39766,7 @@ tr.c-familia>td:first-child{box-shadow:inset 3px 0 0 var(--aviso)}tr.c-empresa>t
     }
     else if (a === "cargar") { cerrarPanel(); abrirPanel(formCargar()); }
     else if (a === "cargarTipo") abrirCarga(b.getAttribute("data-id"), b);
+    else if (a === "borrarBien") borrarBien(b.getAttribute("data-id"), b);
     else if (a === "unirPagoTj") unirPagoTj(b.getAttribute("data-id"), b.getAttribute("data-c"), b);
     else if (a === "compararAU") compararAU();
     else if (a === "aCuotas") { abrirPanel(formCuotas(b.getAttribute("data-id")), "#cu_n"); syncCuotas(); }
